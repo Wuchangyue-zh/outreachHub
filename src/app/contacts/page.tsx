@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { CSVImport } from '@/components/CSVImport'
 import {
   Users, Plus, Download, Upload, Search, Mail, Building, Tag,
   ChevronRight, Edit, Trash2, X, Loader2, UserPlus, Send, Check
@@ -52,6 +53,7 @@ export default function ContactsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showDetailDrawer, setShowDetailDrawer] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [currentContact, setCurrentContact] = useState<Contact | null>(null)
   const [saving, setSaving] = useState(false)
   const limit = 20
@@ -282,6 +284,9 @@ export default function ContactsPage() {
             <p className="text-sm text-gray-500">管理您的海外客户联系人信息</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4" /> 导入
+            </Button>
             <Button variant="outline" className="gap-2" onClick={handleExport}>
               <Download className="h-4 w-4" /> 导出
             </Button>
@@ -710,6 +715,33 @@ export default function ContactsPage() {
                   <Send className="h-4 w-4 mr-2" /> 发送邮件
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">Import Contacts from CSV</h2>
+              <button onClick={() => setShowImportDialog(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <CSVImport
+                onImportComplete={(result) => {
+                  addToast({
+                    type: 'success',
+                    title: 'Import Complete',
+                    description: `Successfully imported ${result.success} contacts. ${result.failed} failed.`,
+                  })
+                  fetchContacts()
+                  setShowImportDialog(false)
+                }}
+              />
             </div>
           </div>
         </div>

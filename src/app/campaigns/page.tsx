@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { CampaignStats } from '@/components/CampaignStats'
 import {
-  Send, Plus, BarChart3, Eye, Edit, Trash2, X, Loader2, Play, Pause, Mail
+  Send, Plus, BarChart3, Eye, Edit, Trash2, X, Loader2, Play, Pause, Mail, List
 } from 'lucide-react'
 
 interface Campaign {
@@ -40,6 +41,8 @@ export default function CampaignsPage() {
   const [saving, setSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
+  const [viewMode, setViewMode] = useState<'list' | 'stats'>('list')
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | undefined>(undefined)
 
   const [form, setForm] = useState({
     name: '',
@@ -190,60 +193,88 @@ export default function CampaignsPage() {
             <h1 className="text-2xl font-bold text-gray-900">邮件营销</h1>
             <p className="text-sm text-gray-500">创建和管理邮件营销活动</p>
           </div>
-          <Button className="gap-2" onClick={openAddDialog}>
-            <Plus className="h-4 w-4" /> 创建活动
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="gap-2 rounded-none"
+              >
+                <List className="h-4 w-4" /> 列表
+              </Button>
+              <Button
+                variant={viewMode === 'stats' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('stats')}
+                className="gap-2 rounded-none"
+              >
+                <BarChart3 className="h-4 w-4" /> 统计
+              </Button>
+            </div>
+            <Button className="gap-2" onClick={openAddDialog}>
+              <Plus className="h-4 w-4" /> 创建活动
+            </Button>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-green-50 p-2">
-                  <Play className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.running}</p>
-                  <p className="text-xs text-gray-500">进行中活动</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-blue-50 p-2">
-                  <Send className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.totalSent.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">总发送邮件</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-gray-100">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-purple-50 p-2">
-                  <BarChart3 className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.avgOpenRate}%</p>
-                  <p className="text-xs text-gray-500">平均打开率</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Stats View */}
+        {viewMode === 'stats' && (
+          <CampaignStats campaignId={selectedCampaignId} />
+        )}
 
-        {/* Campaigns List */}
-        <Card className="border-gray-100">
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
-                <tr>
+        {/* List View */}
+        {viewMode === 'list' && (
+          <>
+            {/* Stats */}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card className="border-gray-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-green-50 p-2">
+                      <Play className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{stats.running}</p>
+                      <p className="text-xs text-gray-500">进行中活动</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-gray-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-blue-50 p-2">
+                      <Send className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{stats.totalSent.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">总发送邮件</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-gray-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-purple-50 p-2">
+                      <BarChart3 className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{stats.avgOpenRate}%</p>
+                      <p className="text-xs text-gray-500">平均打开率</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Campaigns List */}
+            <Card className="border-gray-100">
+              <CardContent className="p-0">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-100 bg-gray-50">
+                    <tr>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">活动名称</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">类型</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
@@ -307,6 +338,18 @@ export default function CampaignsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                setSelectedCampaignId(campaign.id)
+                                setViewMode('stats')
+                              }}
+                              title="查看统计"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(campaign)}>
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -338,6 +381,8 @@ export default function CampaignsPage() {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
       </div>
 
       {/* Add/Edit Dialog */}
