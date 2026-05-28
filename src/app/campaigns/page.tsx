@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { CampaignStats } from '@/components/CampaignStats'
+import { ABTestConfig } from '@/components/ABTestConfig'
 import {
-  Send, Plus, BarChart3, Eye, Edit, Trash2, X, Loader2, Play, Pause, Mail, List
+  Send, Plus, BarChart3, Eye, Edit, Trash2, X, Loader2, Play, Pause, Mail, List, Beaker
 } from 'lucide-react'
 
 interface Campaign {
@@ -41,7 +42,7 @@ export default function CampaignsPage() {
   const [saving, setSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
-  const [viewMode, setViewMode] = useState<'list' | 'stats'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'stats' | 'abtest'>('list')
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | undefined>(undefined)
 
   const [form, setForm] = useState({
@@ -211,6 +212,14 @@ export default function CampaignsPage() {
               >
                 <BarChart3 className="h-4 w-4" /> 统计
               </Button>
+              <Button
+                variant={viewMode === 'abtest' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('abtest')}
+                className="gap-2 rounded-none"
+              >
+                <Beaker className="h-4 w-4" /> A/B测试
+              </Button>
             </div>
             <Button className="gap-2" onClick={openAddDialog}>
               <Plus className="h-4 w-4" /> 创建活动
@@ -221,6 +230,11 @@ export default function CampaignsPage() {
         {/* Stats View */}
         {viewMode === 'stats' && (
           <CampaignStats campaignId={selectedCampaignId} />
+        )}
+
+        {/* A/B Test View */}
+        {viewMode === 'abtest' && (
+          <ABTestConfig campaignId={selectedCampaignId} />
         )}
 
         {/* List View */}
