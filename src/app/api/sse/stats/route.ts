@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
+import { emailEvents, type EmailEvent } from '@/lib/events'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,17 @@ export async function GET(req: NextRequest) {
       start(controller) {
         // Send initial connection message
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`))
+
+        // Listen for real-time email events
+        const unsubscribe = emailEvents.on('*' as any, (event: EmailEvent) => {
+          if (disconnected) return
+          try {
+            const { type: eventType, ...rest } = event
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'email_event', eventType, ...rest })}\n\n`))
+          } catch (e) {
+            // Stream might be closed
+          }
+        })
 
         // Poll for new data every 5 seconds
         const interval = setInterval(async () => {
@@ -44,8 +56,12 @@ export async function GET(req: NextRequest) {
                 sentAt: true,
                 openedAt: true,
                 repliedAt: true,
+                replyCategory: true,
               },
             })
+
+            // Get recent email events
+            const recentEvents = emailEvents.getRecentEvents(5)
 
             const stats = {
               type: 'stats',
@@ -55,6 +71,7 @@ export async function GET(req: NextRequest) {
                 campaignsCount,
                 emailLogsCount,
                 recentEmailLogs,
+                recentEvents,
               },
             }
 
@@ -68,6 +85,7 @@ export async function GET(req: NextRequest) {
         return () => {
           disconnected = true
           clearInterval(interval)
+          unsubscribe()
         }
       },
     })
