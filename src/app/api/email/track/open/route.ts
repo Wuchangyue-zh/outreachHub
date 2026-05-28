@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     // Return tracking pixel
     const pixel = generateTrackingPixel()
-    return new NextResponse(pixel, {
+    return new NextResponse(new Uint8Array(pixel), {
       status: 200,
       headers: {
         'Content-Type': 'image/gif',
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     console.error('Email open tracking error:', error)
     // Still return pixel even if tracking fails
     const pixel = generateTrackingPixel()
-    return new NextResponse(pixel, {
+    return new NextResponse(new Uint8Array(pixel), {
       status: 200,
       headers: { 'Content-Type': 'image/gif' },
     })

@@ -94,8 +94,8 @@ export class IMAPClient {
           const fetch = this.imap!.fetch(messageIds, { bodies: '' })
 
           fetch.on('message', (msg) => {
-            msg.on('body', (stream) => {
-              simpleParser(stream, async (err, parsed: ParsedMail) => {
+            msg.on('body', (stream: any) => {
+              simpleParser(stream, async (err: any, parsed: ParsedMail) => {
                 if (err) {
                   console.error('Error parsing email:', err)
                   return
@@ -106,7 +106,7 @@ export class IMAPClient {
                   inReplyTo: parsed.inReplyTo || null,
                   subject: parsed.subject || '',
                   from: parsed.from?.text || '',
-                  to: parsed.to?.text || '',
+                  to: Array.isArray(parsed.to) ? parsed.to.map(t => t.text || '').join(', ') : (parsed.to?.text || ''),
                   date: parsed.date || new Date(),
                   text: parsed.text || '',
                   html: parsed.html || '',
@@ -142,9 +142,6 @@ export class IMAPClient {
             where: {
               messageId: email.inReplyTo,
             },
-            include: {
-              contact: true,
-            },
           })
 
           if (originalLog) {
@@ -158,16 +155,14 @@ export class IMAPClient {
             })
 
             // Update contact statistics
-            if (originalLog.contact) {
-              await prisma.contact.update({
-                where: { id: originalLog.contactId },
-                data: {
-                  emailsReplied: { increment: 1 },
-                  lastEmailRepliedAt: email.date,
-                  status: 'INTERESTED', // Auto-update status on reply
-                },
-              })
-            }
+            await prisma.contact.update({
+              where: { id: originalLog.contactId },
+              data: {
+                emailsReplied: { increment: 1 },
+                lastEmailRepliedAt: email.date,
+                status: 'INTERESTED', // Auto-update status on reply
+              },
+            })
 
             replyCount++
           }
