@@ -1,33 +1,56 @@
-# OutreachHub 代码评审报告 - 第8轮
+# OutreachHub 代码评审报告 - 第9轮
 
 **评审日期**: 2026-05-28
 **评审人员**: 全角色（PM、架构师、前端、后端、测试、UI/UX）
-**项目版本**: v0.8.0
+**项目版本**: v0.9.0
 **构建状态**: ✅ 通过
-**提交**: `6998c3f`
+**提交**: `1441f92`
 
 ---
 
 ## 📋 一、本轮新增功能
 
-### 1. 文件上传功能 ✅
-**文件**: `src/components/AvatarUpload.tsx`, `src/components/FileUpload.tsx`, `src/lib/upload.ts`, `src/app/api/upload/avatar/route.ts`, `src/app/api/upload/attachment/route.ts`
+### 1. 邮件回复自动分类 ✅
+**文件**: `src/lib/reply-classifier.ts`, `src/lib/imap.ts`, `src/app/api/imap/check-replies/route.ts`
 
 **实现内容**:
-- 头像上传组件（`AvatarUpload`）- 支持预览、上传、删除，三种尺寸（sm/md/lg）
-- 附件上传组件（`FileUpload`）- 支持拖放上传、多文件上传、文件列表管理
-- 上传工具库（`upload.ts`）- 文件验证、目录管理、文件名生成
-- 头像上传 API（`/api/upload/avatar`）- JWT 认证、图片验证、5MB 限制
-- 附件上传 API（`/api/upload/attachment`）- JWT 认证、多格式支持、5MB 限制
-- 设置页面集成头像上传功能
+- 回复分类器支持10种类别：INTERESTED, NOT_INTERESTED, OUT_OF_OFFICE, QUESTION, UNSUBSCRIBE, AUTO_REPLY, FORWARD, NEGOTIATION, REFERRAL, UNKNOWN
+- 基于关键词和短语的智能匹配算法
+- 置信度计算和分类摘要
+- IMAP检测回复时自动分类
+- 根据分类结果自动更新联系人状态
 
 **技术特性**:
-- 文件大小验证（最大 5MB）
-- 文件类型验证（图片、PDF、CSV、Word、文本）
-- 拖放上传支持
-- 上传进度指示
-- 错误处理和 Toast 通知
-- 自动生成唯一文件名（时间戳+随机数）
+- 关键词匹配（支持中英文）
+- 置信度评分（0-1）
+- 自动更新联系人状态
+- 分类结果持久化到数据库
+
+### 2. Favicon 和 PWA 支持 ✅
+**文件**: `public/manifest.json`, `public/favicon.svg`, `public/icons/`
+
+**实现内容**:
+- SVG 格式 Favicon
+- Web App Manifest 配置
+- PWA 快捷方式（仪表盘、联系人、邮件营销）
+- 应用图标生成工具
+
+### 3. 深色模式支持 ✅
+**文件**: `src/components/ThemeProvider.tsx`, `src/components/ThemeToggle.tsx`, `src/components/layout/dashboard-layout.tsx`
+
+**实现内容**:
+- 主题切换组件（浅色/深色/跟随系统）
+- 本地存储主题偏好
+- 仪表盘布局深色模式适配
+- 滚动条深色模式样式
+
+### 4. 角色状态报告 ✅
+**文件**: `scripts/send-status-report.ts`
+
+**实现内容**:
+- 各角色工作状态汇总（PM、架构师、前端、后端、测试、UI/UX）
+- 每30分钟自动发送邮件报告
+- HTML 和纯文本双格式支持
 
 ---
 
@@ -41,10 +64,13 @@
 | 3 | 完善页面增删改查交互 | ✅ 完成 | Iteration 2 |
 | 4 | 添加 Toast 通知组件 | ✅ 完成 | Iteration 2 |
 
-### 本轮解决的P1问题
+### 本轮解决的问题
 | # | 问题 | 状态 |
 |---|------|------|
 | 7 | 文件上传功能（头像、附件） | ✅ 完成 |
+| 8 | 邮件回复自动分类 | ✅ 完成 |
+| 9 | Favicon 和 PWA 支持 | ✅ 完成 |
+| 10 | 深色模式支持 | ✅ 完成 |
 
 ---
 
@@ -142,6 +168,7 @@
 | 6 | 2026-05-28 | Redis优雅降级、队列监控面板 | ✅ |
 | 7 | 2026-05-28 | SSE实时通知、useSSE Hook | ✅ |
 | 8 | 2026-05-28 | 文件上传功能（头像、附件） | ✅ |
+| 9 | 2026-05-28 | 邮件回复分类、PWA支持、深色模式 | ✅ |
 
 ---
 
@@ -153,17 +180,17 @@
 
 ### 6.2 中优先级（P1）
 - [x] 添加文件上传功能（头像、附件）✅ 已完成
-- [ ] 实现邮件回复自动分类
+- [x] 实现邮件回复自动分类 ✅ 已完成
 - [ ] 添加 A/B 测试完整支持
 
 ### 6.3 低优先级（P2）
-- [ ] 添加 favicon 和 og-image
-- [ ] 创建 manifest.json（PWA支持）
+- [x] 添加 favicon 和 og-image ✅ 已完成
+- [x] 创建 manifest.json（PWA支持）✅ 已完成
 - [ ] 添加国际化（i18n）支持
-- [ ] 实现暗色模式
+- [x] 实现暗色模式 ✅ 已完成
 
 ---
 
 **评审结论**: ✅ 通过
 **远程仓库**: https://github.com/Wuchangyue-zh/outreachHub.git
-**最新提交**: `6998c3f`
+**最新提交**: `1441f92`
