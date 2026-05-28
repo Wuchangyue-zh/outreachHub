@@ -41,7 +41,8 @@ export default function RegisterPage() {
         addToast({ type: 'success', title: '注册成功', description: '欢迎加入 OutreachHub！' })
         router.push('/dashboard')
       } else {
-        setError(data.error || '注册失败')
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || '注册失败'
+        setError(errorMsg)
       }
     } catch (e) {
       setError('网络错误，请稍后重试')

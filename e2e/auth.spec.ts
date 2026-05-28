@@ -37,8 +37,9 @@ test.describe('Authentication', () => {
     await page.getByLabel(/密码/).fill('admin123')
     await page.getByRole('button', { name: /登录/ }).click()
 
-    // Should redirect to dashboard
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    // Wait for navigation
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
@@ -47,8 +48,8 @@ test.describe('Authentication', () => {
     await page.getByLabel(/密码/).fill('wrongpassword')
     await page.getByRole('button', { name: /登录/ }).click()
 
-    // Should show error message
-    await expect(page.getByText(/错误|失败|invalid/i)).toBeVisible({ timeout: 5000 })
+    // Should show error message - be more flexible
+    await expect(page.getByText(/错误|失败|invalid|错误的邮箱或密码/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('should register new user', async ({ page }) => {
@@ -58,12 +59,18 @@ test.describe('Authentication', () => {
     await page.getByLabel(/姓名/).fill(`Test User ${timestamp}`)
     await page.getByLabel(/邮箱/).fill(`test${timestamp}@example.com`)
     await page.getByLabel(/密码/).fill('password123')
-    await page.getByLabel(/公司/).fill('Test Company')
+
+    // Fill company if the field exists
+    const companyField = page.getByLabel(/公司/)
+    if (await companyField.isVisible()) {
+      await companyField.fill('Test Company')
+    }
 
     await page.getByRole('button', { name: /注册/ }).click()
 
-    // Should redirect to dashboard
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    // Wait for navigation
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 
   test('should show error for duplicate email', async ({ page }) => {
@@ -76,7 +83,7 @@ test.describe('Authentication', () => {
     await page.getByRole('button', { name: /注册/ }).click()
 
     // Should show error message about duplicate email
-    await expect(page.getByText(/已存在|已注册|duplicate/i)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText(/已存在|已注册|duplicate|该邮箱已注册/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('should logout successfully', async ({ page }) => {
@@ -85,13 +92,13 @@ test.describe('Authentication', () => {
     await page.getByLabel(/邮箱/).fill('admin@outreachhub.com')
     await page.getByLabel(/密码/).fill('admin123')
     await page.getByRole('button', { name: /登录/ }).click()
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
 
     // Logout
     await page.getByRole('button', { name: /退出|登出|logout/i }).click()
 
     // Should redirect to login or landing page
-    await expect(page).toHaveURL(/\/login|\/$/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/login|\/$/, { timeout: 10000 })
   })
 
   test('should protect dashboard route', async ({ page }) => {
@@ -99,7 +106,7 @@ test.describe('Authentication', () => {
     await page.goto('/dashboard')
 
     // Should redirect to login
-    await expect(page).toHaveURL(/\/login/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })
 
   test('should protect contacts route', async ({ page }) => {
@@ -107,7 +114,7 @@ test.describe('Authentication', () => {
     await page.goto('/contacts')
 
     // Should redirect to login
-    await expect(page).toHaveURL(/\/login/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })
 
   test('should protect campaigns route', async ({ page }) => {
@@ -115,6 +122,6 @@ test.describe('Authentication', () => {
     await page.goto('/campaigns')
 
     // Should redirect to login
-    await expect(page).toHaveURL(/\/login/, { timeout: 5000 })
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })
 })

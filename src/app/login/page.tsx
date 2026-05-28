@@ -37,7 +37,8 @@ export default function LoginPage() {
         addToast({ type: 'success', title: '登录成功', description: `欢迎回来，${data.user.name}` })
         router.push('/dashboard')
       } else {
-        setError(data.error || '登录失败')
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || '登录失败'
+        setError(errorMsg)
       }
     } catch (e) {
       setError('网络错误，请稍后重试')

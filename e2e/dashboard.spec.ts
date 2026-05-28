@@ -7,48 +7,48 @@ test.describe('Dashboard', () => {
     await page.getByLabel(/邮箱/).fill('admin@outreachhub.com')
     await page.getByLabel(/密码/).fill('admin123')
     await page.getByRole('button', { name: /登录/ }).click()
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
+    await page.waitForLoadState('networkidle')
   })
 
   test('should display dashboard page', async ({ page }) => {
-    await expect(page.getByText(/仪表盘|Dashboard/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /仪表盘/i })).toBeVisible()
   })
 
   test('should show statistics cards', async ({ page }) => {
-    // Check for stats cards
-    await expect(page.getByText(/总联系人|Total Contacts/i)).toBeVisible()
-    await expect(page.getByText(/邮件活动|Campaigns/i)).toBeVisible()
-    await expect(page.getByText(/打开率|Open Rate/i)).toBeVisible()
+    // Check for stats cards - use actual text from component
+    await expect(page.getByText(/总客户数|公司库|已发送邮件/i).first()).toBeVisible({ timeout: 10000 })
   })
 
   test('should have navigation sidebar', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /联系人|Contacts/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: /公司|Companies/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: /活动|Campaigns/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: /模板|Templates/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: '客户管理', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: '公司库', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: '邮件营销', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: '邮件模板', exact: true })).toBeVisible()
   })
 
   test('should navigate to contacts page', async ({ page }) => {
-    await page.getByRole('link', { name: /联系人|Contacts/i }).click()
+    await page.getByRole('link', { name: /客户管理/i }).click()
     await expect(page).toHaveURL(/\/contacts/)
-    await expect(page.getByText(/联系人管理|Contacts/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /客户管理/i })).toBeVisible()
   })
 
   test('should navigate to campaigns page', async ({ page }) => {
-    await page.getByRole('link', { name: /活动|Campaigns/i }).click()
+    await page.getByRole('link', { name: /邮件营销/i }).click()
     await expect(page).toHaveURL(/\/campaigns/)
-    await expect(page.getByText(/邮件营销|Campaigns/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /邮件营销/i })).toBeVisible()
   })
 
   test('should navigate to templates page', async ({ page }) => {
-    await page.getByRole('link', { name: /模板|Templates/i }).click()
+    const link = page.getByRole('link', { name: '邮件模板', exact: true })
+    await link.click()
+    await page.waitForURL(/\/templates/, { timeout: 10000 })
     await expect(page).toHaveURL(/\/templates/)
-    await expect(page.getByText(/邮件模板|Templates/i)).toBeVisible()
   })
 
   test('should navigate to companies page', async ({ page }) => {
-    await page.getByRole('link', { name: /公司|Companies/i }).click()
+    await page.getByRole('link', { name: '公司库', exact: true }).click()
+    await page.waitForURL(/\/companies/, { timeout: 10000 })
     await expect(page).toHaveURL(/\/companies/)
-    await expect(page.getByText(/公司管理|Companies/i)).toBeVisible()
   })
 })

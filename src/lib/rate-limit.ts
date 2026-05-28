@@ -17,6 +17,11 @@ const store: RateLimitStore = {}
 export function rateLimit(config: RateLimitConfig = { interval: 60000, uniqueTokenPerInterval: 100 }) {
   return {
     check: (req: NextRequest, limit: number = 10): NextResponse | null => {
+      // Disable rate limiting in test environment
+      if (process.env.DISABLE_RATE_LIMIT === 'true') {
+        return null
+      }
+
       const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'anonymous'
       const key = `${ip}:${req.nextUrl.pathname}`
       const now = Date.now()
