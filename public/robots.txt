@@ -1,0 +1,19 @@
+# https://outreachhub.com/robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /contacts/
+Disallow: /companies/
+Disallow: /campaigns/
+Disallow: /templates/
+Disallow: /prospecting/
+Disallow: /settings/
+Disallow: /email-test/
+
+# Sitemaps
+Sitemap: https://outreachhub.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 10
