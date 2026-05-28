@@ -1,0 +1,519 @@
+// OutreachHub - SaaS平台数据库架构
+// 面向国内出海外贸企业的智能拓客与邮件营销平台
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户与租户 ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  avatar        String?
+  role          UserRole  @default(USER)
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  emailAccounts EmailAccount[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  plan        PlanType @default(FREE)
+  maxUsers    Int      @default(1)
+  maxContacts Int      @default(1000)
+  maxEmailsPerDay Int  @default(50)
+  expiresAt   DateTime?
+  settings    Json?
+  users       User[]
+  campaigns   Campaign[]
+  contacts    Contact[]
+  companies   Company[]
+  tasks       Task[]
+  prospectingTasks ProspectingTask[]
+  emailTemplates EmailTemplate[]
+  products    Product[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([plan])
+}
+
+// ==================== 邮箱账户 ====================
+
+model EmailAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String
+  displayName  String?
+  smtpHost     String
+  smtpPort     Int      @default(587)
+  smtpUser     String
+  smtpPassword String   // 加密存储
+  imapHost     String?
+  imapPort     Int?
+  imapUser     String?
+  imapPassword String?
+  isActive     Boolean  @default(true)
+  dailySent    Int      @default(0)
+  dailyLimit   Int      @default(50)
+  lastResetAt  DateTime @default(now())
+  healthScore  Float    @default(100) // 邮箱健康度评分
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([email])
+}
+
+// ==================== 公司数据 ====================
+
+model Company {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  domain          String?
+  website         String?
+  industry        String?
+  industryCode    String?  // NAICS/SIC行业代码
+  size            String?  // 1-10, 11-50, 51-200, 201-500, 501-1000, 1000+
+  description     String?  @db.Text
+  foundedYear     Int?
+  revenue         String?
+  tickerSymbol    String?
+
+  // 地址信息
+  country         String?
+  countryCode     String?
+  region          String?  // 省/州
+  city            String?
+  address         String?
+  postalCode      String?
+
+  // 社交信息
+  linkedinUrl     String?
+  twitterUrl      String?
+  facebookUrl     String?
+
+  // 来源信息
+  source          String?  // rocketreach, crawler, manual, import
+  sourceId        String?  // 原始数据源ID
+  externalData    Json?    // 保存原始JSON
+
+  // 状态
+  tags            String[]
+  notes           String?  @db.Text
+  isVerified      Boolean  @default(false)
+
+  contacts        Contact[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([domain])
+  @@index([countryCode])
+  @@index([industry])
+  @@index([name])
+  @@index([tags])
+}
+
+// ==================== 联系人/客户 ====================
+
+model Contact {
+  id                  String   @id @default(cuid())
+  tenantId            String?
+  tenant              Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companyId           String?
+  company             Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  // 基本信息
+  firstName           String?
+  lastName            String?
+  fullName            String
+  title               String?  // 职位
+  department          String?  // 部门
+  seniority           String?  // 层级: entry, mid, senior, director, vp, c-level
+
+  // 联系方式
+  emails              ContactEmail[]
+  phones              String[]
+  linkedinUrl         String?
+
+  // 地址
+  country             String?
+  countryCode         String?
+  region              String?
+  city                String?
+
+  // 头像
+  avatarUrl           String?
+
+  // 来源
+  source              String?
+  sourceId            String?
+  externalData        Json?
+
+  // 状态与标签
+  status              ContactStatus @default(NEW)
+  tags                String[]
+  notes               String?  @db.Text
+  lastContactedAt     DateTime?
+  lastEmailOpenedAt   DateTime?
+  lastEmailRepliedAt  DateTime?
+
+  // AI分析
+  aiProfile           String?  @db.Text  // AI生成的客户画像摘要
+  aiInterestScore     Float?   // AI预测的兴趣分数 0-100
+  aiRecommendedProducts String[] // AI推荐的产品
+
+  // 互动数据
+  emailsSent          Int      @default(0)
+  emailsOpened        Int      @default(0)
+  emailsReplied       Int      @default(0)
+  emailsBounced       Int      @default(0)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([status])
+  @@index([countryCode])
+  @@index([tags])
+  @@index([fullName])
+}
+
+model ContactEmail {
+  id          String   @id @default(cuid())
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  address     String
+  type        EmailType @default(PROFESSIONAL)  // professional, personal
+  isVerified  Boolean  @default(false)
+  verifiedAt  DateTime?
+  isPrimary   Boolean  @default(false)
+  bounceCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([contactId])
+  @@index([address])
+}
+
+// ==================== 产品管理 ====================
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  category    String?
+  price       Float?
+  currency    String   @default("USD")
+  imageUrl    String?
+  websiteUrl  String?
+  features    String[]
+  tags        String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// ==================== 邮件模板 ====================
+
+model EmailTemplate {
+  id          String        @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String
+  content     String        @db.Text
+  category    String?       // 冷邮件, 跟进, 促销, 节日问候...
+  language    String        @default("en")
+  variables   String[]      // 可用变量列表: {{firstName}}, {{companyName}}...
+  isAiGenerated Boolean     @default(false)
+  aiPrompt    String?       @db.Text
+  usageCount  Int           @default(0)
+  successRate Float?        // 打开率
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([category])
+}
+
+// ==================== 邮件营销活动 ====================
+
+model Campaign {
+  id              String          @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  type            CampaignType    @default(SINGLE)
+  status          CampaignStatus  @default(DRAFT)
+
+  // 邮件配置
+  subject         String
+  content         String          @db.Text
+  htmlContent     String?         @db.Text
+  fromName        String?
+  fromEmail       String?
+  replyTo         String?
+
+  // 多封邮件(用于序列活动)
+  sequence        Json?           // 多封邮件的配置数组
+
+  // 目标客户
+  contactIds      String[]
+  segmentId       String?
+
+  // 发送规则
+  scheduleType    ScheduleType    @default(IMMEDIATE)
+  scheduledAt     DateTime?
+  timezone        String          @default("America/New_York")
+  sendingWindows  Json?           // 发送时间窗口 {start: "09:00", end: "17:00"}
+  throttlePerHour Int             @default(50)
+  throttlePerDay  Int             @default(200)
+
+  // A/B测试
+  abTestEnabled   Boolean         @default(false)
+  abTestVariant   String?
+  abTestWinner    String?
+
+  // 统计
+  totalSent       Int             @default(0)
+  totalOpened     Int             @default(0)
+  totalClicked    Int             @default(0)
+  totalReplied    Int             @default(0)
+  totalBounced    Int             @default(0)
+  totalUnsubscribed Int           @default(0)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  sentAt          DateTime?
+  completedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([type])
+}
+
+// ==================== 邮件任务/序列 ====================
+
+model Task {
+  id              String     @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  type            TaskType   @default(OUTREACH)
+  status          TaskStatus @default(DRAFT)
+
+  // 任务配置
+  contactIds      String[]
+  templateId      String?
+
+  // 序列步骤
+  steps           Json?      // 多步序列配置
+
+  // 统计
+  totalContacts   Int        @default(0)
+  completedContacts Int      @default(0)
+  totalEmails     Int        @default(0)
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ==================== 邮件发送记录 ====================
+
+model EmailLog {
+  id          String     @id @default(cuid())
+  campaignId  String?
+  taskId      String?
+  contactId   String
+  fromEmail   String
+  toEmail     String
+  subject     String
+  content     String     @db.Text
+  htmlContent String?    @db.Text
+  status      EmailStatus @default(PENDING)
+  error       String?
+
+  // 追踪
+  messageId   String?
+  tracked     Boolean    @default(false)
+  openedAt    DateTime?
+  openedCount Int        @default(0)
+  clickedAt   DateTime?
+  clickedCount Int       @default(0)
+  repliedAt   DateTime?
+  bouncedAt   DateTime?
+  bounceReason String?
+
+  sentAt      DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([status])
+  @@index([toEmail])
+  @@index([createdAt])
+}
+
+// ==================== 拓客任务 ====================
+
+model ProspectingTask {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?  @db.Text
+
+  // 搜索条件
+  keywords        String[]
+  keywordSuggestions Json?  // AI拓词建议
+  positions       String[]
+  positionSuggestions Json? // AI拓职位建议
+  locations       String[]
+  industries      String[]
+  companySizes    String[]
+
+  // 执行状态
+  status          TaskStatus @default(DRAFT)
+  progress        Float    @default(0)
+  crawlerStatus   Int      @default(0)  // 0:pending, 1:running, 2:completed, 3:failed
+  crawlerProgress Float    @default(0)
+
+  // 结果统计
+  totalCompaniesFound  Int @default(0)
+  totalCompaniesSaved  Int @default(0)
+  totalContactsFound   Int @default(0)
+  totalContactsSaved   Int @default(0)
+
+  // 爬虫配置
+  crawlerTaskId   String?
+  startIndex      Int      @default(0)
+  maxResults      Int      @default(100)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ==================== 搜索历史 ====================
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // keyword, position
+  value       String
+  suggestions Json?
+  resultCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+}
+
+// ==================== 枚举类型 ====================
+
+enum UserRole {
+  ADMIN
+  USER
+  MANAGER
+}
+
+enum PlanType {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum ContactStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  NOT_INTERESTED
+  QUALIFIED
+  CONVERTED
+  UNREACHABLE
+}
+
+enum EmailType {
+  PROFESSIONAL
+  PERSONAL
+}
+
+enum CampaignType {
+  SINGLE
+  SEQUENCE
+  AB_TEST
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+enum TaskType {
+  OUTREACH
+  FOLLOW_UP
+  NURTURE
+}
+
+enum TaskStatus {
+  DRAFT
+  PENDING
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+enum ScheduleType {
+  IMMEDIATE
+  SCHEDULED
+  RECURRING
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  REPLIED
+  BOUNCED
+  FAILED
+}
