@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import { generateToken } from '@/lib/jwt'
 import { rateLimit } from '@/lib/rate-limit'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -16,13 +17,21 @@ export async function POST(req: NextRequest) {
     const { email, password, name, company } = body
 
     if (!email || !password) {
-      return NextResponse.json({ error: '邮箱和密码为必填项' }, { status: 400 })
+      return errorResponse(
+        ErrorCodes.MISSING_REQUIRED_FIELD,
+        '邮箱和密码为必填项',
+        400
+      )
     }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
-      return NextResponse.json({ error: '该邮箱已注册' }, { status: 409 })
+      return errorResponse(
+        ErrorCodes.ALREADY_EXISTS,
+        '该邮箱已注册',
+        409
+      )
     }
 
     const passwordHash = await hashPassword(password)
@@ -72,7 +81,6 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Registration error:', error)
-    return NextResponse.json({ error: '注册失败，请稍后重试' }, { status: 500 })
+    return handleApiError(error)
   }
 }

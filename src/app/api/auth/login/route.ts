@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/auth'
 import { generateToken } from '@/lib/jwt'
 import { rateLimit } from '@/lib/rate-limit'
+import { successResponse, errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -16,7 +17,11 @@ export async function POST(req: NextRequest) {
     const { email, password } = body
 
     if (!email || !password) {
-      return NextResponse.json({ error: '邮箱和密码为必填项' }, { status: 400 })
+      return errorResponse(
+        ErrorCodes.MISSING_REQUIRED_FIELD,
+        '邮箱和密码为必填项',
+        400
+      )
     }
 
     const user = await prisma.user.findUnique({
@@ -25,12 +30,20 @@ export async function POST(req: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: '邮箱或密码错误' }, { status: 401 })
+      return errorResponse(
+        ErrorCodes.INVALID_CREDENTIALS,
+        '邮箱或密码错误',
+        401
+      )
     }
 
     const validPassword = await verifyPassword(password, user.passwordHash)
     if (!validPassword) {
-      return NextResponse.json({ error: '邮箱或密码错误' }, { status: 401 })
+      return errorResponse(
+        ErrorCodes.INVALID_CREDENTIALS,
+        '邮箱或密码错误',
+        401
+      )
     }
 
     const token = generateToken({
@@ -55,7 +68,6 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Login error:', error)
-    return NextResponse.json({ error: '登录失败，请稍后重试' }, { status: 500 })
+    return handleApiError(error)
   }
 }
