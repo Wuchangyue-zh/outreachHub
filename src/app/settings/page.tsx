@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AvatarUpload } from '@/components/AvatarUpload'
 import { Mail, Plus, Trash2, Check, X } from 'lucide-react'
 
 interface EmailAccount {
@@ -51,6 +52,27 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Profile section */}
+        <Card className="border-gray-100">
+          <CardHeader>
+            <CardTitle className="text-base">个人资料</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-6">
+            <AvatarUpload size="lg" onUpload={(url) => console.log('Avatar uploaded:', url)} />
+            <div className="flex-1 space-y-4">
+              <div>
+                <Label>显示名称</Label>
+                <Input placeholder="Your Name" />
+              </div>
+              <div>
+                <Label>邮箱</Label>
+                <Input value="admin@outreachhub.com" disabled />
+              </div>
+              <Button>保存修改</Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">邮箱设置</h1>
