@@ -14,7 +14,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
     campaignId,
     fromEmail,
     fromName,
-    replyTo,
     trackingPixel,
     trackingLinks,
   } = job.data

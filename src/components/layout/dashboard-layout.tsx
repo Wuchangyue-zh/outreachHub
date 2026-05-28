@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Mail,
   Menu,
+  BarChart3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -28,6 +29,7 @@ const navigation = [
   { name: '邮件营销', href: '/campaigns', icon: Send },
   { name: '邮件模板', href: '/templates', icon: FileText },
   { name: '邮箱设置', href: '/settings', icon: Mail },
+  { name: '队列监控', href: '/email-queue', icon: BarChart3 },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

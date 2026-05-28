@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { emailQueue } from '@/lib/email-queue'
+import { getEmailQueue } from '@/lib/email-queue'
 import { handleApiError, errorResponse, ErrorCodes } from '@/lib/api-errors'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 
@@ -19,7 +19,12 @@ export async function GET(
       return errorResponse(ErrorCodes.VALIDATION_ERROR, 'jobId is required', 400)
     }
 
-    const job = await emailQueue.getJob(jobId)
+    const queue = getEmailQueue()
+    if (!queue) {
+      return errorResponse(ErrorCodes.INTERNAL_ERROR, 'Email queue not available', 500)
+    }
+
+    const job = await queue.getJob(jobId)
 
     if (!job) {
       return errorResponse(ErrorCodes.NOT_FOUND, 'Job not found', 404)
@@ -69,7 +74,12 @@ export async function DELETE(
       return errorResponse(ErrorCodes.VALIDATION_ERROR, 'jobId is required', 400)
     }
 
-    const job = await emailQueue.getJob(jobId)
+    const queue = getEmailQueue()
+    if (!queue) {
+      return errorResponse(ErrorCodes.INTERNAL_ERROR, 'Email queue not available', 500)
+    }
+
+    const job = await queue.getJob(jobId)
 
     if (!job) {
       return errorResponse(ErrorCodes.NOT_FOUND, 'Job not found', 404)
