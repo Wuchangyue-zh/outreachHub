@@ -20,6 +20,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navigation = [
   { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
@@ -48,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -60,22 +61,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-white transition-all duration-300 lg:static',
+          'fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-white dark:bg-gray-800 dark:border-gray-700 transition-all duration-300 lg:static',
           collapsed ? 'w-16' : 'w-64',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b px-4">
+        <div className="flex h-16 items-center justify-between border-b dark:border-gray-700 px-4">
           {!collapsed && (
             <Link href="/dashboard" className="flex items-center gap-2">
               <Mail className="h-7 w-7 text-primary" />
-              <span className="text-lg font-bold text-gray-900">OutreachHub</span>
+              <span className="text-lg font-bold text-gray-900 dark:text-white">OutreachHub</span>
             </Link>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 lg:block"
+            className="hidden rounded-md p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 lg:block"
           >
             {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
@@ -95,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                       isActive
                         ? 'bg-primary/10 text-primary'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
                       collapsed && 'justify-center px-2'
                     )}
                     title={collapsed ? item.name : undefined}
@@ -110,10 +111,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User section */}
-        <div className="border-t p-4">
+        <div className="border-t dark:border-gray-700 p-4">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             {!collapsed && <span>退出登录</span>}
@@ -124,14 +125,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 items-center justify-between border-b bg-white px-4 lg:px-6">
+        <header className="flex h-16 items-center justify-between border-b bg-white dark:bg-gray-800 dark:border-gray-700 px-4 lg:px-6">
           <button
             onClick={() => setMobileOpen(true)}
-            className="rounded-md p-2 text-gray-400 hover:bg-gray-100 lg:hidden"
+            className="rounded-md p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-4 ml-auto">
+            <ThemeToggle />
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
               A
             </div>

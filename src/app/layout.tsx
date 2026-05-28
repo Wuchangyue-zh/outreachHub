@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ToastProvider } from '@/components/ui/toast'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -146,7 +147,9 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ToastProvider>{children}</ToastProvider>
+        <ThemeProvider defaultTheme="system" storageKey="outreach-hub-theme">
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
