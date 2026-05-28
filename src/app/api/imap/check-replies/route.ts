@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initializeIMAPClient } from '@/lib/imap'
+import { getCategoryLabel } from '@/lib/reply-classifier'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +15,22 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const replyCount = await client.detectReplies()
+    const { replyCount, classifications } = await client.detectReplies()
+
+    const summary = classifications.reduce((acc, { category }) => {
+      const label = getCategoryLabel(category as any)
+      acc[label] = (acc[label] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
 
     return NextResponse.json({
       success: true,
       replyCount,
+      classifications: classifications.map(c => ({
+        ...c,
+        categoryLabel: getCategoryLabel(c.category as any),
+      })),
+      summary,
       message: `检测到 ${replyCount} 封新回复`,
     })
   } catch (error: any) {

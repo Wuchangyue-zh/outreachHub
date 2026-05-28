@@ -372,6 +372,9 @@ model EmailLog {
   clickedAt   DateTime?
   clickedCount Int       @default(0)
   repliedAt   DateTime?
+  replyCategory String?  // INTERESTED, NOT_INTERESTED, OUT_OF_OFFICE, QUESTION, UNSUBSCRIBE, AUTO_REPLY, FORWARD, NEGOTIATION, REFERRAL
+  replyConfidence Float?
+  replyKeywords String[]
   bouncedAt   DateTime?
   bounceReason String?
 

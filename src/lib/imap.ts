@@ -1,6 +1,7 @@
 import Imap from 'imap'
 import { simpleParser, ParsedMail } from 'mailparser'
 import { prisma } from '@/lib/prisma'
+import { classifyReply, type ClassificationResult } from './reply-classifier'
 
 export interface IMAPConfig {
   host: string
@@ -130,10 +131,11 @@ export class IMAPClient {
     })
   }
 
-  async detectReplies(): Promise<number> {
+  async detectReplies(): Promise<{ replyCount: number; classifications: Array<{ email: string; category: string; confidence: number }> }> {
     try {
       const emails = await this.fetchInboxEmails(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) // Last 7 days
       let replyCount = 0
+      const classifications: Array<{ email: string; category: string; confidence: number }> = []
 
       for (const email of emails) {
         if (email.inReplyTo) {
@@ -145,23 +147,58 @@ export class IMAPClient {
           })
 
           if (originalLog) {
-            // Update email log with reply info
+            // Classify the reply
+            const classification = classifyReply(email.text, email.subject)
+
+            // Update email log with reply info and classification
             await prisma.emailLog.update({
               where: { id: originalLog.id },
               data: {
                 repliedAt: email.date,
                 status: 'REPLIED',
+                replyCategory: classification.category,
+                replyConfidence: classification.confidence,
+                replyKeywords: classification.keywords,
               },
             })
 
+            // Update contact status based on classification
+            let newStatus: string | undefined
+            switch (classification.category) {
+              case 'INTERESTED':
+              case 'NEGOTIATION':
+                newStatus = 'INTERESTED'
+                break
+              case 'NOT_INTERESTED':
+              case 'UNSUBSCRIBE':
+                newStatus = 'NOT_INTERESTED'
+                break
+              case 'QUESTION':
+                newStatus = 'QUALIFIED'
+                break
+              case 'REFERRAL':
+                newStatus = 'QUALIFIED'
+                break
+            }
+
             // Update contact statistics
+            const updateData: any = {
+              emailsReplied: { increment: 1 },
+              lastEmailRepliedAt: email.date,
+            }
+            if (newStatus) {
+              updateData.status = newStatus
+            }
+
             await prisma.contact.update({
               where: { id: originalLog.contactId },
-              data: {
-                emailsReplied: { increment: 1 },
-                lastEmailRepliedAt: email.date,
-                status: 'INTERESTED', // Auto-update status on reply
-              },
+              data: updateData,
+            })
+
+            classifications.push({
+              email: email.from,
+              category: classification.category,
+              confidence: classification.confidence,
             })
 
             replyCount++
@@ -169,7 +206,7 @@ export class IMAPClient {
         }
       }
 
-      return replyCount
+      return { replyCount, classifications }
     } catch (error) {
       console.error('Error detecting replies:', error)
       throw error
