@@ -176,28 +176,4 @@ export async function checkDailyLimit(accountId: string): Promise<boolean> {
   return account.dailySent < account.dailyLimit
 }
 
-/**
- * 选择最佳可用的 EmailAccount（基于健康度和发送限额）
- * TODO: 实现更复杂的轮换策略
- */
-export async function selectBestAccount(userId: string): Promise<string | null> {
-  const accounts = await prisma.emailAccount.findMany({
-    where: {
-      userId,
-      isActive: true,
-    },
-    orderBy: [
-      { healthScore: 'desc' },
-      { dailySent: 'asc' },
-    ],
-  })
-
-  for (const account of accounts) {
-    const canSend = await checkDailyLimit(account.id)
-    if (canSend) {
-      return account.id
-    }
-  }
-
-  return null
-}
+// selectBestAccount 已移至 lib/select-email-account.ts（更完善的实现）
