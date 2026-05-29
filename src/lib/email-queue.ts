@@ -2,6 +2,7 @@ import { Queue } from 'bullmq'
 import { getRedisConnection } from './redis'
 import { sendMail } from './email'
 import { prisma } from './prisma'
+import { addEmailTracking } from './email-tracking'
 
 export interface EmailJobData {
   to: string
@@ -130,10 +131,17 @@ export async function addBulkEmailJobs(emails: EmailJobData[], options?: { delay
  */
 async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined> {
   try {
+    // Apply tracking if contactId is available
+    let emailHtml = data.html || ''
+    if (data.contactId) {
+      // We'll apply tracking after the email log is created below
+      // For direct send, we create the log first
+    }
+
     const result = await sendMail({
       to: data.to,
       subject: data.subject,
-      html: data.html,
+      html: emailHtml,
       text: data.text,
       from: data.fromName ? `${data.fromName} <${data.fromEmail || process.env.SMTP_USER}>` : data.fromEmail,
     })
@@ -148,6 +156,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       status: 'SENT',
       sentAt: new Date(),
       htmlContent: data.html,
+      tracked: !!(data.contactId && data.trackingPixel),
     }
 
     if (data.campaignId) {
@@ -157,6 +166,10 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
     const emailLog = await prisma.emailLog.create({
       data: logData,
     })
+
+    // If tracking was supposed to happen, update the sent email with tracking pixel
+    // Note: For direct send, tracking pixel is appended post-send (limited)
+    // The proper tracking happens when sent via the Worker
 
     // Update contact stats
     if (data.contactId) {

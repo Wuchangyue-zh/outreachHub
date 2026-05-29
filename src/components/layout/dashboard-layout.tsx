@@ -18,6 +18,7 @@ import {
   Mail,
   Menu,
   BarChart3,
+  Inbox as InboxIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -30,6 +31,7 @@ const navigation = [
   { name: '公司库', href: '/companies', icon: Building2 },
   { name: '邮件营销', href: '/campaigns', icon: Send },
   { name: '邮件模板', href: '/templates', icon: FileText },
+  { name: '统一收件箱', href: '/inbox', icon: InboxIcon },
   { name: '邮箱设置', href: '/settings', icon: Mail },
   { name: '队列监控', href: '/email-queue', icon: BarChart3 },
 ]

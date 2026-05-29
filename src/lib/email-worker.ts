@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq'
 import { getRedisConnection } from './redis'
 import { sendMail } from './email'
 import { prisma } from './prisma'
+import { addEmailTracking } from './email-tracking'
 import type { EmailJobData } from './email-queue'
 
 async function processEmailJob(job: Job<EmailJobData>) {
@@ -45,22 +46,14 @@ async function processEmailJob(job: Job<EmailJobData>) {
 
   await job.updateProgress(30)
 
-  // Prepare email content with tracking
+  // Prepare email content with tracking using the centralized addEmailTracking function
   let emailHtml = html || ''
-  if (trackingPixel && emailLog.id) {
-    const pixelUrl = `${process.env.APP_URL}/api/email/track/open?id=${emailLog.id}`
+  if (emailLog.id && contactId) {
+    emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId)
+  } else if (trackingPixel && emailLog.id) {
+    // Fallback: just add tracking pixel if no contactId
+    const pixelUrl = `${process.env.APP_URL}/api/email/track/open?e=${emailLog.id}&c=${contactId || ''}&t=${Date.now()}`
     emailHtml += `<img src="${pixelUrl}" width="1" height="1" style="display:none" />`
-  }
-
-  if (trackingLinks && emailHtml) {
-    // Replace links with tracking links
-    emailHtml = emailHtml.replace(
-      /href="(https?:\/\/[^"]+)"/g,
-      (match, url) => {
-        const trackingUrl = `${process.env.APP_URL}/api/email/track/click?id=${emailLog.id}&url=${encodeURIComponent(url)}`
-        return `href="${trackingUrl}"`
-      }
-    )
   }
 
   await job.updateProgress(50)

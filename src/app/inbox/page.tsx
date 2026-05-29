@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,7 +38,7 @@ interface Thread {
   aiDraft: string
 }
 
-// ─── Mock Data ──────────────────────────────────────────────
+// ─── Mock Data (fallback when no real threads) ──────────────
 
 const MOCK_THREADS: Thread[] = [
   {
@@ -58,20 +58,7 @@ const MOCK_THREADS: Thread[] = [
         senderName: 'Alice Wang',
         senderEmail: 'alice@outreach-hub.com',
         subject: 'Partnership Opportunity — Precision Bearings for Nordic Market',
-        body: `Dear James,
-
-I hope this email finds you well. I am reaching out from OutreachHub because we noticed TechNordic's strong presence in the industrial automation sector across Scandinavia.
-
-We specialize in high-precision bearings with ISO 9001 and IATF 16949 certification, and believe there is excellent synergy between our companies.
-
-• Competitive factory-direct pricing
-• 15-day standard lead time
-• Full OEM/ODM customization
-
-Would you be open to a brief call this week?
-
-Best regards,
-Alice Wang`,
+        body: `Dear James,\n\nI hope this email finds you well. I am reaching out from OutreachHub because we noticed TechNordic's strong presence in the industrial automation sector across Scandinavia.\n\nWe specialize in high-precision bearings with ISO 9001 and IATF 16949 certification, and believe there is excellent synergy between our companies.\n\n• Competitive factory-direct pricing\n• 15-day standard lead time\n• Full OEM/ODM customization\n\nWould you be open to a brief call this week?\n\nBest regards,\nAlice Wang`,
         timestamp: '2026-05-27 09:15',
       },
       {
@@ -80,35 +67,11 @@ Alice Wang`,
         senderName: 'James Miller',
         senderEmail: 'james@technordic.se',
         subject: 'Re: Partnership Opportunity — Precision Bearings for Nordic Market',
-        body: `Hi Alice,
-
-Thank you for reaching out. We are actually in the process of qualifying new bearing suppliers for our Q3 production ramp-up.
-
-Your products look interesting. Could you send us a quotation for 5,000 units of the 6205-2RS model? We would also need to see your test certificates and lead time for this volume.
-
-Looking forward to your reply.
-
-Best,
-James Miller
-CEO, TechNordic AB`,
+        body: `Hi Alice,\n\nThank you for reaching out. We are actually in the process of qualifying new bearing suppliers for our Q3 production ramp-up.\n\nYour products look interesting. Could you send us a quotation for 5,000 units of the 6205-2RS model? We would also need to see your test certificates and lead time for this volume.\n\nLooking forward to your reply.\n\nBest,\nJames Miller\nCEO, TechNordic AB`,
         timestamp: '2026-05-28 14:32',
       },
     ],
-    aiDraft: `Dear James,
-
-Thank you for your interest and for considering us for your Q3 production needs. We are delighted to provide the following details:
-
-**Quotation — 6205-2RS Precision Bearing (Qty: 5,000)**
-• Unit Price: $2.85 FOB
-• Lead Time: 12–15 business days
-• Certification: ISO 9001, IATF 16949, RoHS compliant
-
-I have attached our full test certificate package for your review. We can also arrange a sample shipment (50 units) for your quality validation before committing to the full order.
-
-Please let me know if you need any adjustments to the specification or if you would like to schedule a video call to discuss further.
-
-Best regards,
-Alice Wang`,
+    aiDraft: `Dear James,\n\nThank you for your interest and for considering us for your Q3 production needs. We are delighted to provide the following details:\n\n**Quotation — 6205-2RS Precision Bearing (Qty: 5,000)**\n• Unit Price: $2.85 FOB\n• Lead Time: 12–15 business days\n• Certification: ISO 9001, IATF 16949, RoHS compliant\n\nI have attached our full test certificate package for your review.\n\nBest regards,\nAlice Wang`,
   },
   {
     id: 't2',
@@ -127,16 +90,7 @@ Alice Wang`,
         senderName: 'Mike Chen',
         senderEmail: 'mike@outreach-hub.com',
         subject: 'Cost Reduction Opportunity — Industrial Fasteners',
-        body: `Dear Sarah,
-
-I am writing to introduce our range of industrial fasteners that could help Brighton Manufacturing reduce procurement costs by 20–30%.
-
-We supply to over 150 manufacturers across Europe with guaranteed 10-day delivery from our Shenzhen warehouse.
-
-Would you be interested in receiving our product catalog?
-
-Best regards,
-Mike Chen`,
+        body: `Dear Sarah,\n\nI am writing to introduce our range of industrial fasteners that could help Brighton Manufacturing reduce procurement costs by 20–30%.\n\nBest regards,\nMike Chen`,
         timestamp: '2026-05-26 11:00',
       },
       {
@@ -145,12 +99,7 @@ Mike Chen`,
         senderName: 'Sarah O\'Connor',
         senderEmail: 'sarah@brighton-mfg.co.uk',
         subject: 'Re: Cost Reduction Opportunity — Industrial Fasteners',
-        body: `Hi,
-
-Please remove me from your mailing list. We are not interested in sourcing fasteners from overseas at this time.
-
-Regards,
-Sarah O'Connor`,
+        body: `Hi,\n\nPlease remove me from your mailing list. We are not interested in sourcing fasteners from overseas at this time.\n\nRegards,\nSarah O'Connor`,
         timestamp: '2026-05-28 09:45',
       },
     ],
@@ -173,14 +122,7 @@ Sarah O'Connor`,
         senderName: 'Alice Wang',
         senderEmail: 'alice@outreach-hub.com',
         subject: 'OEM Bearing Solutions for German Automotive Sector',
-        body: `Dear Hans,
-
-I noticed Becker Automotive's recent expansion into electric vehicle components. Our ceramic hybrid bearings are specifically engineered for EV drivetrains and have been validated by three Tier-1 suppliers in Germany.
-
-I would love to share our EV-specific product line with you.
-
-Best regards,
-Alice Wang`,
+        body: `Dear Hans,\n\nI noticed Becker Automotive's recent expansion into electric vehicle components.\n\nBest regards,\nAlice Wang`,
         timestamp: '2026-05-25 08:30',
       },
       {
@@ -189,15 +131,7 @@ Alice Wang`,
         senderName: 'Hans Becker',
         senderEmail: 'hans@becker-automotive.de',
         subject: 'Auto-Reply: Out of Office',
-        body: `Thank you for your email. I am currently out of the office until June 10th with limited access to email.
-
-For urgent matters, please contact my colleague Thomas Weber at thomas@becker-automotive.de.
-
-I will respond to your message upon my return.
-
-Best regards,
-Hans Becker
-Head of Procurement, Becker Automotive GmbH`,
+        body: `Thank you for your email. I am currently out of the office until June 10th with limited access to email.`,
         timestamp: '2026-05-27 16:00',
       },
     ],
@@ -220,16 +154,7 @@ Head of Procurement, Becker Automotive GmbH`,
         senderName: 'Mike Chen',
         senderEmail: 'mike@outreach-hub.com',
         subject: 'Reliable Supply Chain Partner for LatAm Market',
-        body: `Dear Maria,
-
-I am reaching out because LatAm Industrial's growth in the mining equipment sector is impressive. We manufacture heavy-duty bearings rated for extreme conditions (IP69K, -40°C to +180°C operating range).
-
-With our Mexico-friendly logistics partners, we can deliver DDP to your facility in Monterrey within 20 days.
-
-Would you like to see our mining-grade product specifications?
-
-Best regards,
-Mike Chen`,
+        body: `Dear Maria,\n\nI am reaching out because LatAm Industrial's growth in the mining equipment sector is impressive.\n\nBest regards,\nMike Chen`,
         timestamp: '2026-05-26 14:20',
       },
       {
@@ -238,41 +163,11 @@ Mike Chen`,
         senderName: 'Maria Gonzalez',
         senderEmail: 'maria@latam-industrial.mx',
         subject: 'Re: Reliable Supply Chain Partner for LatAm Market',
-        body: `Hola Mike,
-
-This sounds very interesting. We have been looking for alternatives to our current European supplier who has been having delivery issues.
-
-Do you have distributors in Mexico, or do you ship directly? We need approximately 10,000 pcs/month of the 6308-ZZ model for our crusher line.
-
-Also, what are your payment terms for new customers?
-
-Saludos,
-Maria Gonzalez
-Procurement Director, LatAm Industrial SA de CV`,
+        body: `Hola Mike,\n\nThis sounds very interesting. We have been looking for alternatives to our current European supplier.\n\nDo you have distributors in Mexico, or do you ship directly? We need approximately 10,000 pcs/month of the 6308-ZZ model.\n\nSaludos,\nMaria Gonzalez`,
         timestamp: '2026-05-28 11:15',
       },
     ],
-    aiDraft: `Dear Maria,
-
-Thank you for your prompt response and for considering us as a potential supply chain partner. I am happy to address your questions:
-
-**Distribution & Shipping**
-We ship directly from our factory to Mexico with DDP (Delivered Duty Paid) terms. Our logistics partner in Laredo handles customs clearance, so you receive the goods at your Monterrey facility with no import hassles.
-
-**Quotation — 6308-ZZ Bearing (Qty: 10,000/month)**
-• Unit Price: $4.20 DDP Monterrey
-• Lead Time: 18–20 days from order confirmation
-• Monthly Contract: We can lock pricing for 6 months with a minimum commitment of 8,000 pcs/month
-
-**Payment Terms**
-For new customers, we offer:
-• 30% deposit upon order confirmation
-• 70% upon delivery (Net 30 available after 3 successful orders)
-
-I would be happy to arrange a video call to walk you through our quality documentation and discuss a trial order. Would next Tuesday or Wednesday work for you?
-
-Best regards,
-Mike Chen`,
+    aiDraft: `Dear Maria,\n\nThank you for your prompt response. We ship directly from our factory to Mexico with DDP terms.\n\n**Quotation — 6308-ZZ Bearing (Qty: 10,000/month)**\n• Unit Price: $4.20 DDP Monterrey\n• Lead Time: 18–20 days\n\nBest regards,\nMike Chen`,
   },
 ]
 
@@ -282,30 +177,129 @@ const INTENT_CONFIG: Record<Intent, { label: string; dot: string; bg: string; te
   ooo:        { label: 'OOO',         dot: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
 }
 
+// ─── Generate AI Draft ──────────────────────────────────────
+
+async function generateAiDraft(thread: Thread): Promise<string> {
+  try {
+    const lastMessage = thread.messages[thread.messages.length - 1]
+    const res = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: `Write a professional email reply to this customer inquiry. The context:\n\nContact: ${thread.contactName} (${thread.contactEmail})\nCompany: ${thread.company}\nTheir message:\n${lastMessage.body}\n\nWrite a concise, professional response addressing their questions.`,
+      }),
+    })
+    const json = await res.json()
+    if (json.success && json.data) return json.data
+  } catch (e) {
+    console.error('AI draft generation failed:', e)
+  }
+  return thread.aiDraft || 'AI draft generation failed. Please write manually.'
+}
+
+// ─── Send Reply ─────────────────────────────────────────────
+
+async function sendReply(to: string, subject: string, body: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/email-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, text: body }),
+    })
+    const json = await res.json()
+    return json.success === true
+  } catch (e) {
+    console.error('Reply send failed:', e)
+    return false
+  }
+}
+
 // ─── Page ───────────────────────────────────────────────────
 
 export default function InboxPage() {
-  const [selectedId, setSelectedId] = useState<string>(MOCK_THREADS[0].id)
+  const [threads, setThreads] = useState<Thread[]>(MOCK_THREADS)
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState<string>('')
   const [aiEnabled, setAiEnabled] = useState(true)
   const [editingDraft, setEditingDraft] = useState(false)
   const [draftText, setDraftText] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const [generatingDraft, setGeneratingDraft] = useState(false)
 
-  const selected = MOCK_THREADS.find((t) => t.id === selectedId)!
+  // Fetch real threads from API
+  useEffect(() => {
+    const fetchThreads = async () => {
+      try {
+        const res = await fetch('/api/inbox/threads')
+        const json = await res.json()
+        if (json.success && json.data.length > 0) {
+          // Use real data, but ensure AI draft for interested threads
+          const enriched = json.data.map((t: Thread) => ({
+            ...t,
+            aiDraft: t.intent === 'interested' ? t.aiDraft || '' : t.aiDraft,
+          }))
+          setThreads(enriched)
+          setSelectedId(enriched[0].id)
+        }
+        // If no real threads, keep mock data as fallback
+      } catch (e) {
+        console.error('Failed to fetch inbox threads:', e)
+        // Keep mock data
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchThreads()
+  }, [])
 
-  const handleSend = () => {
-    setSending(true)
-    setTimeout(() => {
-      setSending(false)
-      setSent(true)
-      setTimeout(() => setSent(false), 3000)
-    }, 1500)
+  const selected = threads.find((t) => t.id === selectedId)
+
+  const handleGenerateDraft = async () => {
+    if (!selected) return
+    setGeneratingDraft(true)
+    const draft = await generateAiDraft(selected)
+    setDraftText(draft)
+    setEditingDraft(true)
+    setGeneratingDraft(false)
   }
 
-  const startEdit = () => {
-    setDraftText(selected.aiDraft)
-    setEditingDraft(true)
+  const handleSend = async () => {
+    if (!selected) return
+    setSending(true)
+    const body = editingDraft ? draftText : selected.aiDraft
+    try {
+      const success = await sendReply(
+        selected.contactEmail,
+        `Re: ${selected.messages[selected.messages.length - 1]?.subject || 'Follow-up'}`,
+        body,
+      )
+      if (success) {
+        setSent(true)
+        setTimeout(() => setSent(false), 3000)
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleSelectThread = (id: string) => {
+    setSelectedId(id)
+    setEditingDraft(false)
+    setSent(false)
+    setDraftText('')
+  }
+
+  const unreadCount = threads.filter((t) => t.unread).length
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-32">
+          <p className="text-gray-500">加载中...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -318,7 +312,7 @@ export default function InboxPage() {
           <div className="border-b border-gray-100 px-5 py-4">
             <h2 className="text-base font-bold text-gray-900">Inbox</h2>
             <p className="text-xs text-gray-500">
-              {MOCK_THREADS.filter((t) => t.unread).length} unread conversations
+              {unreadCount} unread conversations
             </p>
           </div>
 
@@ -335,118 +329,130 @@ export default function InboxPage() {
 
           {/* Thread list */}
           <div className="flex-1 overflow-y-auto">
-            {MOCK_THREADS.map((thread) => {
-              const cfg = INTENT_CONFIG[thread.intent]
-              const isActive = thread.id === selectedId
-              return (
-                <button
-                  key={thread.id}
-                  onClick={() => {
-                    setSelectedId(thread.id)
-                    setEditingDraft(false)
-                    setSent(false)
-                  }}
-                  className={cn(
-                    'flex w-full flex-col gap-2 border-b border-gray-50 px-5 py-4 text-left transition-colors',
-                    isActive ? 'bg-blue-50/60' : 'hover:bg-gray-50',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('text-sm font-semibold text-gray-900', thread.unread && 'font-bold')}>
-                        {thread.contactName}
-                      </span>
-                      {thread.unread && (
-                        <span className="h-2 w-2 rounded-full bg-blue-500" />
-                      )}
-                    </div>
-                    <span className="text-[11px] text-gray-400">{thread.lastTime}</span>
-                  </div>
-
-                  <p className="text-xs text-gray-500">{thread.company} · {thread.country}</p>
-
-                  <p className="truncate text-xs text-gray-500">{thread.lastSnippet}</p>
-
-                  {/* Intent badge */}
-                  <span
+            {threads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <Mail className="mb-4 h-12 w-12 text-gray-300" />
+                <p className="text-sm font-medium">暂无对话</p>
+                <p className="text-xs">收到客户回复后将显示在这里</p>
+              </div>
+            ) : (
+              threads.map((thread) => {
+                const cfg = INTENT_CONFIG[thread.intent]
+                const isActive = thread.id === selectedId
+                return (
+                  <button
+                    key={thread.id}
+                    onClick={() => handleSelectThread(thread.id)}
                     className={cn(
-                      'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                      cfg.bg, cfg.text,
+                      'flex w-full flex-col gap-2 border-b border-gray-50 px-5 py-4 text-left transition-colors',
+                      isActive ? 'bg-blue-50/60' : 'hover:bg-gray-50',
                     )}
                   >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-                    {cfg.label}
-                  </span>
-                </button>
-              )
-            })}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('text-sm font-semibold text-gray-900', thread.unread && 'font-bold')}>
+                          {thread.contactName}
+                        </span>
+                        {thread.unread && (
+                          <span className="h-2 w-2 rounded-full bg-blue-500" />
+                        )}
+                      </div>
+                      <span className="text-[11px] text-gray-400">{thread.lastTime}</span>
+                    </div>
+
+                    <p className="text-xs text-gray-500">{thread.company} · {thread.country}</p>
+
+                    <p className="truncate text-xs text-gray-500">{thread.lastSnippet}</p>
+
+                    {/* Intent badge */}
+                    <span
+                      className={cn(
+                        'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        cfg.bg, cfg.text,
+                      )}
+                    >
+                      <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+                      {cfg.label}
+                    </span>
+                  </button>
+                )
+              })
+            )}
           </div>
         </div>
 
         {/* ─── Center: Email Detail & Timeline ─── */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Thread header */}
-          <div className="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-              {selected.contactName.split(' ').map((n) => n[0]).join('')}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-gray-900">{selected.contactName}</h3>
-                <span className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                  INTENT_CONFIG[selected.intent].bg, INTENT_CONFIG[selected.intent].text,
-                )}>
-                  <span className={cn('h-1.5 w-1.5 rounded-full', INTENT_CONFIG[selected.intent].dot)} />
-                  {INTENT_CONFIG[selected.intent].label}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500">
-                {selected.contactEmail} · {selected.company} · {selected.country}
-              </p>
-            </div>
-          </div>
-
-          {/* Messages timeline */}
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <div className="space-y-6">
-              {selected.messages.map((msg) => {
-                const isUs = msg.from === 'us'
-                return (
-                  <div key={msg.id} className={cn('flex gap-3', isUs && 'flex-row-reverse')}>
-                    {/* Avatar */}
-                    <div
-                      className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                        isUs ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700',
-                      )}
-                    >
-                      {msg.senderName.split(' ').map((n) => n[0]).join('')}
-                    </div>
-
-                    {/* Bubble */}
-                    <div
-                      className={cn(
-                        'max-w-[75%] rounded-2xl border px-5 py-4',
-                        isUs
-                          ? 'border-blue-100 bg-blue-50'
-                          : 'border-gray-100 bg-white shadow-sm',
-                      )}
-                    >
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="text-xs font-semibold text-gray-900">{msg.senderName}</span>
-                        <span className="text-[10px] text-gray-400">{msg.timestamp}</span>
-                      </div>
-                      <p className="text-xs font-medium text-gray-600 mb-2">{msg.subject}</p>
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                        {msg.body}
-                      </div>
-                    </div>
+          {selected ? (
+            <>
+              {/* Thread header */}
+              <div className="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                  {selected.contactName.split(' ').map((n) => n[0]).join('')}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-900">{selected.contactName}</h3>
+                    <span className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                      INTENT_CONFIG[selected.intent].bg, INTENT_CONFIG[selected.intent].text,
+                    )}>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', INTENT_CONFIG[selected.intent].dot)} />
+                      {INTENT_CONFIG[selected.intent].label}
+                    </span>
                   </div>
-                )
-              })}
+                  <p className="text-xs text-gray-500">
+                    {selected.contactEmail} · {selected.company} · {selected.country}
+                  </p>
+                </div>
+              </div>
+
+              {/* Messages timeline */}
+              <div className="flex-1 overflow-y-auto px-6 py-6">
+                <div className="space-y-6">
+                  {selected.messages.map((msg) => {
+                    const isUs = msg.from === 'us'
+                    return (
+                      <div key={msg.id} className={cn('flex gap-3', isUs && 'flex-row-reverse')}>
+                        {/* Avatar */}
+                        <div
+                          className={cn(
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                            isUs ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700',
+                          )}
+                        >
+                          {msg.senderName.split(' ').map((n) => n[0]).join('')}
+                        </div>
+
+                        {/* Bubble */}
+                        <div
+                          className={cn(
+                            'max-w-[75%] rounded-2xl border px-5 py-4',
+                            isUs
+                              ? 'border-blue-100 bg-blue-50'
+                              : 'border-gray-100 bg-white shadow-sm',
+                          )}
+                        >
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-900">{msg.senderName}</span>
+                            <span className="text-[10px] text-gray-400">{msg.timestamp}</span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-600 mb-2">{msg.subject}</p>
+                          <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                            {msg.body}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-gray-400">
+              <p>选择一封对话开始</p>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ─── Right: AI Responder Panel ─── */}
@@ -482,13 +488,13 @@ export default function InboxPage() {
               {aiEnabled && (
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2">
                   <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs text-blue-700">Active — monitoring {MOCK_THREADS.length} threads</span>
+                  <span className="text-xs text-blue-700">Active — monitoring {threads.length} threads</span>
                 </div>
               )}
             </div>
 
             {/* Module B: AI Draft */}
-            {selected.intent === 'interested' && selected.aiDraft ? (
+            {selected && selected.intent === 'interested' && (
               <div className="rounded-xl border border-gray-200 bg-white p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-violet-600" />
@@ -539,7 +545,7 @@ export default function InboxPage() {
                       </Button>
                     </div>
                   </div>
-                ) : (
+                ) : (selected.aiDraft ? (
                   <>
                     <div className="mb-4 max-h-64 overflow-y-auto rounded-lg bg-gray-50 p-4">
                       <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
@@ -570,23 +576,49 @@ export default function InboxPage() {
                         size="sm"
                         variant="outline"
                         className="gap-1.5"
-                        onClick={startEdit}
+                        onClick={() => {
+                          setDraftText(selected.aiDraft)
+                          setEditingDraft(true)
+                        }}
                       >
                         <Edit3 className="h-3.5 w-3.5" />
                         Edit
                       </Button>
                     </div>
                   </>
-                )}
+                ) : (
+                  <Button
+                    size="sm"
+                    className="w-full gap-1.5"
+                    onClick={handleGenerateDraft}
+                    disabled={generatingDraft}
+                  >
+                    {generatingDraft ? (
+                      <>
+                        <Clock className="h-3.5 w-3.5 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Generate AI Draft
+                      </>
+                    )}
+                  </Button>
+                ))}
               </div>
-            ) : selected.intent === 'opt-out' ? (
+            )}
+
+            {selected && selected.intent === 'opt-out' && (
               <div className="rounded-xl border border-red-100 bg-red-50 p-4">
                 <p className="text-sm font-semibold text-red-700">🔴 Contact Opted Out</p>
                 <p className="mt-1 text-xs text-red-600">
                   This contact has requested to be removed from your mailing list. AI will not send further emails.
                 </p>
               </div>
-            ) : selected.intent === 'ooo' ? (
+            )}
+
+            {selected && selected.intent === 'ooo' && (
               <div className="rounded-xl border border-amber-100 bg-amber-50 p-4">
                 <p className="text-sm font-semibold text-amber-700">🟡 Out of Office</p>
                 <p className="mt-1 text-xs text-amber-600">
@@ -594,10 +626,10 @@ export default function InboxPage() {
                 </p>
                 <div className="mt-3 flex items-center gap-2 text-xs text-amber-600">
                   <Clock className="h-3.5 w-3.5" />
-                  <span>Auto-follow-up scheduled: June 11, 2026</span>
+                  <span>Auto-follow-up will be scheduled</span>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </div>

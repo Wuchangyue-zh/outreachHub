@@ -14,6 +14,7 @@ export function middleware(req: NextRequest) {
     '/settings',
     '/prospecting',
     '/email-queue',
+    '/inbox',
   ]
 
   const isProtectedPath = protectedPaths.some((path) =>
@@ -56,6 +57,7 @@ export const config = {
     '/settings/:path*',
     '/prospecting/:path*',
     '/email-queue/:path*',
+    '/inbox/:path*',
     '/login',
     '/register',
     '/api/:path*',

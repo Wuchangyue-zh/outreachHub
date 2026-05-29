@@ -1,101 +1,66 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Send, Plus, TrendingUp, TrendingDown, Eye, Reply, Rocket,
-  Search, Pause, Play, Trash2, MoreHorizontal,
+  Search, Pause, Play, Trash2, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Types ──────────────────────────────────────────────────
 
-type CampaignStatus = 'sending' | 'paused' | 'draft' | 'completed'
+type CampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED'
+type StatusFilter = 'all' | CampaignStatus
 
 interface Campaign {
   id: string
   name: string
   status: CampaignStatus
-  audienceSize: number
-  deliveryRate: number
-  openRate: number
-  replyRate: number
+  type: string
+  totalSent: number
+  totalOpened: number
+  totalClicked: number
+  totalReplied: number
+  totalBounced: number
+  contactIds: string[]
   createdAt: string
+  sentAt: string | null
+  completedAt: string | null
 }
 
-// ─── Mock Data ──────────────────────────────────────────────
-
-const MOCK_CAMPAIGNS: Campaign[] = [
-  {
-    id: '1',
-    name: '北美电子行业 CEO 精准开发',
-    status: 'sending',
-    audienceSize: 2450,
-    deliveryRate: 97.2,
-    openRate: 32.4,
-    replyRate: 6.8,
-    createdAt: '2026-05-22',
-  },
-  {
-    id: '2',
-    name: '欧洲机械买家追发序列',
-    status: 'sending',
-    audienceSize: 1820,
-    deliveryRate: 96.8,
-    openRate: 28.1,
-    replyRate: 5.2,
-    createdAt: '2026-05-20',
-  },
-  {
-    id: '3',
-    name: '东南亚跨境电商卖家触达',
-    status: 'paused',
-    audienceSize: 3100,
-    deliveryRate: 95.5,
-    openRate: 22.7,
-    replyRate: 3.9,
-    createdAt: '2026-05-18',
-  },
-  {
-    id: '4',
-    name: '中东建材采购商首轮开发',
-    status: 'completed',
-    audienceSize: 890,
-    deliveryRate: 98.1,
-    openRate: 35.6,
-    replyRate: 8.4,
-    createdAt: '2026-05-10',
-  },
-  {
-    id: '5',
-    name: '拉美汽车零部件 A/B 测试',
-    status: 'draft',
-    audienceSize: 1560,
-    deliveryRate: 0,
-    openRate: 0,
-    replyRate: 0,
-    createdAt: '2026-05-25',
-  },
-]
-
-const MOCK_STATS = {
-  totalSent: 12840,
-  avgOpenRate: 24.5,
-  openRateDelta: +1.2,
-  avgReplyRate: 4.8,
-  activeCampaigns: 3,
+interface CampaignsStats {
+  overall: {
+    totalSent: number
+    totalOpened: number
+    totalClicked: number
+    totalReplied: number
+    totalBounced: number
+    openRate: number
+    clickRate: number
+    replyRate: number
+    bounceRate: number
+  }
+  daily: Array<{ date: string; sent: number; opened: number; clicked: number; replied: number }>
+  comparison: Array<{ name: string; openRate: number; clickRate: number; replyRate: number }>
 }
 
-// ─── Status config ──────────────────────────────────────────
+// Map DB status to display config
+const STATUS_DISPLAY: Record<CampaignStatus, { label: string; dot: string; bg: string; text: string }> = {
+  RUNNING:   { label: 'Running',   dot: 'bg-green-500 animate-pulse', bg: 'bg-green-50',   text: 'text-green-700' },
+  PAUSED:    { label: 'Paused',    dot: 'bg-amber-500',              bg: 'bg-amber-50',    text: 'text-amber-700' },
+  DRAFT:     { label: 'Draft',     dot: 'bg-blue-500',               bg: 'bg-blue-50',     text: 'text-blue-700' },
+  COMPLETED: { label: 'Completed', dot: 'bg-gray-400',               bg: 'bg-gray-100',    text: 'text-gray-600' },
+  SCHEDULED: { label: 'Scheduled', dot: 'bg-purple-500',             bg: 'bg-purple-50',   text: 'text-purple-700' },
+  FAILED:    { label: 'Failed',    dot: 'bg-red-500',                bg: 'bg-red-50',      text: 'text-red-700' },
+}
 
-const STATUS_CONFIG: Record<CampaignStatus, { label: string; dot: string; bg: string; text: string }> = {
-  sending:   { label: 'Sending',   dot: 'bg-green-500 animate-pulse', bg: 'bg-green-50',   text: 'text-green-700' },
-  paused:    { label: 'Paused',    dot: 'bg-amber-500',              bg: 'bg-amber-50',    text: 'text-amber-700' },
-  draft:     { label: 'Draft',     dot: 'bg-blue-500',               bg: 'bg-blue-50',     text: 'text-blue-700' },
-  completed: { label: 'Completed', dot: 'bg-gray-400',               bg: 'bg-gray-100',    text: 'text-gray-600' },
+function rateDenominator(c: Campaign): number {
+  // Use totalSent from the campaign model (server-side counter)
+  return c.totalSent || 0
 }
 
 // ─── Stat Card ──────────────────────────────────────────────
@@ -150,7 +115,7 @@ function RateBar({ value, color }: { value: number; color: string }) {
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
-      <span className="text-sm tabular-nums text-gray-700">{value > 0 ? `${value}%` : '—'}</span>
+      <span className="text-sm tabular-nums text-gray-700">{value > 0 ? `${value.toFixed(1)}%` : '—'}</span>
     </div>
   )
 }
@@ -158,25 +123,117 @@ function RateBar({ value, color }: { value: number; color: string }) {
 // ─── Page ───────────────────────────────────────────────────
 
 export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [stats, setStats] = useState<CampaignsStats | null>(null)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<CampaignStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [actioning, setActioning] = useState<string | null>(null)
+
+  // Fetch campaigns
+  const fetchCampaigns = useCallback(async () => {
+    try {
+      setLoading(true)
+      const [campRes, statsRes] = await Promise.all([
+        fetch('/api/campaigns?page=1&limit=100'),
+        fetch('/api/campaigns/stats'),
+      ])
+      const campJson = await campRes.json()
+      const statsJson = await statsRes.json()
+      if (campJson.success) setCampaigns(campJson.data)
+      if (statsJson.success) setStats(statsJson.data)
+    } catch (e) {
+      console.error('Failed to fetch campaigns:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCampaigns()
+  }, [fetchCampaigns])
 
   const filtered = useMemo(() => {
-    return MOCK_CAMPAIGNS.filter((c) => {
+    return campaigns.filter((c) => {
       const matchSearch = c.name.toLowerCase().includes(search.toLowerCase())
       const matchStatus = statusFilter === 'all' || c.status === statusFilter
       return matchSearch && matchStatus
     })
-  }, [search, statusFilter])
+  }, [campaigns, search, statusFilter])
 
-  const toggleStatus = (id: string) => {
-    // Mock toggle — in production this would PATCH /api/campaigns/:id
-    console.log('Toggle campaign', id)
+  const toggleCampaign = async (id: string) => {
+    const camp = campaigns.find((c) => c.id === id)
+    if (!camp) return
+    const newStatus: CampaignStatus = camp.status === 'RUNNING' ? 'PAUSED' : 'RUNNING'
+    setActioning(id)
+    try {
+      await fetch(`/api/campaigns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      // Update local state
+      setCampaigns((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+      )
+    } catch (e) {
+      console.error('Failed to toggle campaign:', e)
+    } finally {
+      setActioning(null)
+    }
   }
 
-  const deleteCampaign = (id: string) => {
-    // Mock delete — in production this would DELETE /api/campaigns/:id
-    console.log('Delete campaign', id)
+  const deleteCampaign = async (id: string) => {
+    if (!confirm('确定要删除这个营销活动吗？此操作不可撤销。')) return
+    setActioning(id)
+    try {
+      await fetch(`/api/campaigns/${id}`, { method: 'DELETE' })
+      setCampaigns((prev) => prev.filter((c) => c.id !== id))
+    } catch (e) {
+      console.error('Failed to delete campaign:', e)
+    } finally {
+      setActioning(null)
+    }
+  }
+
+  const launchCampaign = async (id: string) => {
+    if (!confirm('确定要启动这个营销活动吗？系统将开始向目标联系人发送邮件。')) return
+    setActioning(id)
+    try {
+      const res = await fetch(`/api/campaigns/${id}/launch`, { method: 'POST' })
+      const json = await res.json()
+      if (json.success) {
+        setCampaigns((prev) =>
+          prev.map((c) =>
+            c.id === id ? { ...c, status: 'RUNNING' as CampaignStatus, totalSent: c.totalSent + (json.data.enqueued || 0) } : c
+          )
+        )
+      } else {
+        alert(json.message || '启动失败')
+      }
+    } catch (e) {
+      console.error('Failed to launch campaign:', e)
+    } finally {
+      setActioning(null)
+    }
+  }
+
+  const overall = stats?.overall
+  const statsValue = {
+    totalSent: overall?.totalSent ?? 0,
+    avgOpenRate: overall ? overall.openRate : 0,
+    avgReplyRate: overall ? overall.replyRate : 0,
+    activeCampaigns: campaigns.filter((c) => c.status === 'RUNNING').length,
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-32">
+          <p className="text-gray-500">加载中...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -187,26 +244,25 @@ export default function CampaignsPage() {
           <StatCard
             icon={Send}
             label="Total Sent"
-            value={MOCK_STATS.totalSent.toLocaleString()}
+            value={statsValue.totalSent.toLocaleString()}
             iconBg="bg-blue-50 text-blue-600"
           />
           <StatCard
             icon={Eye}
             label="Avg Open Rate"
-            value={`${MOCK_STATS.avgOpenRate}%`}
-            delta={MOCK_STATS.openRateDelta}
+            value={`${statsValue.avgOpenRate.toFixed(1)}%`}
             iconBg="bg-emerald-50 text-emerald-600"
           />
           <StatCard
             icon={Reply}
             label="Avg Reply Rate"
-            value={`${MOCK_STATS.avgReplyRate}%`}
+            value={`${statsValue.avgReplyRate.toFixed(1)}%`}
             iconBg="bg-violet-50 text-violet-600"
           />
           <StatCard
             icon={Rocket}
             label="Active Campaigns"
-            value={String(MOCK_STATS.activeCampaigns)}
+            value={String(statsValue.activeCampaigns)}
             iconBg="bg-amber-50 text-amber-600"
           />
         </div>
@@ -228,14 +284,16 @@ export default function CampaignsPage() {
             {/* Status filter */}
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as CampaignStatus | 'all')}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
-              <option value="sending">Sending</option>
-              <option value="paused">Paused</option>
-              <option value="draft">Draft</option>
-              <option value="completed">Completed</option>
+              <option value="RUNNING">Running</option>
+              <option value="PAUSED">Paused</option>
+              <option value="DRAFT">Draft</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="SCHEDULED">Scheduled</option>
+              <option value="FAILED">Failed</option>
             </select>
           </div>
 
@@ -263,7 +321,7 @@ export default function CampaignsPage() {
                   Audience
                 </th>
                 <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Delivery
+                  Sent
                 </th>
                 <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Open Rate
@@ -281,7 +339,11 @@ export default function CampaignsPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((campaign) => {
-                const cfg = STATUS_CONFIG[campaign.status]
+                const cfg = STATUS_DISPLAY[campaign.status]
+                const den = rateDenominator(campaign)
+                const openRate = den > 0 ? (campaign.totalOpened / den) * 100 : 0
+                const replyRate = den > 0 ? (campaign.totalReplied / den) * 100 : 0
+
                 return (
                   <tr
                     key={campaign.id}
@@ -290,7 +352,9 @@ export default function CampaignsPage() {
                     {/* Name + created */}
                     <td className="px-5 py-4">
                       <p className="font-semibold text-gray-900">{campaign.name}</p>
-                      <p className="mt-0.5 text-xs text-gray-400">{campaign.createdAt}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {new Date(campaign.createdAt).toLocaleDateString('zh-CN')}
+                      </p>
                     </td>
 
                     {/* Status badge */}
@@ -308,58 +372,64 @@ export default function CampaignsPage() {
 
                     {/* Audience */}
                     <td className="px-5 py-4 text-right tabular-nums text-gray-700">
-                      {campaign.audienceSize.toLocaleString()}
+                      {campaign.contactIds.length.toLocaleString()}
                     </td>
 
-                    {/* Delivery rate */}
-                    <td className="px-5 py-4 text-center">
-                      <RateBar value={campaign.deliveryRate} color="bg-blue-500" />
+                    {/* Sent */}
+                    <td className="px-5 py-4 text-right tabular-nums text-gray-700">
+                      {campaign.totalSent.toLocaleString()}
                     </td>
 
                     {/* Open rate */}
                     <td className="px-5 py-4 text-center">
-                      <RateBar value={campaign.openRate} color="bg-emerald-500" />
+                      <RateBar value={openRate} color="bg-emerald-500" />
                     </td>
 
                     {/* Reply rate */}
                     <td className="px-5 py-4 text-center">
-                      <RateBar value={campaign.replyRate} color="bg-violet-500" />
+                      <RateBar value={replyRate} color="bg-violet-500" />
                     </td>
 
                     {/* Created */}
                     <td className="px-5 py-4 text-right text-xs text-gray-500">
-                      {campaign.createdAt}
+                      {campaign.sentAt ? new Date(campaign.sentAt).toLocaleDateString('zh-CN') : '—'}
                     </td>
 
                     {/* Actions */}
                     <td className="px-5 py-4">
                       <div className="flex justify-end gap-1">
-                        {campaign.status === 'sending' ? (
+                        {campaign.status === 'DRAFT' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-violet-600 hover:text-violet-700"
+                            onClick={() => launchCampaign(campaign.id)}
+                            disabled={actioning === campaign.id}
+                            title="启动"
+                          >
+                            <Zap className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {(campaign.status === 'RUNNING' || campaign.status === 'PAUSED') && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-amber-600 hover:text-amber-700"
-                            onClick={() => toggleStatus(campaign.id)}
-                            title="暂停"
+                            onClick={() => toggleCampaign(campaign.id)}
+                            disabled={actioning === campaign.id}
+                            title={campaign.status === 'RUNNING' ? '暂停' : '启动'}
                           >
-                            <Pause className="h-4 w-4" />
+                            {campaign.status === 'RUNNING'
+                              ? <Pause className="h-4 w-4" />
+                              : <Play className="h-4 w-4" />}
                           </Button>
-                        ) : campaign.status === 'paused' ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-green-600 hover:text-green-700"
-                            onClick={() => toggleStatus(campaign.id)}
-                            title="启动"
-                          >
-                            <Play className="h-4 w-4" />
-                          </Button>
-                        ) : null}
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-red-500 hover:text-red-600"
                           onClick={() => deleteCampaign(campaign.id)}
+                          disabled={actioning === campaign.id}
                           title="删除"
                         >
                           <Trash2 className="h-4 w-4" />

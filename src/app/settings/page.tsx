@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,14 +13,38 @@ interface EmailAccount {
   id: string
   email: string
   displayName: string
+  smtpHost: string
+  smtpPort: number
+  smtpUser: string
+  smtpPassword: string
+  imapHost?: string | null
+  imapPort?: number | null
+  imapUser?: string | null
+  imapPassword?: string | null
   isActive: boolean
   dailySent: number
   dailyLimit: number
   healthScore: number
 }
 
+interface UserProfile {
+  id: string
+  email: string
+  name: string | null
+  avatar: string | null
+  role: string
+}
+
 export default function SettingsPage() {
+  // Profile
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profileName, setProfileName] = useState('')
+  const [profileAvatar, setProfileAvatar] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+
+  // Email accounts
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     email: '',
@@ -29,24 +53,140 @@ export default function SettingsPage() {
     smtpPort: '587',
     smtpUser: '',
     smtpPassword: '',
+    imapHost: '',
+    imapPort: '993',
+    imapUser: '',
+    imapPassword: '',
   })
+  const [savingAccount, setSavingAccount] = useState(false)
 
-  const addAccount = () => {
-    if (!form.email || !form.smtpPassword) return
-    setAccounts([
-      ...accounts,
-      {
-        id: Math.random().toString(36).slice(2),
-        email: form.email,
-        displayName: form.displayName || form.email.split('@')[0],
-        isActive: true,
-        dailySent: 0,
-        dailyLimit: 50,
-        healthScore: 100,
-      },
-    ])
-    setShowForm(false)
-    setForm({ email: '', displayName: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPassword: '' })
+  // Load profile
+  useEffect(() => {
+    fetch('/api/users/me')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success) {
+          setProfile(j.data)
+          setProfileName(j.data.name || '')
+          setProfileAvatar(j.data.avatar || '')
+        }
+      })
+      .catch(console.error)
+  }, [])
+
+  // Load email accounts
+  const fetchAccounts = useCallback(async () => {
+    try {
+      setLoadingAccounts(true)
+      const res = await fetch('/api/email-accounts')
+      const json = await res.json()
+      if (json.success) setAccounts(json.data)
+    } catch (e) {
+      console.error('Failed to fetch email accounts:', e)
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [fetchAccounts])
+
+  // Save profile
+  const handleSaveProfile = async () => {
+    setSavingProfile(true)
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: profileName }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setProfile(json.data)
+        alert('个人资料已保存')
+      }
+    } catch (e) {
+      console.error('Failed to save profile:', e)
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  // Handle avatar upload — update User.avatar
+  const handleAvatarUpload = async (url: string) => {
+    setProfileAvatar(url)
+    try {
+      await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: url }),
+      })
+    } catch (e) {
+      console.error('Failed to save avatar:', e)
+    }
+  }
+
+  // Add email account
+  const addAccount = async () => {
+    if (!form.email || !form.smtpHost || !form.smtpUser || !form.smtpPassword) return
+    setSavingAccount(true)
+    try {
+      const res = await fetch('/api/email-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          displayName: form.displayName || form.email.split('@')[0],
+          smtpHost: form.smtpHost,
+          smtpPort: parseInt(form.smtpPort) || 587,
+          smtpUser: form.smtpUser,
+          smtpPassword: form.smtpPassword,
+          imapHost: form.imapHost || null,
+          imapPort: form.imapPort ? parseInt(form.imapPort) : null,
+          imapUser: form.imapUser || null,
+          imapPassword: form.imapPassword || null,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setAccounts((prev) => [json.data, ...prev])
+        setShowForm(false)
+        setForm({ email: '', displayName: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPassword: '', imapHost: '', imapPort: '993', imapUser: '', imapPassword: '' })
+      }
+    } catch (e) {
+      console.error('Failed to add email account:', e)
+    } finally {
+      setSavingAccount(false)
+    }
+  }
+
+  // Toggle account active
+  const toggleAccount = async (id: string, isActive: boolean) => {
+    try {
+      const res = await fetch(`/api/email-accounts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setAccounts((prev) => prev.map((a) => (a.id === id ? json.data : a)))
+      }
+    } catch (e) {
+      console.error('Failed to toggle account:', e)
+    }
+  }
+
+  // Delete account
+  const deleteAccount = async (id: string) => {
+    if (!confirm('确定要删除这个邮箱账户吗？')) return
+    try {
+      await fetch(`/api/email-accounts/${id}`, { method: 'DELETE' })
+      setAccounts((prev) => prev.filter((a) => a.id !== id))
+    } catch (e) {
+      console.error('Failed to delete account:', e)
+    }
   }
 
   return (
@@ -58,17 +198,23 @@ export default function SettingsPage() {
             <CardTitle className="text-base">个人资料</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-6">
-            <AvatarUpload size="lg" onUpload={(url) => console.log('Avatar uploaded:', url)} />
+            <AvatarUpload size="lg" onUpload={handleAvatarUpload} />
             <div className="flex-1 space-y-4">
               <div>
                 <Label>显示名称</Label>
-                <Input placeholder="Your Name" />
+                <Input
+                  placeholder="Your Name"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                />
               </div>
               <div>
                 <Label>邮箱</Label>
-                <Input value="admin@outreachhub.com" disabled />
+                <Input value={profile?.email || ''} disabled />
               </div>
-              <Button>保存修改</Button>
+              <Button onClick={handleSaveProfile} disabled={savingProfile}>
+                {savingProfile ? '保存中...' : '保存修改'}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -141,16 +287,62 @@ export default function SettingsPage() {
                   placeholder="输入密码或应用专用密码"
                 />
               </div>
+
+              {/* IMAP section (optional) */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-600 mb-3">IMAP 收信配置（可选）</p>
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <Label>IMAP服务器</Label>
+                    <Input
+                      value={form.imapHost}
+                      onChange={(e) => setForm({ ...form, imapHost: e.target.value })}
+                      placeholder="imap.gmail.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>IMAP端口</Label>
+                    <Input
+                      value={form.imapPort}
+                      onChange={(e) => setForm({ ...form, imapPort: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>IMAP用户名</Label>
+                    <Input
+                      value={form.imapUser}
+                      onChange={(e) => setForm({ ...form, imapUser: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>IMAP密码</Label>
+                    <Input
+                      type="password"
+                      value={form.imapPassword}
+                      onChange={(e) => setForm({ ...form, imapPassword: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setShowForm(false)}>取消</Button>
-                <Button onClick={addAccount}>保存</Button>
+                <Button onClick={addAccount} disabled={savingAccount}>
+                  {savingAccount ? '保存中...' : '保存'}
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
         {/* Email accounts list */}
-        {accounts.length === 0 ? (
+        {loadingAccounts ? (
+          <Card className="border-gray-100">
+            <CardContent className="flex items-center justify-center py-8">
+              <p className="text-gray-400">加载中...</p>
+            </CardContent>
+          </Card>
+        ) : accounts.length === 0 ? (
           <Card className="border-gray-100">
             <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
               <Mail className="mb-4 h-16 w-16 text-gray-300" />
@@ -171,15 +363,19 @@ export default function SettingsPage() {
                       <p className="font-medium">{account.email}</p>
                       <p className="text-xs text-gray-500">
                         今日发送 {account.dailySent}/{account.dailyLimit} | 健康度 {account.healthScore}%
+                        {account.smtpHost && ` | SMTP: ${account.smtpHost}:${account.smtpPort}`}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <button
+                      onClick={() => toggleAccount(account.id, !account.isActive)}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors ${account.isActive ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    >
                       {account.isActive ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {account.isActive ? '启用' : '禁用'}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400">
+                    </button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400" onClick={() => deleteAccount(account.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
