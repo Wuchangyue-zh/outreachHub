@@ -1,4 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 // ─── Mock AI email generation ────────────────────────────────
 // Simulates a ~2.5s LLM call, returns a realistic cold outreach email.
@@ -52,16 +54,16 @@ Best regards,
 [Phone] | [Email]`
 }
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json()
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
+    const body = await req.json()
     const { productPrompt, tone } = body
 
     if (!productPrompt?.trim()) {
-      return NextResponse.json(
-        { success: false, error: '请输入产品描述' },
-        { status: 400 },
-      )
+      return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请输入产品描述', 400)
     }
 
     // Simulate LLM latency (2–3s)
@@ -74,9 +76,6 @@ export async function POST(request: Request) {
       data: { email },
     })
   } catch {
-    return NextResponse.json(
-      { success: false, error: '生成失败，请重试' },
-      { status: 500 },
-    )
+    return errorResponse(ErrorCodes.INTERNAL_ERROR, '生成失败，请重试', 500)
   }
 }

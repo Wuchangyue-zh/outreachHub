@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
     const stats = await withCache(
       cacheKey,
       async () => {
-        const where = campaignId ? { id: campaignId } : {}
+        const where: any = { tenantId: authResult.tenantId }
+        if (campaignId) where.id = campaignId
 
         // Fetch campaigns with email logs
         const campaigns = await prisma.campaign.findMany({

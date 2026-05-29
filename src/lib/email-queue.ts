@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq'
-import { redisConnection } from './redis'
+import { getRedisConnection } from './redis'
 import { sendMail } from './email'
 import { prisma } from './prisma'
 
@@ -17,12 +17,18 @@ export interface EmailJobData {
 }
 
 let _emailQueue: Queue<EmailJobData> | null = null
+let _queueDisabled = false
 
 export function getEmailQueue(): Queue<EmailJobData> | null {
+  if (_queueDisabled) return null
+
+  const connection = getRedisConnection()
+  if (!connection) return null
+
   if (!_emailQueue) {
     try {
       _emailQueue = new Queue<EmailJobData>('email-queue', {
-        connection: redisConnection,
+        connection,
         defaultJobOptions: {
           removeOnComplete: {
             age: 3600, // keep completed jobs for 1 hour
@@ -40,7 +46,12 @@ export function getEmailQueue(): Queue<EmailJobData> | null {
       })
 
       _emailQueue.on('error', (error) => {
-        console.error('[EmailQueue] Queue error:', error.message)
+        if (_queueDisabled) return
+        _queueDisabled = true
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn('[EmailQueue] Redis unavailable, falling back to direct send:', message || 'connection failed')
+        void _emailQueue?.close().catch(() => {})
+        _emailQueue = null
       })
     } catch (error) {
       console.warn('[EmailQueue] Failed to initialize queue, falling back to direct send:', (error as Error).message)

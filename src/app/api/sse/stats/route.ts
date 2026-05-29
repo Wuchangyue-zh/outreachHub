@@ -13,30 +13,49 @@ export async function GET(req: NextRequest) {
     }
 
     const encoder = new TextEncoder()
-    let disconnected = false
+    let interval: ReturnType<typeof setInterval> | null = null
+    let unsubscribe: (() => void) | null = null
+    let closed = false
+
+    const cleanup = () => {
+      if (closed) return
+      closed = true
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+      if (unsubscribe) {
+        unsubscribe()
+        unsubscribe = null
+      }
+    }
 
     const stream = new ReadableStream({
       start(controller) {
+        const safeEnqueue = (data: string) => {
+          if (closed || controller.desiredSize === null) return false
+          try {
+            controller.enqueue(encoder.encode(data))
+            return true
+          } catch {
+            cleanup()
+            return false
+          }
+        }
+
         // Send initial connection message
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`))
+        safeEnqueue(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`)
 
         // Listen for real-time email events
-        const unsubscribe = emailEvents.on('*' as any, (event: EmailEvent) => {
-          if (disconnected) return
-          try {
-            const { type: eventType, ...rest } = event
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'email_event', eventType, ...rest })}\n\n`))
-          } catch (e) {
-            // Stream might be closed
-          }
+        unsubscribe = emailEvents.on('*' as any, (event: EmailEvent) => {
+          if (closed) return
+          const { type: eventType, ...rest } = event
+          safeEnqueue(`data: ${JSON.stringify({ type: 'email_event', eventType, ...rest })}\n\n`)
         })
 
         // Poll for new data every 5 seconds
-        const interval = setInterval(async () => {
-          if (disconnected) {
-            clearInterval(interval)
-            return
-          }
+        interval = setInterval(async () => {
+          if (closed) return
 
           try {
             const [contactsCount, campaignsCount, emailLogsCount] = await Promise.all([
@@ -75,18 +94,19 @@ export async function GET(req: NextRequest) {
               },
             }
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(stats)}\n\n`))
+            safeEnqueue(`data: ${JSON.stringify(stats)}\n\n`)
           } catch (error) {
-            console.error('[SSE] Error fetching stats:', error)
+            if (!closed) {
+              console.error('[SSE] Error fetching stats:', error)
+            }
           }
         }, 5000)
 
-        // Cleanup on disconnect
-        return () => {
-          disconnected = true
-          clearInterval(interval)
-          unsubscribe()
-        }
+        req.signal.addEventListener('abort', cleanup, { once: true })
+        if (req.signal.aborted) cleanup()
+      },
+      cancel() {
+        cleanup()
       },
     })
 

@@ -33,7 +33,13 @@ export default function StatsOverview() {
       const res = await fetch('/api/stats')
       const data = await res.json()
       if (data.success) {
-        setStats(data.data)
+        setStats((prev) => ({
+          ...prev,
+          ...data.data,
+          emails_SENT: data.data.emails_SENT ?? 0,
+          emails_OPENED: data.data.emails_OPENED ?? 0,
+          emails_REPLIED: data.data.emails_REPLIED ?? 0,
+        }))
       }
     } catch (e) {
       console.error(e)

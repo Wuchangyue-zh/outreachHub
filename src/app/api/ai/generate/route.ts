@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { generateEmail, generateEmailSubject } from '@/lib/openai'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const body = await req.json()
     const { type, data } = body
 
@@ -32,9 +37,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: subjects })
     }
 
-    return NextResponse.json({ error: '无效的生成类型' }, { status: 400 })
+    return errorResponse(ErrorCodes.VALIDATION_ERROR, '无效的生成类型', 400)
   } catch (error) {
-    console.error('AI generation error:', error)
-    return NextResponse.json({ error: 'AI生成失败，请稍后重试' }, { status: 500 })
+    return handleApiError(error)
   }
 }

@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { addEmailTracking } from '@/lib/email-tracking'
 import { prisma } from '@/lib/prisma'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const body = await req.json()
     const { to, subject, content, contactId } = body
 
     if (!to) {
-      return NextResponse.json({ error: '请提供收件人邮箱' }, { status: 400 })
+      return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请提供收件人邮箱', 400)
     }
 
     const transporter = nodemailer.createTransport({

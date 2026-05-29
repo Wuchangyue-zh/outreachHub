@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
@@ -9,6 +11,9 @@ export async function GET(req: NextRequest) {
   if (rateLimitResult) return rateLimitResult
 
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const { searchParams } = new URL(req.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -19,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit
 
-    const where: any = {}
+    const where: any = { tenantId: auth.tenantId }
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },
@@ -55,8 +60,7 @@ export async function GET(req: NextRequest) {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     })
   } catch (error) {
-    console.error('Get contacts error:', error)
-    return NextResponse.json({ error: '获取客户列表失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }
 
@@ -65,36 +69,36 @@ export async function POST(req: NextRequest) {
   if (rateLimitResult) return rateLimitResult
 
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+
     const body = await req.json()
     const { firstName, lastName, title, department, company, emails, phones, tags, notes, country, city } = body
 
     if (!firstName || !emails || emails.length === 0) {
-      return NextResponse.json({ error: '姓名和邮箱为必填项' }, { status: 400 })
+      return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '姓名和邮箱为必填项', 400)
     }
 
-    // Check if email already exists
+    // Check if email already exists within the same tenant
     const existingEmail = await prisma.contactEmail.findFirst({
-      where: { address: emails[0] },
+      where: { address: emails[0], contact: { tenantId: auth.tenantId } },
     })
     if (existingEmail) {
-      return NextResponse.json({ error: '该邮箱已被其他客户使用' }, { status: 409 })
+      return errorResponse(ErrorCodes.CONFLICT, '该邮箱已被其他客户使用', 409)
     }
 
-    // Create or find company
+    // Create or find company within the same tenant
     let companyId = null
     if (company) {
       const existingCompany = await prisma.company.findFirst({
-        where: { name: { equals: company, mode: 'insensitive' } },
+        where: { name: { equals: company, mode: 'insensitive' }, tenantId: auth.tenantId },
       })
       if (existingCompany) {
         companyId = existingCompany.id
       } else {
         const newCompany = await prisma.company.create({
-          data: {
-            name: company,
-            country,
-            city,
-          },
+          data: { name: company, tenantId: auth.tenantId, country, city },
         })
         companyId = newCompany.id
       }
@@ -107,6 +111,7 @@ export async function POST(req: NextRequest) {
         fullName: `${firstName} ${lastName || ''}`.trim(),
         title,
         department,
+        tenantId: auth.tenantId,
         companyId,
         emails: {
           create: emails.map((email: string, i: number) => ({
@@ -125,7 +130,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: contact })
   } catch (error) {
-    console.error('Create contact error:', error)
-    return NextResponse.json({ error: '创建客户失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }

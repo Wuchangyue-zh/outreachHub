@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const { searchParams } = new URL(req.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -10,7 +15,7 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type') || ''
 
     const skip = (page - 1) * limit
-    const where: any = {}
+    const where: any = { tenantId: auth.tenantId }
     if (status) where.status = status
     if (type) where.type = type
 
@@ -30,16 +35,22 @@ export async function GET(req: NextRequest) {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     })
   } catch (error) {
-    return NextResponse.json({ error: '获取活动列表失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+
     const body = await req.json()
-    const campaign = await prisma.campaign.create({ data: body })
+    const campaign = await prisma.campaign.create({
+      data: { ...body, tenantId: auth.tenantId },
+    })
     return NextResponse.json({ success: true, data: campaign })
   } catch (error) {
-    return NextResponse.json({ error: '创建活动失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }

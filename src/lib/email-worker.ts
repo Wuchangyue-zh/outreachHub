@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq'
-import { redisConnection } from './redis'
+import { getRedisConnection } from './redis'
 import { sendMail } from './email'
 import { prisma } from './prisma'
 import type { EmailJobData } from './email-queue'
@@ -143,8 +143,13 @@ async function processEmailJob(job: Job<EmailJobData>) {
 }
 
 export function createEmailWorker() {
+  const connection = getRedisConnection()
+  if (!connection) {
+    throw new Error('Redis is not configured. Set REDIS_URL or REDIS_HOST in .env to run the email worker.')
+  }
+
   const worker = new Worker<EmailJobData>('email-queue', processEmailJob, {
-    connection: redisConnection,
+    connection,
     concurrency: 5, // Process 5 emails concurrently
     limiter: {
       max: 100, // Max 100 jobs
@@ -170,7 +175,13 @@ export function createEmailWorker() {
 // Start worker if this file is run directly
 if (require.main === module) {
   console.log('[Email Worker] Starting email worker...')
-  const worker = createEmailWorker()
+  let worker
+  try {
+    worker = createEmailWorker()
+  } catch (error) {
+    console.error('[Email Worker]', (error as Error).message)
+    process.exit(1)
+  }
 
   process.on('SIGTERM', async () => {
     console.log('[Email Worker] Shutting down...')

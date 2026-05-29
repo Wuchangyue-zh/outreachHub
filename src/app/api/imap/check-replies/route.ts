@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initializeIMAPClient } from '@/lib/imap'
 import { getCategoryLabel } from '@/lib/reply-classifier'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const client = await initializeIMAPClient()
 
     if (!client) {

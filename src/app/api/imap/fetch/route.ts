@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initializeIMAPClient } from '@/lib/imap'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const limit = parseInt(req.nextUrl.searchParams.get('limit') || '20')
     const daysAgo = parseInt(req.nextUrl.searchParams.get('days') || '7')
 
