@@ -16,72 +16,47 @@ const iconMap: Record<string, React.ElementType> = {
   'bar-chart-3': BarChart3,
 }
 
-const gradients = [
-  'from-blue-500 to-indigo-600',
-  'from-emerald-500 to-teal-600',
-  'from-violet-500 to-purple-600',
-  'from-amber-500 to-orange-600',
-  'from-cyan-500 to-blue-600',
-  'from-rose-500 to-pink-600',
-  'from-fuchsia-500 to-purple-600',
-  'from-lime-500 to-green-600',
-]
-
-/** Bento grid layout config: [colSpan, rowSpan] per card index */
-const bentoLayout: [number, number][] = [
-  [2, 2], // AI 智能拓客 — hero card
-  [1, 1],
-  [1, 1],
-  [1, 2], // A/B 测试 — tall card
-  [2, 1],
-  [1, 1],
-  [1, 1],
-  [1, 1],
+const iconBg = [
+  'bg-blue-50 text-blue-600',
+  'bg-emerald-50 text-emerald-600',
+  'bg-violet-50 text-violet-600',
+  'bg-amber-50 text-amber-600',
+  'bg-cyan-50 text-cyan-600',
+  'bg-rose-50 text-rose-600',
+  'bg-fuchsia-50 text-fuchsia-600',
+  'bg-lime-50 text-lime-600',
 ]
 
 function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
   const Icon = iconMap[feature.icon] || Brain
-  const gradient = gradients[index % gradients.length]
-  const [colSpan, rowSpan] = bentoLayout[index] || [1, 1]
-  const isHero = colSpan === 2 && rowSpan === 2
+  const bg = iconBg[index % iconBg.length]
 
   return (
     <Link
       href={feature.href}
-      className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:border-blue-200 hover:shadow-xl ${
-        colSpan === 2 ? 'md:col-span-2' : ''
-      } ${rowSpan === 2 ? 'md:row-span-2' : ''}`}
+      className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-gray-100 bg-white p-7 text-center shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.03] hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50"
     >
-      {/* Radial gradient spotlight on hover */}
-      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100"
-        style={{
-          background: 'radial-gradient(circle 300px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(59,130,246,0.08), transparent)',
-        }}
-      />
-
-      <div className={`relative h-full ${isHero ? 'p-8 lg:p-10' : 'p-6'}`}>
-        {/* Icon with damped scale */}
-        <div
-          className={`mb-4 flex items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:-translate-y-0.5 ${
-            isHero ? 'h-16 w-16' : 'h-12 w-12'
-          }`}
-        >
-          <Icon className={`text-white ${isHero ? 'h-8 w-8' : 'h-6 w-6'}`} />
+      {/* Icon */}
+      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 group-hover:scale-110">
+        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${bg} transition-colors duration-300`}>
+          <Icon className="h-6 w-6" />
         </div>
+      </div>
 
-        {/* Content */}
-        <h3 className={`font-bold text-gray-900 ${isHero ? 'text-xl' : 'text-base'}`}>
-          {feature.title}
-        </h3>
-        <p className={`mt-2 leading-relaxed text-gray-500 ${isHero ? 'text-sm' : 'text-sm'}`}>
-          {feature.description}
-        </p>
+      {/* Title */}
+      <h3 className="text-base font-bold text-gray-900 transition-colors duration-300 group-hover:text-blue-700">
+        {feature.title}
+      </h3>
 
-        {/* Arrow */}
-        <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 translate-y-1 transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0">
-          了解更多
-          <ArrowRight className="h-3 w-3 transition-transform duration-500 group-hover:translate-x-1" />
-        </div>
+      {/* Description */}
+      <p className="mt-2 text-sm leading-relaxed text-gray-500">
+        {feature.description}
+      </p>
+
+      {/* Arrow reveal */}
+      <div className="mt-auto pt-4 flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 translate-y-1 transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0">
+        了解更多
+        <ArrowRight className="h-3 w-3 transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" />
       </div>
     </Link>
   )
@@ -103,8 +78,8 @@ export function Features() {
           <p className="mt-4 text-base text-gray-500">{featuresData.subtitle}</p>
         </div>
 
-        {/* Bento Grid */}
-        <div className="mt-14 grid auto-rows-[200px] gap-5 md:grid-cols-3 lg:grid-cols-4">
+        {/* 4-col uniform grid — zero col-span, zero bento */}
+        <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           {featuresData.features.map((feature, i) => (
             <FeatureCard key={feature.title} feature={feature} index={i} />
           ))}

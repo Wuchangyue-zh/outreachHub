@@ -52,6 +52,23 @@ export const heroData = {
   },
 }
 
+// ─── 02b. HERO WORKFLOW ─────────────────────────────────────
+
+export interface WorkflowNode {
+  id: string
+  label: string
+  description: string
+}
+
+export const heroWorkflowData: WorkflowNode[] = [
+  { id: 'prospect', label: 'Prospect', description: '60 亿+海关数据锁定目标买家' },
+  { id: 'enrich', label: 'Enrich', description: 'AI 补全企业画像与决策人信息' },
+  { id: 'verify', label: 'Verify', description: '98.5% 准确率实时验证邮箱' },
+  { id: 'outreach', label: 'Outreach', description: 'AI 生成个性化开发信自动发送' },
+  { id: 'reply', label: 'Reply', description: '智能跟进序列提升回复率' },
+  { id: 'win', label: 'Win', description: 'CRM 全链路管理直至成交' },
+]
+
 // ─── 03. TRUST BAR (Logo 墙) ────────────────────────────────
 
 export interface TrustLogo {

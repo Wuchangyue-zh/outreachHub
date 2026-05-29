@@ -1,8 +1,17 @@
 import Link from 'next/link'
-import { Users, Globe, Mail, TrendingUp, ArrowRight } from 'lucide-react'
-import { heroData } from '@/lib/landing-data'
+import { Users, Globe, Mail, TrendingUp, ArrowRight, Search, UserCheck, Send, MessageSquare, Trophy, Sparkles } from 'lucide-react'
+import { heroData, heroWorkflowData } from '@/lib/landing-data'
 
 const statIcons = { users: Users, globe: Globe, mail: Mail }
+
+const workflowIcons: Record<string, React.ElementType> = {
+  prospect: Search,
+  enrich: UserCheck,
+  verify: Mail,
+  outreach: Send,
+  reply: MessageSquare,
+  win: Trophy,
+}
 
 export function Hero() {
   return (
@@ -144,6 +153,128 @@ export function Hero() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ─── Workflow Pipeline ─── */}
+        <div className="mt-20">
+          {/* Section heading */}
+          <div className="mb-10 text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
+              How It Works
+            </p>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
+              从发现线索到成功签约，一站式自动化
+            </h2>
+          </div>
+
+          {/* Desktop: horizontal pipeline with SVG connectors */}
+          <div className="hidden lg:block">
+            <div className="relative mx-auto max-w-5xl">
+              {/* SVG flowing lines */}
+              <svg
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                viewBox="0 0 1000 120"
+                preserveAspectRatio="xMidYMid meet"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.15" />
+                    <stop offset="50%" stopColor="#6366f1" stopOpacity="0.6" />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.15" />
+                  </linearGradient>
+                </defs>
+                {heroWorkflowData.slice(0, -1).map((_, i) => {
+                  const x1 = (i + 1) * (1000 / 7) + 28
+                  const x2 = (i + 2) * (1000 / 7) - 28
+                  const y = 60
+                  return (
+                    <g key={i}>
+                      {/* Static base line */}
+                      <line
+                        x1={x1} y1={y} x2={x2} y2={y}
+                        stroke="#e2e8f0"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                      />
+                      {/* Animated flowing dash */}
+                      <line
+                        x1={x1} y1={y} x2={x2} y2={y}
+                        stroke="url(#flowGrad)"
+                        strokeWidth={2.5}
+                        strokeLinecap="round"
+                        strokeDasharray="12 20"
+                        className="animate-[dash_3s_linear_infinite]"
+                      />
+                    </g>
+                  )
+                })}
+              </svg>
+
+              {/* Nodes */}
+              <div className="relative grid grid-cols-6 gap-2">
+                {heroWorkflowData.map((node, idx) => {
+                  const Icon = workflowIcons[node.id] || Sparkles
+                  return (
+                    <div
+                      key={node.id}
+                      className="group flex flex-col items-center text-center"
+                      style={{ animationDelay: `${idx * 120}ms` }}
+                    >
+                      {/* Icon container with breathing glow */}
+                      <div className="relative mb-4">
+                        {/* Breathing ping ring */}
+                        <span
+                          className="absolute inset-0 rounded-2xl bg-blue-400/20 animate-ping"
+                          style={{ animationDuration: '2.4s', animationDelay: `${idx * 300}ms` }}
+                        />
+                        {/* Solid icon box */}
+                        <div
+                          className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-white shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:border-blue-300 group-hover:shadow-lg group-hover:shadow-blue-100/50 group-hover:-translate-y-1"
+                        >
+                          <Icon className="h-6 w-6 text-blue-600 transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110" />
+                        </div>
+                      </div>
+                      {/* Label */}
+                      <p className="text-sm font-bold text-gray-900 transition-colors duration-300 group-hover:text-blue-700">
+                        {node.label}
+                      </p>
+                      {/* Description */}
+                      <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                        {node.description}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile / Tablet: grid layout */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:hidden">
+            {heroWorkflowData.map((node, idx) => {
+              const Icon = workflowIcons[node.id] || Sparkles
+              return (
+                <div
+                  key={node.id}
+                  className="group flex flex-col items-center rounded-2xl border border-gray-100 bg-white p-5 text-center shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:border-blue-200 hover:shadow-md"
+                  style={{ animationDelay: `${idx * 80}ms` }}
+                >
+                  <div className="relative mb-3">
+                    <span
+                      className="absolute inset-0 rounded-xl bg-blue-400/15 animate-ping"
+                      style={{ animationDuration: '2.4s', animationDelay: `${idx * 300}ms` }}
+                    />
+                    <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 transition-colors duration-300 group-hover:bg-blue-100">
+                      <Icon className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">{node.label}</p>
+                  <p className="mt-1 text-xs text-gray-500">{node.description}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
 
