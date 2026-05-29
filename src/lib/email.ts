@@ -9,7 +9,11 @@ export interface SendMailOptions {
   attachments?: Array<{ filename: string; content: Buffer }>
 }
 
-export async function createTransporter() {
+/**
+ * 创建平台级 transporter（使用 .env SMTP 配置）
+ * 用途：注册确认、密码重置、账单通知、系统告警
+ */
+export async function createPlatformTransporter() {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.jafron.com',
     port: parseInt(process.env.SMTP_PORT || '465'),
@@ -28,8 +32,12 @@ export async function createTransporter() {
   })
 }
 
-export async function sendMail(options: SendMailOptions) {
-  const transporter = await createTransporter()
+/**
+ * 发送平台系统邮件（使用 .env SMTP）
+ * 用途：注册确认、密码重置、账单通知、系统告警
+ */
+export async function sendPlatformMail(options: SendMailOptions) {
+  const transporter = await createPlatformTransporter()
 
   const fromName = process.env.SMTP_FROM_NAME || 'OutreachHub'
   const mailOptions = {
@@ -45,8 +53,11 @@ export async function sendMail(options: SendMailOptions) {
   return { success: true, messageId: result.messageId }
 }
 
-export async function sendBatchEmails(emails: SendMailOptions[]) {
-  const transporter = await createTransporter()
+/**
+ * 批量发送平台系统邮件
+ */
+export async function sendPlatformBatchEmails(emails: SendMailOptions[]) {
+  const transporter = await createPlatformTransporter()
   const results: Array<{ success: boolean; messageId?: string; error?: string; to: string }> = []
 
   for (const email of emails) {
@@ -72,3 +83,15 @@ export async function sendBatchEmails(emails: SendMailOptions[]) {
 
   return results
 }
+
+// ==================== 向后兼容别名 ====================
+// 保持向后兼容，现有代码无需立即修改
+
+/** @deprecated 使用 createPlatformTransporter() 代替 */
+export const createTransporter = createPlatformTransporter
+
+/** @deprecated 使用 sendPlatformMail() 代替 */
+export const sendMail = sendPlatformMail
+
+/** @deprecated 使用 sendPlatformBatchEmails() 代替 */
+export const sendBatchEmails = sendPlatformBatchEmails

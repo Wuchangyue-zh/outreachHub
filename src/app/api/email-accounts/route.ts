@@ -3,6 +3,16 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
+function sanitizeEmailAccount<T extends { smtpPassword?: string | null; imapPassword?: string | null }>(
+  account: T
+) {
+  return {
+    ...account,
+    smtpPassword: account.smtpPassword ? '********' : '',
+    imapPassword: account.imapPassword ? '********' : '',
+  }
+}
+
 // GET /api/email-accounts — list user's email accounts
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +23,10 @@ export async function GET(req: NextRequest) {
       where: { userId: auth.userId },
       orderBy: { createdAt: 'desc' },
     })
-    return NextResponse.json({ success: true, data: accounts })
+    return NextResponse.json({
+      success: true,
+      data: accounts.map(sanitizeEmailAccount),
+    })
   } catch (error) {
     return handleApiError(error)
   }
@@ -47,7 +60,7 @@ export async function POST(req: NextRequest) {
         imapPassword: imapPassword || null,
       },
     })
-    return NextResponse.json({ success: true, data: account }, { status: 201 })
+    return NextResponse.json({ success: true, data: sanitizeEmailAccount(account) }, { status: 201 })
   } catch (error) {
     return handleApiError(error)
   }

@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq'
 import { getRedisConnection } from './redis'
-import { sendMail } from './email'
+import { sendPlatformMail } from './email'
+import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
 
@@ -11,6 +12,7 @@ export interface EmailJobData {
   text?: string
   contactId?: string
   campaignId?: string
+  emailAccountId?: string  // 用户 EmailAccount ID
   fromEmail?: string
   fromName?: string
   trackingPixel?: string
@@ -131,47 +133,83 @@ export async function addBulkEmailJobs(emails: EmailJobData[], options?: { delay
  */
 async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined> {
   try {
-    // Apply tracking if contactId is available
-    let emailHtml = data.html || ''
-    if (data.contactId) {
-      // We'll apply tracking after the email log is created below
-      // For direct send, we create the log first
+    // 确定发件人邮箱
+    let fromEmail = data.fromEmail || process.env.SMTP_USER || ''
+
+    // 如果指定了 EmailAccount，检查发送限额
+    if (data.emailAccountId) {
+      const canSend = await checkDailyLimit(data.emailAccountId)
+      if (!canSend) {
+        console.warn(`[EmailQueue] EmailAccount ${data.emailAccountId} reached daily limit, skipping`)
+        return undefined
+      }
+      // 从 EmailAccount 获取发件人邮箱
+      const account = await prisma.emailAccount.findUnique({
+        where: { id: data.emailAccountId },
+        select: { email: true },
+      })
+      if (account) {
+        fromEmail = account.email
+      }
     }
 
-    const result = await sendMail({
-      to: data.to,
-      subject: data.subject,
-      html: emailHtml,
-      text: data.text,
-      from: data.fromName ? `${data.fromName} <${data.fromEmail || process.env.SMTP_USER}>` : data.fromEmail,
-    })
-
-    // Create email log entry
     const logData: any = {
       contactId: data.contactId || '',
-      messageId: result.messageId,
+      messageId: '',
       toEmail: data.to,
-      fromEmail: data.fromEmail || process.env.SMTP_USER || '',
+      fromEmail,
       subject: data.subject,
-      status: 'SENT',
+      status: 'PENDING',
       sentAt: new Date(),
       htmlContent: data.html,
-      tracked: !!(data.contactId && data.trackingPixel),
+      content: data.text || data.html || '',
+      tracked: false,
     }
 
     if (data.campaignId) {
       logData.campaignId = data.campaignId
     }
 
-    const emailLog = await prisma.emailLog.create({
-      data: logData,
+    const emailLog = await prisma.emailLog.create({ data: logData })
+
+    let emailHtml = data.html || ''
+    if (data.contactId) {
+      emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId)
+    }
+
+    // 根据是否有 EmailAccount 选择发送方式
+    let result: { success: boolean; messageId?: string }
+
+    if (data.emailAccountId) {
+      // 使用用户 EmailAccount 发送
+      result = await sendAccountMail({
+        emailAccountId: data.emailAccountId,
+        to: data.to,
+        subject: data.subject,
+        html: emailHtml,
+        text: data.text,
+        from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+      })
+    } else {
+      // 使用平台 SMTP 发送（降级）
+      result = await sendPlatformMail({
+        to: data.to,
+        subject: data.subject,
+        html: emailHtml,
+        text: data.text,
+        from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+      })
+    }
+
+    await prisma.emailLog.update({
+      where: { id: emailLog.id },
+      data: {
+        status: 'SENT',
+        messageId: result.messageId,
+        htmlContent: emailHtml,
+        tracked: !!data.contactId,
+      },
     })
-
-    // If tracking was supposed to happen, update the sent email with tracking pixel
-    // Note: For direct send, tracking pixel is appended post-send (limited)
-    // The proper tracking happens when sent via the Worker
-
-    // Update contact stats
     if (data.contactId) {
       await prisma.contact.update({
         where: { id: data.contactId },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { generateEmail, generateEmailSubject } from '@/lib/openai'
+import { generateEmail, generateEmailSubject, generateReplyDraft } from '@/lib/openai'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,6 +35,15 @@ export async function POST(req: NextRequest) {
         language: data.language || 'en',
       })
       return NextResponse.json({ success: true, data: subjects })
+    }
+
+    if (type === 'generate-reply') {
+      const draft = await generateReplyDraft({
+        contactName: data.contactName,
+        company: data.company || '',
+        lastMessage: data.lastMessage,
+      })
+      return NextResponse.json({ success: true, data: draft })
     }
 
     return errorResponse(ErrorCodes.VALIDATION_ERROR, '无效的生成类型', 400)

@@ -121,6 +121,40 @@ Requirements:
   return completion.choices[0]?.message?.content?.trim() || ''
 }
 
+export async function generateReplyDraft(input: {
+  contactName: string
+  company: string
+  lastMessage: string
+}) {
+  const completion = await createChatCompletion(
+    [
+      {
+        role: 'system',
+        content:
+          'You are a professional B2B sales representative. Write concise, helpful email replies that address the customer inquiry directly. Use a professional but warm tone.',
+      },
+      {
+        role: 'user',
+        content: `Write a reply email to ${input.contactName} at ${input.company}.
+
+Their latest message:
+${input.lastMessage}
+
+Requirements:
+1. Address their specific questions or requests
+2. Keep it under 200 words
+3. Include a clear next step
+4. Sign off professionally
+
+Return only the email body text.`,
+      },
+    ],
+    { temperature: 0.7, max_tokens: 800 }
+  )
+
+  return completion.choices[0]?.message?.content?.trim() || ''
+}
+
 export async function generateEmailSubject(input: {
   contactName: string
   companyName: string

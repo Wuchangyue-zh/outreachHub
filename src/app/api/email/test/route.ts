@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
 
     const body = await req.json()
-    const { to, subject, content, contactId } = body
+    const { to, subject, content, contactId, plain } = body
 
     if (!to) {
       return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请提供收件人邮箱', 400)
@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const htmlContent = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    const htmlContent = plain
+      ? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; white-space: pre-wrap;">${(content || '').replace(/\n/g, '<br>')}</div>`
+      : `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #3b82f6, #6366f1); padding: 20px; border-radius: 8px 8px 0 0; color: white;">
         <h2 style="margin: 0;">OutreachHub 邮件发送测试</h2>
       </div>

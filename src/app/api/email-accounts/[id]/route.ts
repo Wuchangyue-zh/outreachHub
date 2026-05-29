@@ -5,6 +5,16 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+function sanitizeEmailAccount<T extends { smtpPassword?: string | null; imapPassword?: string | null }>(
+  account: T
+) {
+  return {
+    ...account,
+    smtpPassword: account.smtpPassword ? '********' : '',
+    imapPassword: account.imapPassword ? '********' : '',
+  }
+}
+
 // GET /api/email-accounts/[id]
 export async function GET(req: NextRequest, ctx: RouteContext) {
   try {
@@ -16,7 +26,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       where: { id, userId: auth.userId },
     })
     if (!account) return errorResponse(ErrorCodes.NOT_FOUND, '邮箱账户不存在', 404)
-    return NextResponse.json({ success: true, data: account })
+    return NextResponse.json({ success: true, data: sanitizeEmailAccount(account) })
   } catch (error) {
     return handleApiError(error)
   }
@@ -42,11 +52,15 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     if (body.smtpHost !== undefined) updateData.smtpHost = body.smtpHost
     if (body.smtpPort !== undefined) updateData.smtpPort = parseInt(body.smtpPort)
     if (body.smtpUser !== undefined) updateData.smtpUser = body.smtpUser
-    if (body.smtpPassword !== undefined) updateData.smtpPassword = body.smtpPassword
+    if (body.smtpPassword !== undefined && body.smtpPassword !== '********') {
+      updateData.smtpPassword = body.smtpPassword
+    }
     if (body.imapHost !== undefined) updateData.imapHost = body.imapHost
     if (body.imapPort !== undefined) updateData.imapPort = parseInt(body.imapPort)
     if (body.imapUser !== undefined) updateData.imapUser = body.imapUser
-    if (body.imapPassword !== undefined) updateData.imapPassword = body.imapPassword
+    if (body.imapPassword !== undefined && body.imapPassword !== '********') {
+      updateData.imapPassword = body.imapPassword
+    }
     if (body.isActive !== undefined) updateData.isActive = body.isActive
     if (body.dailyLimit !== undefined) updateData.dailyLimit = body.dailyLimit
 
@@ -54,7 +68,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
       where: { id },
       data: updateData,
     })
-    return NextResponse.json({ success: true, data: account })
+    return NextResponse.json({ success: true, data: sanitizeEmailAccount(account) })
   } catch (error) {
     return handleApiError(error)
   }
@@ -84,7 +98,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       where: { id },
       data: updateData,
     })
-    return NextResponse.json({ success: true, data: account })
+    return NextResponse.json({ success: true, data: sanitizeEmailAccount(account) })
   } catch (error) {
     return handleApiError(error)
   }

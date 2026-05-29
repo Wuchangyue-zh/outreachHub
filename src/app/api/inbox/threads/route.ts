@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
-// Map replyCategory (from reply-classifier) to inbox intent
 function categoryToIntent(category: string | null): 'interested' | 'opt-out' | 'ooo' {
   switch (category) {
     case 'INTERESTED':
@@ -22,15 +21,25 @@ function categoryToIntent(category: string | null): 'interested' | 'opt-out' | '
   }
 }
 
-// GET /api/inbox/threads — fetch inbox threads from EmailLog replies
+// GET /api/inbox/threads — fetch inbox threads from replied EmailLogs (tenant-scoped)
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!auth.tenantId) return NextResponse.json({ success: true, data: [] })
 
-    // Fetch replied email logs
+    const tenantContacts = await prisma.contact.findMany({
+      where: { tenantId: auth.tenantId },
+      select: { id: true },
+    })
+    const tenantContactIds = tenantContacts.map((c) => c.id)
+    if (tenantContactIds.length === 0) {
+      return NextResponse.json({ success: true, data: [] })
+    }
+
     const repliedLogs = await prisma.emailLog.findMany({
       where: {
+        contactId: { in: tenantContactIds },
         repliedAt: { not: null },
       },
       include: {
@@ -40,17 +49,14 @@ export async function GET(req: NextRequest) {
       take: 100,
     })
 
-    // Collect unique contact IDs
     const contactIds = [...new Set(repliedLogs.map((log) => log.contactId).filter(Boolean))]
 
-    // Fetch contacts with company info
     const contacts = await prisma.contact.findMany({
-      where: { id: { in: contactIds } },
+      where: { id: { in: contactIds }, tenantId: auth.tenantId },
       include: { company: true },
     })
     const contactMap = new Map(contacts.map((c) => [c.id, c]))
 
-    // Group by contact to build threads
     const threadMap = new Map<string, {
       id: string
       contactName: string
@@ -76,21 +82,25 @@ export async function GET(req: NextRequest) {
 
     for (const log of repliedLogs) {
       const contact = contactMap.get(log.contactId)
+      if (!contact) continue
+
       const contactKey = log.contactId
+      const outboundBody = log.htmlContent || log.content || log.subject || ''
+      const replyBody = log.content || log.subject || ''
 
       if (!threadMap.has(contactKey)) {
-        const companyName = contact?.company?.name || ''
-        const countryCode = contact?.countryCode || ''
+        const companyName = contact.company?.name || ''
+        const countryCode = contact.countryCode || ''
         const countryFlag = countryCode ? getFlagEmoji(countryCode) : ''
 
         threadMap.set(contactKey, {
           id: `thread-${contactKey}`,
-          contactName: contact?.fullName || log.toEmail,
+          contactName: contact.fullName || log.toEmail,
           contactEmail: log.toEmail,
           company: companyName,
-          country: `${countryFlag} ${contact?.country || ''}`.trim() || 'Unknown',
+          country: `${countryFlag} ${contact.country || ''}`.trim() || 'Unknown',
           intent: categoryToIntent(log.replyCategory),
-          lastSnippet: truncate(log.content || log.subject || '', 80),
+          lastSnippet: truncate(replyBody, 80),
           lastTime: formatRelativeTime(log.repliedAt!),
           unread: !log.tracked,
           messages: [
@@ -100,16 +110,16 @@ export async function GET(req: NextRequest) {
               senderName: log.fromEmail || 'OutreachHub',
               senderEmail: log.fromEmail,
               subject: log.subject,
-              body: log.content || log.subject || '',
+              body: outboundBody,
               timestamp: log.sentAt ? formatDateTime(log.sentAt) : '',
             },
             {
               id: `msg-in-${log.id}`,
               from: 'them',
-              senderName: contact?.fullName || log.toEmail,
+              senderName: contact.fullName || log.toEmail,
               senderEmail: log.toEmail,
               subject: `Re: ${log.subject}`,
-              body: log.content || log.subject || '',
+              body: replyBody,
               timestamp: log.repliedAt ? formatDateTime(log.repliedAt) : '',
             },
           ],
@@ -119,15 +129,15 @@ export async function GET(req: NextRequest) {
       } else {
         const thread = threadMap.get(contactKey)!
         thread.emailLogIds.push(log.id)
-        thread.lastSnippet = truncate(log.content || log.subject || '', 80)
+        thread.lastSnippet = truncate(replyBody, 80)
         thread.lastTime = formatRelativeTime(log.repliedAt!)
         thread.messages.push({
           id: `msg-in-${log.id}`,
           from: 'them',
-          senderName: contact?.fullName || log.toEmail,
+          senderName: contact.fullName || log.toEmail,
           senderEmail: log.toEmail,
           subject: `Re: ${log.subject}`,
-          body: log.content || log.subject || '',
+          body: replyBody,
           timestamp: log.repliedAt ? formatDateTime(log.repliedAt) : '',
         })
         thread.intent = categoryToIntent(log.replyCategory)

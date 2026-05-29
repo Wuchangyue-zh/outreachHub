@@ -167,17 +167,22 @@ export default function CampaignsPage() {
     const newStatus: CampaignStatus = camp.status === 'RUNNING' ? 'PAUSED' : 'RUNNING'
     setActioning(id)
     try {
-      await fetch(`/api/campaigns/${id}`, {
+      const res = await fetch(`/api/campaigns/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
-      // Update local state
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        alert(json.message || '操作失败')
+        return
+      }
       setCampaigns((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
       )
     } catch (e) {
       console.error('Failed to toggle campaign:', e)
+      alert('操作失败，请重试')
     } finally {
       setActioning(null)
     }
@@ -187,10 +192,16 @@ export default function CampaignsPage() {
     if (!confirm('确定要删除这个营销活动吗？此操作不可撤销。')) return
     setActioning(id)
     try {
-      await fetch(`/api/campaigns/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        alert(json.message || '删除失败')
+        return
+      }
       setCampaigns((prev) => prev.filter((c) => c.id !== id))
     } catch (e) {
       console.error('Failed to delete campaign:', e)
+      alert('删除失败，请重试')
     } finally {
       setActioning(null)
     }
@@ -203,16 +214,13 @@ export default function CampaignsPage() {
       const res = await fetch(`/api/campaigns/${id}/launch`, { method: 'POST' })
       const json = await res.json()
       if (json.success) {
-        setCampaigns((prev) =>
-          prev.map((c) =>
-            c.id === id ? { ...c, status: 'RUNNING' as CampaignStatus, totalSent: c.totalSent + (json.data.enqueued || 0) } : c
-          )
-        )
+        await fetchCampaigns()
       } else {
         alert(json.message || '启动失败')
       }
     } catch (e) {
       console.error('Failed to launch campaign:', e)
+      alert('启动失败，请重试')
     } finally {
       setActioning(null)
     }
@@ -406,6 +414,18 @@ export default function CampaignsPage() {
                             onClick={() => launchCampaign(campaign.id)}
                             disabled={actioning === campaign.id}
                             title="启动"
+                          >
+                            <Zap className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {campaign.status === 'PAUSED' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-violet-600 hover:text-violet-700"
+                            onClick={() => launchCampaign(campaign.id)}
+                            disabled={actioning === campaign.id}
+                            title="继续发送"
                           >
                             <Zap className="h-4 w-4" />
                           </Button>
