@@ -180,28 +180,28 @@ export default function InboxPage() {
     switch (intent) {
       case 'interested':
         return (
-          <Badge variant="default" className="bg-green-100 text-green-700 border-green-200">
+          <Badge className="bg-green-100 text-green-700 border-green-200">
             <ThumbsUp className="mr-1 h-3 w-3" />
             感兴趣
           </Badge>
         )
       case 'opt-out':
         return (
-          <Badge variant="default" className="bg-red-100 text-red-700 border-red-200">
+          <Badge className="bg-red-100 text-red-700 border-red-200">
             <ThumbsDown className="mr-1 h-3 w-3" />
             退订
           </Badge>
         )
       case 'ooo':
         return (
-          <Badge variant="default" className="bg-yellow-100 text-yellow-700 border-yellow-200">
+          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
             <AlertCircle className="mr-1 h-3 w-3" />
             外出
           </Badge>
         )
       default:
         return (
-          <Badge variant="secondary">
+          <Badge className="bg-gray-100 text-gray-700">
             <MessageSquare className="mr-1 h-3 w-3" />
             其他
           </Badge>

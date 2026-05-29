@@ -355,12 +355,12 @@ export default function SettingsPage() {
                             <div className="flex items-center gap-2">
                               <p className="font-medium">{account.email}</p>
                               {account.isActive ? (
-                                <Badge variant="default" className="bg-green-100 text-green-700">
+                                <Badge className="bg-green-100 text-green-700">
                                   <CheckCircle className="mr-1 h-3 w-3" />
                                   活跃
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary">
+                                <Badge className="bg-gray-100 text-gray-700">
                                   <XCircle className="mr-1 h-3 w-3" />
                                   停用
                                 </Badge>

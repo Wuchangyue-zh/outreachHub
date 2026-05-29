@@ -71,8 +71,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 创建新的邮件日志记录回复
+    // 注意：contactId 是必填字段，但回复邮件可能没有关联的联系人
+    // 使用一个特殊的 contactId 来标识系统回复
     await prisma.emailLog.create({
       data: {
+        contactId: 'system-reply', // 必填字段，用于标识系统回复
         fromEmail: account.email,
         toEmail: to,
         subject: subject || 'Re: 回复',
