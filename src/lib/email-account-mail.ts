@@ -1,7 +1,6 @@
 import nodemailer from 'nodemailer'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from './prisma'
+import { safeDecrypt } from './encryption'
 
 export interface SendAccountMailOptions {
   emailAccountId: string
@@ -58,13 +57,16 @@ export async function getEmailAccount(accountId: string): Promise<EmailAccountCo
 export async function createAccountTransporter(accountId: string) {
   const account = await getEmailAccount(accountId)
 
+  // P1-4: 解密密码（支持向后兼容未加密的密码）
+  const decryptedPassword = safeDecrypt(account.smtpPassword)
+
   return nodemailer.createTransport({
     host: account.smtpHost,
     port: account.smtpPort,
     secure: account.smtpPort === 465, // 465 端口默认 SSL
     auth: {
       user: account.smtpUser,
-      pass: account.smtpPassword,
+      pass: decryptedPassword,
     },
     connectionTimeout: 30000,
     greetingTimeout: 30000,

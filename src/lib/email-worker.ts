@@ -157,15 +157,8 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     })
 
-    // Update campaign failed count if campaignId exists
-    if (campaignId) {
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: {
-          totalBounced: { increment: 1 },
-        },
-      })
-    }
+    // P1-6 修复：SMTP 发送失败不计入 totalBounced（那是真实退信统计）
+    // 失败记录已保存在 EmailLog 中，可通过查询 EmailLog 统计失败数
 
     throw error
   }

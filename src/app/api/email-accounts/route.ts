@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { encrypt, decrypt } from '@/lib/encryption'
 
 function sanitizeEmailAccount<T extends { smtpPassword?: string | null; imapPassword?: string | null }>(
   account: T
@@ -53,11 +54,11 @@ export async function POST(req: NextRequest) {
         smtpHost,
         smtpPort: parseInt(smtpPort) || 587,
         smtpUser,
-        smtpPassword,
+        smtpPassword: encrypt(smtpPassword), // P1-4: 加密存储
         imapHost: imapHost || null,
         imapPort: imapPort ? parseInt(imapPort) : null,
         imapUser: imapUser || null,
-        imapPassword: imapPassword || null,
+        imapPassword: imapPassword ? encrypt(imapPassword) : null, // P1-4: 加密存储
       },
     })
     return NextResponse.json({ success: true, data: sanitizeEmailAccount(account) }, { status: 201 })

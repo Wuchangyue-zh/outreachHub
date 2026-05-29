@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const { checkDailyLimit } = await import('@/lib/email-account-mail')
     const canSend = await checkDailyLimit(emailAccountId)
     if (!canSend) {
-      return errorResponse(ErrorCodes.RATE_LIMITED, '今日发送已达上限', 429)
+      return errorResponse(ErrorCodes.RATE_LIMIT_EXCEEDED, '今日发送已达上限', 429)
     }
 
     // 构建 HTML 内容
@@ -81,7 +81,6 @@ export async function POST(req: NextRequest) {
         status: 'SENT',
         sentAt: new Date(),
         messageId: result.messageId,
-        userId: auth.userId,
       },
     })
 

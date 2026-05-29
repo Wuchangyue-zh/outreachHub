@@ -58,6 +58,20 @@ export async function POST(req: NextRequest) {
 
     // 根据是否指定 EmailAccount 选择发送方式
     if (emailAccountId) {
+      // P1-5 修复：验证 EmailAccount 所有权
+      const account = await prisma.emailAccount.findFirst({
+        where: {
+          id: emailAccountId,
+          userId: auth.userId,
+          isActive: true,
+        },
+        select: { id: true, email: true },
+      })
+
+      if (!account) {
+        return errorResponse(ErrorCodes.NOT_FOUND, '账户不存在或无权使用', 404)
+      }
+
       // 使用用户 EmailAccount 发送
       result = await sendAccountMail({
         emailAccountId,
@@ -67,14 +81,7 @@ export async function POST(req: NextRequest) {
         html: trackedHtml,
       })
 
-      // 获取账户邮箱用于日志
-      const account = await prisma.emailAccount.findUnique({
-        where: { id: emailAccountId },
-        select: { email: true },
-      })
-      if (account) {
-        senderEmail = account.email
-      }
+      senderEmail = account.email
     } else {
       // 使用平台 SMTP 发送（降级）
       const transporter = nodemailer.createTransport({
