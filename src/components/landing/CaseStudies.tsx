@@ -15,7 +15,7 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-lg">
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:shadow-xl hover:-translate-y-1">
       {/* Header */}
       <div className={`${colors.bg} px-6 py-4`}>
         <div className="flex items-center justify-between">
@@ -30,28 +30,45 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
 
       {/* Body */}
       <div className="px-6 py-5">
-        {/* Challenge */}
+        {/* Challenge with smooth collapse */}
         <div className="mb-4">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">面临挑战</h4>
-          <p className={`mt-2 text-sm leading-relaxed text-gray-600 ${!expanded ? 'line-clamp-3' : ''}`}>
-            {caseData.challenge}
-          </p>
+          <div
+            className="grid transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+            style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+          >
+            <div className="overflow-hidden">
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">{caseData.challenge}</p>
+            </div>
+          </div>
+          {!expanded && (
+            <p className="mt-2 text-sm leading-relaxed text-gray-600 line-clamp-2">{caseData.challenge}</p>
+          )}
         </div>
 
-        {/* Solution */}
+        {/* Solution with smooth collapse */}
         <div className="mb-5">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">解决方案</h4>
-          <p className={`mt-2 text-sm leading-relaxed text-gray-600 ${!expanded ? 'line-clamp-3' : ''}`}>
-            {caseData.solution}
-          </p>
+          <div
+            className="grid transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+            style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+          >
+            <div className="overflow-hidden">
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">{caseData.solution}</p>
+            </div>
+          </div>
+          {!expanded && (
+            <p className="mt-2 text-sm leading-relaxed text-gray-600 line-clamp-2">{caseData.solution}</p>
+          )}
         </div>
 
         {/* Expand toggle */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mb-5 text-xs font-medium text-blue-600 hover:text-blue-700"
+          className="mb-5 flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-300"
         >
-          {expanded ? '收起详情' : '展开完整案例 →'}
+          {expanded ? '收起详情' : '展开完整案例'}
+          <ChevronIcon isOpen={expanded} />
         </button>
 
         {/* Results grid */}
@@ -83,9 +100,24 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
   )
 }
 
+function ChevronIcon({ isOpen }: { isOpen: boolean }) {
+  return (
+    <svg
+      className="h-3 w-3 transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+      style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  )
+}
+
 export function CaseStudies() {
   return (
-    <section id="cases" className="bg-gray-50 py-20 lg:py-28">
+    <section id="cases" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
         <div className="mx-auto max-w-2xl text-center">
@@ -110,7 +142,7 @@ export function CaseStudies() {
         <div className="mt-12 text-center">
           <a
             href="/register"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors duration-300 hover:text-blue-700"
           >
             查看更多客户案例
             <ArrowRight className="h-4 w-4" />

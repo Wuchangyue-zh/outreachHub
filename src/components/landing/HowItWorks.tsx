@@ -5,7 +5,7 @@ const stepIcons = [Target, ScanSearch, Rocket]
 
 export function HowItWorks() {
   return (
-    <section className="py-20 lg:py-28">
+    <section className="py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
         <div className="mx-auto max-w-2xl text-center">

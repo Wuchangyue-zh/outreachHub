@@ -46,7 +46,7 @@ function SecurityCard({ feature, index }: { feature: SecurityFeature; index: num
 
 export function Security() {
   return (
-    <section className="bg-gray-50 py-20 lg:py-28">
+    <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
         <div className="mx-auto max-w-2xl text-center">

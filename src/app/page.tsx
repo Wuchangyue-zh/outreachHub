@@ -43,6 +43,18 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
+      {/* Subtle dot grid background pattern */}
+      <div
+        className="fixed inset-0 -z-10 opacity-[0.03]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+      {/* Mesh gradient accent */}
+      <div className="fixed left-0 top-0 -z-10 h-[600px] w-[800px] opacity-30 blur-3xl" style={{ background: 'radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.15), transparent 70%)' }} />
+      <div className="fixed right-0 top-1/3 -z-10 h-[500px] w-[600px] opacity-20 blur-3xl" style={{ background: 'radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.12), transparent 70%)' }} />
+
       <Navbar />
       <Hero />
       <TrustBar />

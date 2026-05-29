@@ -13,14 +13,23 @@ function FAQItem({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; o
       >
         <span className="text-base font-semibold text-gray-900">{item.question}</span>
         <ChevronDown
-          className={`h-5 w-5 flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className="h-5 w-5 flex-shrink-0 text-gray-400 transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
         />
       </button>
-      {isOpen && (
-        <div className="pb-5 pr-12">
-          <p className="text-sm leading-relaxed text-gray-600">{item.answer}</p>
+      {/* Smooth collapse using grid-template-rows */}
+      <div
+        className="grid transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+        style={{
+          gridTemplateRows: isOpen ? '1fr' : '0fr',
+        }}
+      >
+        <div className="overflow-hidden">
+          <div className="pb-5 pr-12">
+            <p className="text-sm leading-relaxed text-gray-600">{item.answer}</p>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -29,7 +38,7 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   return (
-    <section id="faq" className="py-20 lg:py-28">
+    <section id="faq" className="py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-5">
           {/* Left: Header */}
@@ -48,7 +57,7 @@ export function FAQ() {
                 <p className="mt-1 text-sm text-blue-700">联系我们的客服团队，获取一对一解答</p>
                 <a
                   href="mailto:support@outreachhub.com"
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors duration-300"
                 >
                   support@outreachhub.com →
                 </a>

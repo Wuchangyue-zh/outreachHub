@@ -49,7 +49,7 @@ function PainCard({ point, index }: { point: PainPoint; index: number }) {
 
 export function PainPoints() {
   return (
-    <section className="bg-gray-50 py-20">
+    <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
         <div className="mx-auto max-w-2xl text-center">

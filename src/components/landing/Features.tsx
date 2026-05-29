@@ -27,33 +27,61 @@ const gradients = [
   'from-lime-500 to-green-600',
 ]
 
+/** Bento grid layout config: [colSpan, rowSpan] per card index */
+const bentoLayout: [number, number][] = [
+  [2, 2], // AI 智能拓客 — hero card
+  [1, 1],
+  [1, 1],
+  [1, 2], // A/B 测试 — tall card
+  [2, 1],
+  [1, 1],
+  [1, 1],
+  [1, 1],
+]
+
 function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
   const Icon = iconMap[feature.icon] || Brain
   const gradient = gradients[index % gradients.length]
+  const [colSpan, rowSpan] = bentoLayout[index] || [1, 1]
+  const isHero = colSpan === 2 && rowSpan === 2
 
   return (
     <Link
       href={feature.href}
-      className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:border-blue-200 hover:shadow-lg"
+      className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:border-blue-200 hover:shadow-xl ${
+        colSpan === 2 ? 'md:col-span-2' : ''
+      } ${rowSpan === 2 ? 'md:row-span-2' : ''}`}
     >
-      {/* Background glow on hover */}
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-50 opacity-0 blur-2xl transition-opacity group-hover:opacity-100" />
+      {/* Radial gradient spotlight on hover */}
+      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100"
+        style={{
+          background: 'radial-gradient(circle 300px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(59,130,246,0.08), transparent)',
+        }}
+      />
 
-      {/* Icon */}
-      <div
-        className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}
-      >
-        <Icon className="h-6 w-6 text-white" />
-      </div>
+      <div className={`relative h-full ${isHero ? 'p-8 lg:p-10' : 'p-6'}`}>
+        {/* Icon with damped scale */}
+        <div
+          className={`mb-4 flex items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110 group-hover:-translate-y-0.5 ${
+            isHero ? 'h-16 w-16' : 'h-12 w-12'
+          }`}
+        >
+          <Icon className={`text-white ${isHero ? 'h-8 w-8' : 'h-6 w-6'}`} />
+        </div>
 
-      {/* Content */}
-      <h3 className="text-base font-bold text-gray-900">{feature.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-500">{feature.description}</p>
+        {/* Content */}
+        <h3 className={`font-bold text-gray-900 ${isHero ? 'text-xl' : 'text-base'}`}>
+          {feature.title}
+        </h3>
+        <p className={`mt-2 leading-relaxed text-gray-500 ${isHero ? 'text-sm' : 'text-sm'}`}>
+          {feature.description}
+        </p>
 
-      {/* Arrow */}
-      <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 transition-all group-hover:opacity-100">
-        了解更多
-        <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+        {/* Arrow */}
+        <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 translate-y-1 transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0">
+          了解更多
+          <ArrowRight className="h-3 w-3 transition-transform duration-500 group-hover:translate-x-1" />
+        </div>
       </div>
     </Link>
   )
@@ -61,7 +89,7 @@ function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
 
 export function Features() {
   return (
-    <section id="features" className="bg-gray-50 py-20 lg:py-28">
+    <section id="features" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
         <div className="mx-auto max-w-2xl text-center">
@@ -75,8 +103,8 @@ export function Features() {
           <p className="mt-4 text-base text-gray-500">{featuresData.subtitle}</p>
         </div>
 
-        {/* Feature cards grid */}
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Bento Grid */}
+        <div className="mt-14 grid auto-rows-[200px] gap-5 md:grid-cols-3 lg:grid-cols-4">
           {featuresData.features.map((feature, i) => (
             <FeatureCard key={feature.title} feature={feature} index={i} />
           ))}

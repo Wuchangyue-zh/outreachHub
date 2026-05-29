@@ -14,7 +14,7 @@ export function CTA() {
   const [email, setEmail] = useState('')
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 py-20 lg:py-28">
+    <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 py-28 lg:py-36">
       {/* Background decoration */}
       <div className="absolute -left-32 -top-32 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
       <div className="absolute -bottom-32 -right-32 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
@@ -54,7 +54,7 @@ export function CTA() {
               />
               <button
                 type="submit"
-                className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-blue-700 shadow-lg transition-all hover:bg-blue-50 hover:shadow-xl"
+                className="group/btn relative overflow-hidden rounded-lg bg-white px-6 py-3 text-sm font-semibold text-blue-700 shadow-lg transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:bg-blue-50 hover:shadow-xl"
               >
                 {ctaData.form.button}
               </button>
