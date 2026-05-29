@@ -4,6 +4,7 @@ import { addEmailTracking } from '@/lib/email-tracking'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
+import { sendAccountMail } from '@/lib/email-account-mail'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,25 +12,11 @@ export async function POST(req: NextRequest) {
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
 
     const body = await req.json()
-    const { to, subject, content, contactId, plain } = body
+    const { to, subject, content, contactId, plain, emailAccountId } = body
 
     if (!to) {
       return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请提供收件人邮箱', 400)
     }
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.jafron.com',
-      port: parseInt(process.env.SMTP_PORT || '465'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER || 'wuchangyue@jafron.com',
-        pass: process.env.SMTP_PASSWORD || '',
-      },
-      connectionTimeout: 10000,
-      tls: {
-        rejectUnauthorized: false,
-      },
-    })
 
     const htmlContent = plain
       ? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; white-space: pre-wrap;">${(content || '').replace(/\n/g, '<br>')}</div>`
@@ -45,11 +32,13 @@ export async function POST(req: NextRequest) {
 
     // Create email log entry for tracking
     let emailLogId = 'test-' + Date.now()
+    let senderEmail = process.env.SMTP_USER || ''
+
     if (contactId) {
       const emailLog = await prisma.emailLog.create({
         data: {
           contactId,
-          fromEmail: process.env.SMTP_USER || '',
+          fromEmail: senderEmail,
           toEmail: to,
           subject: subject || 'OutreachHub 测试邮件',
           content: content || '',
@@ -65,13 +54,53 @@ export async function POST(req: NextRequest) {
       ? addEmailTracking(htmlContent, emailLogId, contactId)
       : htmlContent
 
-    const result = await transporter.sendMail({
-      from: `"OutreachHub" <${process.env.SMTP_USER || 'wuchangyue@jafron.com'}>`,
-      to,
-      subject: subject || 'OutreachHub 测试邮件',
-      text: content || '这是一封测试邮件，验证SMTP配置是否正常。',
-      html: trackedHtml,
-    })
+    let result: { success: boolean; messageId?: string }
+
+    // 根据是否指定 EmailAccount 选择发送方式
+    if (emailAccountId) {
+      // 使用用户 EmailAccount 发送
+      result = await sendAccountMail({
+        emailAccountId,
+        to,
+        subject: subject || 'OutreachHub 测试邮件',
+        text: content || '这是一封测试邮件，验证SMTP配置是否正常。',
+        html: trackedHtml,
+      })
+
+      // 获取账户邮箱用于日志
+      const account = await prisma.emailAccount.findUnique({
+        where: { id: emailAccountId },
+        select: { email: true },
+      })
+      if (account) {
+        senderEmail = account.email
+      }
+    } else {
+      // 使用平台 SMTP 发送（降级）
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.jafron.com',
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER || 'wuchangyue@jafron.com',
+          pass: process.env.SMTP_PASSWORD || '',
+        },
+        connectionTimeout: 10000,
+        tls: {
+          rejectUnauthorized: false,
+        },
+      })
+
+      const mailResult = await transporter.sendMail({
+        from: `"OutreachHub" <${senderEmail}>`,
+        to,
+        subject: subject || 'OutreachHub 测试邮件',
+        text: content || '这是一封测试邮件，验证SMTP配置是否正常。',
+        html: trackedHtml,
+      })
+
+      result = { success: true, messageId: mailResult.messageId }
+    }
 
     // Update email log status if created
     if (contactId) {
@@ -88,9 +117,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       messageId: result.messageId,
-      response: result.response,
       emailLogId: contactId ? emailLogId : undefined,
       trackingEnabled: !!contactId,
+      usedAccount: !!emailAccountId,
     })
   } catch (error: any) {
     console.error('Email send error:', error)
