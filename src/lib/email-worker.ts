@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq'
 import { getRedisConnection } from './redis'
-import { sendMail } from './email'
+import { sendPlatformMail } from './email'
+import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
 import type { EmailJobData } from './email-queue'
@@ -13,6 +14,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
     text,
     contactId,
     campaignId,
+    emailAccountId,
     fromEmail,
     fromName,
     trackingPixel,
@@ -24,12 +26,31 @@ async function processEmailJob(job: Job<EmailJobData>) {
   // Update job progress
   await job.updateProgress(10)
 
+  // 确定发件人邮箱
+  let senderEmail = fromEmail || process.env.SMTP_USER || ''
+
+  // 如果指定了 EmailAccount，检查发送限额并获取发件人邮箱
+  if (emailAccountId) {
+    const canSend = await checkDailyLimit(emailAccountId)
+    if (!canSend) {
+      console.warn(`[Email Worker] EmailAccount ${emailAccountId} reached daily limit, skipping job ${job.id}`)
+      throw new Error(`EmailAccount ${emailAccountId} reached daily limit`)
+    }
+    const account = await prisma.emailAccount.findUnique({
+      where: { id: emailAccountId },
+      select: { email: true },
+    })
+    if (account) {
+      senderEmail = account.email
+    }
+  }
+
   // Create email log entry
   const emailLogData: any = {
     contactId: contactId || '',
     messageId: '',
     toEmail: to,
-    fromEmail: fromEmail || process.env.SMTP_USER || '',
+    fromEmail: senderEmail,
     subject,
     status: 'PENDING',
     sentAt: new Date(),
@@ -59,14 +80,29 @@ async function processEmailJob(job: Job<EmailJobData>) {
   await job.updateProgress(50)
 
   try {
-    // Send email
-    const result = await sendMail({
-      to,
-      subject,
-      html: emailHtml,
-      text,
-      from: fromName ? `${fromName} <${fromEmail || process.env.SMTP_USER}>` : fromEmail,
-    })
+    // Send email - 根据是否有 EmailAccount 选择发送方式
+    let result: { success: boolean; messageId?: string }
+
+    if (emailAccountId) {
+      // 使用用户 EmailAccount 发送
+      result = await sendAccountMail({
+        emailAccountId,
+        to,
+        subject,
+        html: emailHtml,
+        text,
+        from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+      })
+    } else {
+      // 使用平台 SMTP 发送（降级）
+      result = await sendPlatformMail({
+        to,
+        subject,
+        html: emailHtml,
+        text,
+        from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+      })
+    }
 
     await job.updateProgress(90)
 

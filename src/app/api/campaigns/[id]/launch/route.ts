@@ -85,6 +85,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
           text,
           contactId: contact.id,
           campaignId: campaign.id,
+          emailAccountId: campaign.emailAccountId || undefined,  // 使用 Campaign 绑定的发件账户
           fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
           fromName: campaign.fromName || '',
           trackingPixel: true,
