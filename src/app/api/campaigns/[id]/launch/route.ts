@@ -4,6 +4,7 @@ import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { addBulkEmailJobs } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
+import { getAvailableAccount } from '@/lib/select-email-account'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -32,6 +33,16 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     if (!campaign.contactIds?.length) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '请先为该活动添加目标联系人', 400)
+    }
+
+    // 获取可用的发件账户（优先使用绑定账户，否则自动选择）
+    const availableAccountId = await getAvailableAccount(auth.userId!, campaign.emailAccountId)
+    if (!availableAccountId) {
+      return errorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        '没有可用的发件账户：所有账户已达到日限额或已停用',
+        400
+      )
     }
 
     const contacts = await prisma.contact.findMany({
@@ -85,7 +96,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
           text,
           contactId: contact.id,
           campaignId: campaign.id,
-          emailAccountId: campaign.emailAccountId || undefined,  // 使用 Campaign 绑定的发件账户
+          emailAccountId: availableAccountId,  // 使用自动选择的发件账户
           fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
           fromName: campaign.fromName || '',
           trackingPixel: true,

@@ -398,7 +398,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | P0'-2 | ✅ Worker + 队列直发改用 EmailAccount | `email-worker.ts`, `email-queue.ts`, `EmailJobData` 加 `emailAccountId` | 发信日志 fromEmail 为用户邮箱 |
 | P0'-3 | ✅ Campaign 绑定发件账户 | `schema.prisma` 加 `emailAccountId?`；`campaigns/new` 选账户；Launch 传入 | 向导可选邮箱；Launch 用指定账户 |
 | P0'-4 | ✅ Settings 测试 + Inbox 回复走 EmailAccount | `settings/page.tsx`, `inbox/page.tsx`, `api/email/test` | 测试邮件从用户 SMTP 发出 |
-| P0'-5 | `selectEmailAccount(userId)` 轮换 | 新建 `lib/select-email-account.ts` | 超 dailyLimit 跳过；取 healthScore 最高 |
+| P0'-5 | ✅ `selectEmailAccount(userId)` 轮换 | `lib/select-email-account.ts` | 超 dailyLimit 跳过；取 healthScore 最高 |
 
 **Phase 1 完成后：** `npm run build` ✅ → 进入 Phase 2
 
