@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { parseCSV, importContacts } from '@/lib/csv-import'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
+import { checkContactLimit } from '@/lib/plan-limits'
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,9 @@ export async function POST(req: NextRequest) {
     }
     if (!hasPermission(authResult.role, 'contacts:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
+    if (!authResult.tenantId) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
     }
 
     // Parse request body
@@ -33,11 +37,29 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, 'CSV file is empty', 400)
     }
 
+    // H3b: 检查联系人限额（含本次导入量）
+    const limitCheck = await checkContactLimit(authResult.tenantId)
+    const remaining = limitCheck.max - limitCheck.current
+    if (remaining <= 0) {
+      return errorResponse(
+        ErrorCodes.FORBIDDEN,
+        `联系人已达上限（${limitCheck.current}/${limitCheck.max}），请升级套餐或删除部分联系人`,
+        403
+      )
+    }
+    if (parseResult.totalRows > remaining) {
+      return errorResponse(
+        ErrorCodes.FORBIDDEN,
+        `导入 ${parseResult.totalRows} 条将超过剩余配额（还可导入 ${remaining} 条）`,
+        403
+      )
+    }
+
     // Import contacts
     const importResult = await importContacts(
       parseResult.rows,
       mapping,
-      authResult.userId
+      authResult.tenantId
     )
 
     return NextResponse.json({

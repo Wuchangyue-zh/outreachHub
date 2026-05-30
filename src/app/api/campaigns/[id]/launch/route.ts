@@ -7,6 +7,8 @@ import { applyEmailVariables, buildContactVariables } from '@/lib/email-variable
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { checkDailyEmailLimit } from '@/lib/plan-limits'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
+import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
+import { getStorageBackend } from '@/lib/env'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -105,6 +107,9 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '未找到有效的联系人', 400)
     }
 
+    // H1: 查询 Campaign 关联的附件 ID
+    const attachmentIds = await getCampaignAttachmentIds(auth.tenantId!, campaign.id)
+
     // #46: 检查租户每日发信限额（按本次实际待发送数量）
     const alreadySentForLimit = await prisma.emailLog.findMany({
       where: {
@@ -170,6 +175,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
               fromName: campaign.fromName || '',
               trackingPixel: true,
               trackingLinks: true,
+              attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
             }
           })
           .filter(Boolean)
@@ -273,6 +279,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             fromName: campaign.fromName || '',
             trackingPixel: true,
             trackingLinks: true,
+            attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
           }
         })
         .filter(Boolean)
@@ -365,6 +372,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
           fromName: campaign.fromName || '',
           trackingPixel: true,
           trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         }
       })
       .filter(Boolean)

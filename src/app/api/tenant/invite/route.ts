@@ -135,3 +135,41 @@ export async function GET(req: NextRequest) {
     return handleApiError(error)
   }
 }
+
+/**
+ * DELETE /api/tenant/invite?id=xxx
+ * 撤销待处理邀请
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+    if (!hasPermission(auth.role, 'settings:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要设置管理权限', 403)
+    }
+
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) {
+      return errorResponse(ErrorCodes.VALIDATION_ERROR, '缺少邀请 ID', 400)
+    }
+
+    const invitation = await prisma.invitation.findFirst({
+      where: { id, tenantId: auth.tenantId, status: 'PENDING' },
+    })
+
+    if (!invitation) {
+      return errorResponse(ErrorCodes.NOT_FOUND, '邀请不存在或已处理', 404)
+    }
+
+    await prisma.invitation.update({
+      where: { id },
+      data: { status: 'REVOKED' },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}

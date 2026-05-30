@@ -32,6 +32,13 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'asc' },
     })
 
+    // H3d: 获取待处理邀请
+    const invitations = await prisma.invitation.findMany({
+      where: { tenantId: auth.tenantId, status: 'PENDING' },
+      select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
+      orderBy: { createdAt: 'desc' },
+    })
+
     return NextResponse.json({
       success: true,
       data: {
@@ -50,6 +57,7 @@ export async function GET(req: NextRequest) {
           userPercent: limits.maxUsers > 0 ? Math.round((usage.userCount / limits.maxUsers) * 100) : 0,
         },
         members,
+        invitations,
       },
     })
   } catch (error) {

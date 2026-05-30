@@ -19,7 +19,7 @@
 4. **Campaign 联系人**：用 `src/lib/campaign-contacts.ts`，禁止新代码依赖裸 `contactIds[]`
 5. **租户隔离**：`tenantWhere(tenantId)` 强制注入
 6. **Redis 化**：限流、SSE 事件、统计预聚合 — 禁止改回进程内单例
-7. **文件存储**：`src/lib/storage.ts`（Blob 生产 / 本地开发）
+7. **文件存储**：`src/lib/storage.ts`（Vercel Blob 生产 / 本地 `public/uploads/` 开发；附件 DB 追踪 `Attachment` 模型）
 8. **安全**：生产必填 `CRON_SECRET`、`NEXTAUTH_SECRET`、`ENCRYPTION_KEY`，无 fallback
 
 完整规则与禁止事项见 [`CLAUDE.md`](CLAUDE.md) 和 [`docs/architecture.md`](docs/architecture.md)。

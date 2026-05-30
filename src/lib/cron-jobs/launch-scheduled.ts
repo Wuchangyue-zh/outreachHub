@@ -3,6 +3,7 @@ import { addBulkEmailJobs } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
+import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
 
 function calculateNextRecurrence(recurrenceRule: string, lastRun: Date): Date | null {
   switch (recurrenceRule.toLowerCase()) {
@@ -76,6 +77,10 @@ async function processScheduledCampaign(campaign: any) {
       return { campaignId: campaign.id, success: false, error: 'No valid contacts' }
     }
 
+    const attachmentIds = campaign.tenantId
+      ? await getCampaignAttachmentIds(campaign.tenantId, campaign.id)
+      : []
+
     const alreadySent = await prisma.emailLog.findMany({
       where: {
         campaignId: campaign.id,
@@ -106,6 +111,7 @@ async function processScheduledCampaign(campaign: any) {
           fromName: campaign.fromName || '',
           trackingPixel: true,
           trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         }
       })
       .filter(Boolean)
@@ -158,6 +164,10 @@ async function processRecurringCampaign(campaign: any) {
       return { campaignId: campaign.id, success: false, error: 'No valid contacts' }
     }
 
+    const attachmentIds = campaign.tenantId
+      ? await getCampaignAttachmentIds(campaign.tenantId, campaign.id)
+      : []
+
     const recentLogs = await prisma.emailLog.findMany({
       where: {
         campaignId: campaign.id,
@@ -188,6 +198,7 @@ async function processRecurringCampaign(campaign: any) {
           fromName: campaign.fromName || '',
           trackingPixel: true,
           trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         }
       })
       .filter(Boolean)

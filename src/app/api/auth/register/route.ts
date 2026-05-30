@@ -5,6 +5,7 @@ import { generateToken } from '@/lib/jwt'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { sendPlatformMail } from '@/lib/email'
+import { syncTenantLimits } from '@/lib/plan-limits'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
         maxEmailsPerDay: 50,
       },
     })
+
+    await syncTenantLimits(tenant.id, tenant.plan)
 
     // Create user
     const user = await prisma.user.create({

@@ -13,6 +13,8 @@ import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
 import { maybeMarkCampaignCompleted } from './campaign-completion'
+import { fetchFileBuffer } from './storage'
+import { resolvePublicUrls } from './email-html'
 
 export interface EmailJobData {
   to: string
@@ -26,6 +28,7 @@ export interface EmailJobData {
   fromName?: string
   trackingPixel?: string
   trackingLinks?: boolean
+  attachmentIds?: string[] // H1: 附件 ID 列表
 }
 
 let _emailQueue: Queue<EmailJobData> | null = null
@@ -186,6 +189,31 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId, data.campaignId)
     }
 
+    // H2: 将本地路径图片 URL 转为公网可访问 URL
+    emailHtml = resolvePublicUrls(emailHtml)
+
+    // H1: 加载附件 Buffer
+    let emailAttachments: Array<{ filename: string; content: Buffer }> | undefined
+    if (data.attachmentIds && data.attachmentIds.length > 0) {
+      try {
+        const attRecords = await prisma.attachment.findMany({
+          where: { id: { in: data.attachmentIds } },
+        })
+        const loaded: Array<{ filename: string; content: Buffer }> = []
+        for (const att of attRecords) {
+          try {
+            const { buffer, filename } = await fetchFileBuffer(att.url)
+            loaded.push({ filename: att.originalName || filename, content: buffer })
+          } catch (err) {
+            console.warn(`[EmailQueue] Failed to load attachment ${att.id}:`, err)
+          }
+        }
+        if (loaded.length > 0) emailAttachments = loaded
+      } catch (err) {
+        console.warn(`[EmailQueue] Failed to fetch attachments:`, err)
+      }
+    }
+
     // 根据是否有 EmailAccount 选择发送方式
     let result: { success: boolean; messageId?: string }
 
@@ -198,6 +226,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
         html: emailHtml,
         text: data.text,
         from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+        attachments: emailAttachments,
       })
     } else {
       // 使用平台 SMTP 发送（降级）
@@ -207,6 +236,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
         html: emailHtml,
         text: data.text,
         from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+        attachments: emailAttachments,
       })
     }
 

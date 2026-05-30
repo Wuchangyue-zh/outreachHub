@@ -237,3 +237,40 @@ export async function deleteFile(opts: { folder: string; filename: string; url?:
   const filePath = path.join(UPLOAD_DIR, opts.folder, opts.filename)
   await fs.unlink(filePath).catch(() => {})
 }
+
+/**
+ * 根据 URL 获取文件 Buffer（用于邮件附件）
+ * 本地路径直接读磁盘；远程 URL 用 fetch 下载
+ */
+export async function fetchFileBuffer(url: string): Promise<{ buffer: Buffer; filename: string }> {
+  const filename = path.basename(url)
+
+  // 本地磁盘路径（/uploads/...）
+  if (url.startsWith('/uploads/')) {
+    const filePath = path.join(process.cwd(), 'public', url)
+    const buffer = await fs.readFile(filePath)
+    return { buffer, filename }
+  }
+
+  // 远程 URL（Blob / S3）
+  const resp = await fetch(url)
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch file: ${resp.status} ${resp.statusText}`)
+  }
+  const arrayBuf = await resp.arrayBuffer()
+  return { buffer: Buffer.from(arrayBuf), filename }
+}
+
+/**
+ * 将本地相对路径转为公网可访问 URL（H2: 邮件 HTML 图片公网化）
+ * - /uploads/... → APP_URL + /uploads/...（仅当有 APP_URL 时）
+ * - 已是 http(s) 开头 → 原样返回
+ */
+export function resolvePublicUrl(urlPath: string): string {
+  if (urlPath.startsWith('http://') || urlPath.startsWith('https://')) {
+    return urlPath
+  }
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '')
+  if (!appUrl) return urlPath
+  return `${appUrl}${urlPath.startsWith('/') ? '' : '/'}${urlPath}`
+}

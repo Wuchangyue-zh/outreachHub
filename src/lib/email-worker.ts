@@ -9,6 +9,8 @@ import type { EmailJobData } from './email-queue'
 import { maybeMarkCampaignCompleted } from './campaign-completion'
 import { isPermanentBounce, markAsBounced } from './bounce-handler'
 import { getWorkerConcurrency, getWorkerRateLimit } from './env'
+import { fetchFileBuffer } from './storage'
+import { resolvePublicUrls } from './email-html'
 import { incrementTenantStat } from './stats-aggregate'
 import { updateCampaignContactStatus } from './campaign-contacts'
 
@@ -25,6 +27,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
     fromName,
     trackingPixel,
     trackingLinks,
+    attachmentIds,
   } = job.data
 
   console.log(`[Email Worker] Processing job ${job.id}: Sending to ${to}`)
@@ -57,6 +60,28 @@ async function processEmailJob(job: Job<EmailJobData>) {
       finalSubject = applyEmailVariables(subject, variables)
       finalHtml = applyEmailVariables(html || '', variables)
       finalText = applyEmailVariables(text || '', variables)
+    }
+  }
+
+  // H1: 加载附件 Buffer
+  let emailAttachments: Array<{ filename: string; content: Buffer }> | undefined
+  if (attachmentIds && attachmentIds.length > 0) {
+    try {
+      const attachments = await prisma.attachment.findMany({
+        where: { id: { in: attachmentIds } },
+      })
+      const loaded: Array<{ filename: string; content: Buffer }> = []
+      for (const att of attachments) {
+        try {
+          const { buffer, filename } = await fetchFileBuffer(att.url)
+          loaded.push({ filename: att.originalName || filename, content: buffer })
+        } catch (err) {
+          console.warn(`[Email Worker] Failed to load attachment ${att.id}:`, err)
+        }
+      }
+      if (loaded.length > 0) emailAttachments = loaded
+    } catch (err) {
+      console.warn(`[Email Worker] Failed to fetch attachments:`, err)
     }
   }
 
@@ -112,6 +137,9 @@ async function processEmailJob(job: Job<EmailJobData>) {
     emailHtml += `<img src="${pixelUrl}" width="1" height="1" style="display:none" />`
   }
 
+  // H2: 将本地路径图片 URL 转为公网可访问 URL
+  emailHtml = resolvePublicUrls(emailHtml)
+
   await job.updateProgress(50)
 
   try {
@@ -127,6 +155,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
         html: emailHtml,
         text: finalText,
         from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+        attachments: emailAttachments,
       })
     } else {
       // 使用平台 SMTP 发送（降级）
@@ -136,6 +165,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
         html: emailHtml,
         text: finalText,
         from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+        attachments: emailAttachments,
       })
     }
 

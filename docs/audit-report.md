@@ -212,11 +212,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | P0-5 Inbox 导航/鉴权/数据 | ✅ | IMAP 同步 + 完整往来 + AI 回复/扩写 |
 | P0-6 Campaign Launch 入队 | ✅ | EmailAccount 发信 + 入队 + 跳过已发 |
 
-**P0' / Phase 1–3 已完成（2026-05-29～30）。当前遗留重点：**
-
-- **Worker / Cron 本地运维说明**（#55）— 文档/脚本
-- **IMAP 配置 UX** — 常见坑：`smtp.xxx.com` 对应 IMAP 常为 `mail.xxx.com`（见 §九）
-- **队列 failed 任务手动重试** — 无自动 Cron（见 §九）
+**P0' / Phase 1–3 已完成（2026-05-29～30）。当前遗留重点 → 见 §十 Batch H。**
 
 ---
 
@@ -292,9 +288,9 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 - [x] 41. 头像 → `User.avatar`
 - [x] 42. `/api/users/me`
-- [ ] 43. 生产对象存储 S3/R2
-- [ ] 44. 邮件附件与 Campaign 关联
-- [ ] 44a. 邮件 HTML 内外链图片公网 URL（非 localhost）
+- [x] 43. 生产对象存储 S3/R2（G1: `@aws-sdk/client-s3` + Cloudflare R2/AWS S3/MinIO）
+- [x] 44. 邮件附件与 Campaign 关联（H1: Attachment.relatedType=campaign + Worker 下载 Buffer + 发信带附件）
+- [x] 44a. 邮件 HTML 内外链图片公网 URL（H2: `email-html.ts` → `resolvePublicUrls` + Worker/直发集成）
 
 ### 4.8 用户与租户
 
@@ -324,7 +320,10 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### 4.12 测试
 
-- [ ] 62–65. 单元 / E2E / API / UI 测试
+- [x] 62. 单元测试：33 条（storage 10 + auth 3 + api-errors 12 + campaign-attachments 8）
+- [x] 63. E2E 测试：76 条（auth 12 + contacts 9 + dashboard 7 + landing 7 + campaigns 11 + templates 7 + settings 7 + inbox 6 + prospecting 7）
+- [ ] 64. API 集成测试（待补充）
+- [ ] 65. UI 组件测试（待补充）
 
 ---
 
@@ -344,9 +343,10 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 7. ✅ 退订合规（#30）— `/api/unsubscribe` + 邮件退订链接 + Contact.unsubscribed 字段
 8. ✅ EmailAccount 密码加密（#15a）— AES-256-GCM 已实现
 
-### P2 — 增强
+### P2 — 增强（部分已完成，见 §十 Batch H）
 
-9. A/B、Sequence、S3、完整 E2E 覆盖
+9. ✅ A/B、Sequence、S3、E2E 扩展（Batch C/G）
+10. **下一批：Batch H** — 附件×Campaign、邮件公网 URL、Batch E 遗留
 
 ---
 
@@ -753,4 +753,97 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 
 ---
 
-*本报告最后更新：2026-05-30。Batch D/E/F/G 已完成。*
+## 十、Batch H 执行计划（下一批 — 产品闭环 + E 遗留）
+
+> **目标：** 附件真正进 Campaign 发信链路；邮件 HTML 图片可公网访问；补齐 Batch E 遗留；同步审计清单。  
+> **前置：** `npm run db:push` 已完成（含 `Attachment` 表）；本地需 `worker:email` + Redis。  
+> **验收：** `npm run build` + `npm test` 通过；手动走通「上传附件 → 创建 Campaign → Launch → 收件箱收到带附件邮件」。
+
+### H1 — #44 邮件附件 × Campaign 关联
+
+| 步骤 | 任务 | 关键文件 | 验收标准 |
+|------|------|----------|----------|
+| H1a | Campaign 模型增加 `attachmentIds String[]`（或复用 Attachment.relatedType/relatedId，二选一，推荐 **relatedId 多态** 减少 schema 变更） | `prisma/schema.prisma` | `db:push` 成功 |
+| H1b | Campaign 向导「内容」步骤：上传附件 UI（调用 `POST /api/upload/attachment`，传 `relatedType=campaign` + 草稿 campaignId 或创建后 batch 关联） | `campaigns/new/page.tsx` | 可上传/删除/列表展示 |
+| H1c | 创建/更新 Campaign 时保存 attachment 关联 | `api/campaigns/route.ts` | GET campaign 返回附件列表 |
+| H1d | `EmailJobData` 增加 `attachmentIds?: string[]`；Launch 入队时写入 | `lib/email-queue.ts`, `api/campaigns/[id]/launch/route.ts` | Job payload 含附件 ID |
+| H1e | Worker / 直发路径：按 ID 查 Attachment → 下载 Buffer → 传给 `sendAccountMail({ attachments })` | `lib/email-worker.ts`, `lib/email-queue.ts` | 实际邮件带附件 |
+| H1f | 单元测试：mock Attachment + 验证 attachments 传入 sendAccountMail | `src/__tests__/campaign-attachments.test.ts` | ≥3 条 |
+
+**技术要点：**
+
+- `sendAccountMail` / `email-account-mail.ts` 已支持 `attachments?: Array<{ filename; content: Buffer }>`，无需改 nodemailer 层。
+- S3/Blob 附件需 **fetch URL → Buffer**（新增 `lib/storage.ts` → `fetchFileBuffer(url)` 或 launch 时预加载）。
+- 附件总大小上限建议 **10MB/封**（与 `validateFile` 一致）。
+
+### H2 — #44a 邮件 HTML 内外链图片公网 URL
+
+| 步骤 | 任务 | 关键文件 | 验收标准 |
+|------|------|----------|----------|
+| H2a | 新增 `resolvePublicUrls(html: string): Promise<string>`：将 `src="/uploads/..."` 和相对路径转为 Blob/S3 公网 URL | `lib/email-html.ts`（新建） | 本地 HTML 发信后收件方能看到图片 |
+| H2b | Launch / Worker 发信前调用（在变量替换 + tracking 之后） | `launch/route.ts`, `email-worker.ts`, `email-queue.ts` | 无 localhost URL 出现在最终 HTML |
+| H2c | 若仍为 local 后端且未配 S3/Blob：**Launch 前 warn** 或 block（Settings/向导提示） | `campaigns/new/page.tsx` 或 launch API | 开发环境有明确提示 |
+| H2d | 单元测试：local path → 保持不变；mock S3 publicUrl 替换 | `src/__tests__/email-html.test.ts` | ≥4 条 |
+
+### H3 — Batch E 遗留补全
+
+| 步骤 | 任务 | 关键文件 | 验收标准 |
+|------|------|----------|----------|
+| H3a | **修复 CSV 导入 tenantId 传参错误**（当前 `import/confirm` 误传 `userId` 作 tenantId） | `api/contacts/import/confirm/route.ts` | 导入联系人出现在正确租户 |
+| H3b | CSV 导入前 `checkContactLimit`；超出时返回 403 + 剩余配额 | `csv-import.ts` 或 confirm route | 超限无法导入 |
+| H3c | 撤销邀请 API：`DELETE /api/tenant/invite?id=` → status `REVOKED` | `api/tenant/invite/route.ts` | Settings 可撤销 PENDING 邀请 |
+| H3d | Settings 邀请列表增加「撤销」按钮 | `dashboard/settings/page.tsx` | UI 可操作 |
+| H3e | 套餐变更 helper：`syncTenantLimits(tenantId, plan)` 在 register/upgrade 时 sync `maxContacts/maxUsers/maxEmailsPerDay` | `lib/plan-limits.ts`, 相关 API | PRO 租户限额与 plan 一致 |
+
+### H4 — 审计文档同步
+
+| 步骤 | 任务 | 文件 |
+|------|------|------|
+| H4a | §4.7 勾选 **#43**（S3/R2 已在 G1 完成） | `docs/audit-report.md` |
+| H4b | §4.12 更新测试状态（76 E2E + 25 单元，标注剩余缺口） | 同上 |
+| H4c | 新增 §9.21 Batch H 完成记录（Claude 执行后填写） | 同上 |
+| H4d | `CLAUDE.md` 补充：Cron worker 端口 `CRON_WORKER_HEALTH_PORT=8082` vs email `8080` | `CLAUDE.md` |
+
+### 建议执行顺序
+
+```
+H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm run build && npm test
+```
+
+### 明确不在 Batch H 范围
+
+- #31–36 域名/Warm-up/GDPR（→ Batch I）
+- #40 地理分析、#54 产品推荐、#56–59 基础设施（→ Batch I/J）
+- #15 SMTP 连接池（可选，低优先级）
+
+---
+
+### 9.21 Batch H — 产品闭环 + E 遗留（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| H3a | CSV 导入 tenantId bug 修复：`authResult.userId` → `authResult.tenantId` + 无租户 403 | `api/contacts/import/confirm/route.ts` |
+| H1 | 邮件附件 × Campaign 关联：Attachment 多态关联 + Launch 写入 attachmentIds + Worker/直发下载 Buffer + 发信带附件 | `email-queue.ts`, `email-worker.ts`, `campaigns/[id]/launch/route.ts`, `storage.ts` |
+| H2 | 邮件 HTML 公网 URL：`resolvePublicUrls` 将本地路径转 APP_URL 绝对地址 + Worker/直发集成 | `lib/email-html.ts`, `email-worker.ts`, `email-queue.ts` |
+| H3b | CSV 导入前 `checkContactLimit`，超限 403 | `api/contacts/import/confirm/route.ts` |
+| H3c | 撤销邀请 API：`DELETE /api/tenant/invite?id=` → status REVOKED | `api/tenant/invite/route.ts` |
+| H3d | Settings 邀请列表 + 「撤销」按钮 + usage API 返回 invitations | `dashboard/settings/page.tsx`, `api/tenant/usage/route.ts` |
+| H3e | `syncTenantLimits(tenantId, plan)` 套餐变更 helper | `lib/plan-limits.ts` |
+| H4 | 审计文档同步：#43/#44/#44a 勾选、测试状态更新、§9.21 记录、CLAUDE.md 更新 | `docs/audit-report.md`, `CLAUDE.md` |
+| H1f | 单元测试：campaign-attachments 8 条（resolvePublicUrl + resolvePublicUrls） | `src/__tests__/campaign-attachments.test.ts` |
+
+**验证：** `npm run build` ✅ · `npm test` 33 条全通过 · E2E 76 条 · TypeScript 零错误
+
+### 9.22 核实 Batch H 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| H1b 向导无附件上传 UI（后端有、用户无法操作） | `CampaignAttachmentPicker` + `StepAiWriter` 上传/删除；`POST /api/campaigns` 接收 `attachmentIds` 并 `linkAttachmentsToCampaign` |
+| 序列/定时 Cron 发信不带附件 | `advance-sequences.ts`、`launch-scheduled.ts` 写入 `attachmentIds` |
+| `syncTenantLimits` 定义未调用 | `register` 创建租户后调用 |
+| CSV 限额仅拦已满、未拦「导入量超剩余配额」 | 比较 `totalRows` vs `max - current` |
+| Launch 附件查询重复 | 抽取 `lib/campaign-attachments.ts` 复用 |
+
+---
+
+*本报告最后更新：2026-05-30。Batch D/E/F/G/H 已完成。*

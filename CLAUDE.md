@@ -96,11 +96,14 @@ Vercel Blob (生产文件存储)
 | Dashboard 统计缓存 | Redis 预聚合 | `src/lib/stats-aggregate.ts` |
 | 缓存删除 | Redis SCAN（**禁止**用 KEYS） | `src/lib/redis.ts` |
 
-### 7. 文件上传 — Blob 优先
+### 7. 文件上传 — Blob（生产）/ 本地磁盘（开发）
 
-- 统一入口：`uploadFile()` in `src/lib/storage.ts`
-- 生产（Vercel）：`BLOB_READ_WRITE_TOKEN` → Vercel Blob
-- 本地开发：降级到 `public/uploads/`
+- 统一入口：`uploadFile()` / `deleteFile()` / `fetchFileBuffer()` in `src/lib/storage.ts`
+- **本地开发**：不配 `BLOB_READ_WRITE_TOKEN` → `public/uploads/`
+- **Vercel 生产**：关联 Blob Store 后平台注入 `BLOB_READ_WRITE_TOKEN`
+- 附件 DB 追踪：`Attachment` 模型（`relatedType`/`relatedId` 多态关联 Campaign 等）
+- 邮件附件：Worker 通过 `fetchFileBuffer(url)` 下载 → `sendAccountMail({ attachments })`
+- 邮件图片公网化：`resolvePublicUrls(html)` 将 `/uploads/...` 转为 `APP_URL` 绝对地址
 - **禁止**在新代码里直接 `fs.writeFile` 到 `public/uploads`
 
 ### 8. 安全 — 生产无 fallback

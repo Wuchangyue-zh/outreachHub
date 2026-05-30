@@ -8,6 +8,8 @@ export {
   uploadFile,
   deleteFile,
   deleteFromS3,
+  fetchFileBuffer,
+  resolvePublicUrl,
   type UploadedFile,
   type StorageUploadOptions,
 } from './storage'

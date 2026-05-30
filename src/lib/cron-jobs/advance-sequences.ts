@@ -3,6 +3,7 @@ import { addBulkEmailJobs } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
+import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
 
 export async function executeAdvanceSequences() {
   const campaigns = await prisma.campaign.findMany({
@@ -116,6 +117,10 @@ export async function executeAdvanceSequences() {
       continue
     }
 
+    const attachmentIds = campaign.tenantId
+      ? await getCampaignAttachmentIds(campaign.tenantId, campaign.id)
+      : []
+
     const emailJobs = contacts
       .map((contact) => {
         const primaryEmail = contact.emails[0]
@@ -134,6 +139,7 @@ export async function executeAdvanceSequences() {
           fromName: campaign.fromName || '',
           trackingPixel: true,
           trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         }
       })
       .filter(Boolean)

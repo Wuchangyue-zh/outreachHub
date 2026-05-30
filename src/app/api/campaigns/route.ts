@@ -4,6 +4,7 @@ import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { refreshRunningCampaignStatuses } from '@/lib/campaign-completion'
 import { syncCampaignStatsByIds } from '@/lib/campaign-stats-sync'
+import { linkAttachmentsToCampaign } from '@/lib/campaign-attachments'
 
 export async function GET(req: NextRequest) {
   try {
@@ -80,9 +81,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+    const { attachmentIds, ...campaignData } = body
+
     const campaign = await prisma.campaign.create({
-      data: { ...body, tenantId: auth.tenantId },
+      data: { ...campaignData, tenantId: auth.tenantId },
     })
+
+    if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+      await linkAttachmentsToCampaign(auth.tenantId, campaign.id, attachmentIds)
+    }
+
     return NextResponse.json({ success: true, data: campaign })
   } catch (error) {
     return handleApiError(error)

@@ -144,6 +144,7 @@ interface TenantUsage {
     contactPercent: number; emailPercent: number; userPercent: number
   }
   members: Array<{ id: string; email: string; name: string | null; role: string; avatar: string | null; createdAt: string }>
+  invitations: Array<{ id: string; email: string; role: string; createdAt: string; expiresAt: string }>
 }
 
 const PLAN_LABELS: Record<string, string> = { FREE: '免费版', BASIC: '基础版', PRO: '专业版', ENTERPRISE: '企业版' }
@@ -210,6 +211,20 @@ export default function SettingsPage() {
         toast.error(data.error?.message || data.error || '邀请失败')
       }
     } catch { toast.error('邀请失败') } finally { setInviting(false) }
+  }
+
+  // H3d: 撤销邀请
+  const handleRevokeInvite = async (inviteId: string) => {
+    try {
+      const res = await fetch(`/api/tenant/invite?id=${inviteId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('邀请已撤销')
+        loadTenantUsage()
+      } else {
+        toast.error(data.error?.message || '撤销失败')
+      }
+    } catch { toast.error('撤销失败') }
   }
 
   useEffect(() => {
@@ -764,6 +779,29 @@ export default function SettingsPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* H3d: 待处理邀请 */}
+                    {tenantData.invitations && tenantData.invitations.length > 0 && (
+                      <>
+                        <p className="text-xs font-medium text-gray-500 mt-4 mb-2">待处理邀请</p>
+                        <div className="divide-y divide-gray-100">
+                          {tenantData.invitations.map((inv) => (
+                            <div key={inv.id} className="flex items-center gap-3 py-3">
+                              <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center text-sm font-medium text-amber-600">
+                                <Mail className="h-4 w-4" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{inv.email}</p>
+                                <p className="text-xs text-gray-500 truncate">{inv.role} · 到期 {new Date(inv.expiresAt).toLocaleDateString('zh-CN')}</p>
+                              </div>
+                              <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleRevokeInvite(inv.id)}>
+                                撤销
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </>

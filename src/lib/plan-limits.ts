@@ -109,3 +109,26 @@ export async function checkDailyEmailLimit(tenantId: string, emailsToAdd: number
     max: limits.maxEmailsPerDay,
   }
 }
+
+/**
+ * H3e: 套餐变更时同步 Tenant 表限额字段
+ * 在注册、套餐升级/降级时调用，确保 Tenant 表的 maxContacts/maxUsers/maxEmailsPerDay 与当前 plan 一致。
+ * 仅当 Tenant 表值小于套餐默认值时才更新（Enterprise 定制值不会被覆盖）。
+ */
+export async function syncTenantLimits(tenantId: string, plan: string): Promise<void> {
+  const defaults = PLAN_DEFAULTS[plan] || PLAN_DEFAULTS.FREE
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { maxContacts: true, maxUsers: true, maxEmailsPerDay: true },
+  })
+  if (!tenant) return
+
+  const updates: Record<string, number> = {}
+  if (tenant.maxContacts < defaults.maxContacts) updates.maxContacts = defaults.maxContacts
+  if (tenant.maxUsers < defaults.maxUsers) updates.maxUsers = defaults.maxUsers
+  if (tenant.maxEmailsPerDay < defaults.maxEmailsPerDay) updates.maxEmailsPerDay = defaults.maxEmailsPerDay
+
+  if (Object.keys(updates).length > 0) {
+    await prisma.tenant.update({ where: { id: tenantId }, data: updates })
+  }
+}

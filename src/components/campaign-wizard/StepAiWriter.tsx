@@ -11,6 +11,10 @@ import {
   ArrowLeft, Sparkles, Loader2, Copy, Check, Variable,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  CampaignAttachmentPicker,
+  type CampaignAttachmentItem,
+} from '@/components/campaign-wizard/CampaignAttachmentPicker'
 
 const TONES: { id: ToneType; label: string; emoji: string }[] = [
   { id: 'professional', label: '专业', emoji: '💼' },
@@ -47,6 +51,7 @@ export function StepAiWriter() {
   const [copied, setCopied] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [launchError, setLaunchError] = useState('')
+  const [attachments, setAttachments] = useState<CampaignAttachmentItem[]>([])
   const textareaRef = { current: null as HTMLTextAreaElement | null }
 
   /** 从粘贴邮箱解析或查找/创建联系人，返回 contactIds */
@@ -157,6 +162,9 @@ export function StepAiWriter() {
       }
       // #52: 传递产品关联
       if (productId) createPayload.productId = productId
+      if (attachments.length > 0) {
+        createPayload.attachmentIds = attachments.map((a) => a.id)
+      }
 
       // #7: SEQUENCE 类型传递步骤配置
       if (campaignType === 'SEQUENCE' && sequence.length > 0) {
@@ -191,7 +199,7 @@ export function StepAiWriter() {
       })
       const createJson = await createRes.json()
       if (!createRes.ok || !createJson.success) {
-        setLaunchError(createJson.message || createJson.error || '创建活动失败')
+        setLaunchError(createJson.error?.message || createJson.message || '创建活动失败')
         return
       }
 
@@ -207,7 +215,7 @@ export function StepAiWriter() {
       })
       const launchJson = await launchRes.json()
       if (!launchRes.ok || !launchJson.success) {
-        setLaunchError(launchJson.message || launchJson.error || '启动活动失败')
+        setLaunchError(launchJson.error?.message || launchJson.message || '启动活动失败')
         router.push('/campaigns')
         return
       }
@@ -301,6 +309,8 @@ export function StepAiWriter() {
           ))}
         </div>
       )}
+
+      <CampaignAttachmentPicker attachments={attachments} onChange={setAttachments} />
 
       {/* Product prompt */}
       <div className="space-y-2">
