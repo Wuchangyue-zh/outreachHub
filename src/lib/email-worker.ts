@@ -4,6 +4,7 @@ import { sendPlatformMail } from './email'
 import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
+import { applyEmailVariables, buildContactVariables } from './email-variables'
 import type { EmailJobData } from './email-queue'
 
 async function processEmailJob(job: Job<EmailJobData>) {
@@ -25,6 +26,34 @@ async function processEmailJob(job: Job<EmailJobData>) {
 
   // Update job progress
   await job.updateProgress(10)
+
+  // P1-10: 模板变量替换
+  let finalSubject = subject
+  let finalHtml = html || ''
+  let finalText = text || ''
+
+  if (contactId) {
+    // 获取联系人信息用于变量替换
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: {
+        company: true,
+        emails: {
+          where: { isPrimary: true },
+          take: 1,
+        },
+      },
+    })
+
+    if (contact) {
+      const primaryEmail = contact.emails[0]?.address || to
+      const variables = buildContactVariables(contact, primaryEmail)
+
+      finalSubject = applyEmailVariables(subject, variables)
+      finalHtml = applyEmailVariables(html || '', variables)
+      finalText = applyEmailVariables(text || '', variables)
+    }
+  }
 
   // 确定发件人邮箱
   let senderEmail = fromEmail || process.env.SMTP_USER || ''
@@ -51,10 +80,10 @@ async function processEmailJob(job: Job<EmailJobData>) {
     messageId: '',
     toEmail: to,
     fromEmail: senderEmail,
-    subject,
+    subject: finalSubject,
     status: 'PENDING',
     sentAt: new Date(),
-    htmlContent: html,
+    htmlContent: finalHtml,
   }
 
   if (campaignId) {
@@ -68,7 +97,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
   await job.updateProgress(30)
 
   // Prepare email content with tracking using the centralized addEmailTracking function
-  let emailHtml = html || ''
+  let emailHtml = finalHtml
   if (emailLog.id && contactId) {
     emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId)
   } else if (trackingPixel && emailLog.id) {
@@ -88,18 +117,18 @@ async function processEmailJob(job: Job<EmailJobData>) {
       result = await sendAccountMail({
         emailAccountId,
         to,
-        subject,
+        subject: finalSubject,
         html: emailHtml,
-        text,
+        text: finalText,
         from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
       })
     } else {
       // 使用平台 SMTP 发送（降级）
       result = await sendPlatformMail({
         to,
-        subject,
+        subject: finalSubject,
         html: emailHtml,
-        text,
+        text: finalText,
         from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
       })
     }

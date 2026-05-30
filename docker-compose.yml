@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: outreachhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: outreach_hub
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis（用于 BullMQ 邮件队列）
+  redis:
+    image: redis:7-alpine
+    container_name: outreachhub-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js 应用（可选 - 本地开发通常直接 npm run dev）
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: outreachhub-app
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3030:3030"
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+  #     REDIS_URL: redis://redis:6379
+  #     NEXTAUTH_SECRET: your-secret-key-change-in-production
+  #     NEXTAUTH_URL: http://localhost:3030
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+
+  # 邮件 Worker（可选 - 独立运行后台任务）
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.worker
+  #   container_name: outreachhub-worker
+  #   restart: unless-stopped
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -424,14 +424,14 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 | # | 任务 | 关键文件 | 验收标准 |
 |---|------|----------|----------|
-| P1-8 | RocketReach 搜索入库 | `api/prospecting/route.ts`, `rocketreach.ts` | 搜索结果写入 Company/Contact |
-| P1-9 | Prospecting 去重 | prospecting API | 同 domain/email 不重复创建 |
-| P1-10 | 模板发信变量替换统一到 Worker | `email-worker.ts` 复用 `email-variables.ts` | 模板邮件变量正确 |
-| P1-11 | `/products` 基础 CRUD 页 | `api/products`, `app/products/page.tsx` | 列表 + 新建 |
-| P1-12 | docker-compose.yml | 项目根目录 | PG(5433) + Redis + 可选 worker 服务 |
-| P1-13 | Campaign 统计从 EmailLog 聚合 | `api/campaigns/stats` | openRate 与 log 一致 |
-| P1-14 | 联系人互动时间线 API | 新建 `api/contacts/[id]/timeline` | 返回 open/click/reply 事件 |
-| P1-15 | E2E 冒烟：登录 → 创建 Campaign → Launch | `e2e/campaigns.spec.ts` 扩展 | 至少不报错（SMTP 可 mock） |
+| P1-8 | ✅ RocketReach 搜索入库 | `api/prospecting/route.ts` | 搜索结果写入 Company/Contact |
+| P1-9 | ✅ Prospecting 去重 | `api/prospecting/route.ts` | 同 domain/email 不重复创建 |
+| P1-10 | ✅ 模板发信变量替换统一到 Worker | `email-worker.ts` 复用 `email-variables.ts` | 模板邮件变量正确 |
+| P1-11 | ✅ `/products` 基础 CRUD 页 | `api/products`, `app/dashboard/products/page.tsx` | 列表 + 新建 |
+| P1-12 | ✅ docker-compose.yml | 项目根目录 | PG(5433) + Redis + 可选 worker 服务 |
+| P1-13 | ✅ Campaign 统计从 EmailLog 聚合 | `api/campaigns/stats` | openRate 与 log 一致 |
+| P1-14 | ✅ 联系人互动时间线 API | `api/contacts/[id]/timeline` | 返回 open/click/reply 事件 |
+| P1-15 | ✅ E2E 冒烟：登录 → 创建 Campaign → Launch | `e2e/campaigns.spec.ts` 扩展 | 至少不报错（SMTP 可 mock） |
 
 **Phase 3 结束：** `npm run build` + 简要更新本文第四节 checkbox
 
