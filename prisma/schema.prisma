@@ -380,6 +380,7 @@ model EmailLog {
   replyCategory String?  // INTERESTED, NOT_INTERESTED, OUT_OF_OFFICE, QUESTION, UNSUBSCRIBE, AUTO_REPLY, FORWARD, NEGOTIATION, REFERRAL
   replyConfidence Float?
   replyKeywords String[]
+  replyBody   String?    @db.Text  // P1-3: 存储回复正文
   bouncedAt   DateTime?
   bounceReason String?
 

@@ -86,7 +86,8 @@ export async function GET(req: NextRequest) {
 
       const contactKey = log.contactId
       const outboundBody = log.htmlContent || log.content || log.subject || ''
-      const replyBody = log.content || log.subject || ''
+      // P1-3: 优先使用 replyBody 字段，回退到 content
+      const replyBody = log.replyBody || log.content || log.subject || ''
 
       if (!threadMap.has(contactKey)) {
         const companyName = contact.company?.name || ''

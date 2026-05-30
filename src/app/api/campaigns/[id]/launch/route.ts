@@ -21,13 +21,15 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
 
     const { id } = await ctx.params
+    const body = await req.json().catch(() => ({}))
+    const { scheduledAt } = body
 
     const campaign = await prisma.campaign.findUnique({
       where: { id, tenantId: auth.tenantId },
     })
     if (!campaign) return errorResponse(ErrorCodes.NOT_FOUND, '活动不存在或无权操作', 404)
 
-    if (!['DRAFT', 'PAUSED'].includes(campaign.status)) {
+    if (!['DRAFT', 'PAUSED', 'SCHEDULED'].includes(campaign.status)) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, `无法从 ${campaign.status} 状态启动`, 400)
     }
 
@@ -35,6 +37,37 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '请先为该活动添加目标联系人', 400)
     }
 
+    // P1-6: 如果提供了 scheduledAt，设置为定时任务
+    if (scheduledAt) {
+      const scheduledDate = new Date(scheduledAt)
+      if (isNaN(scheduledDate.getTime())) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '无效的定时时间', 400)
+      }
+
+      if (scheduledDate <= new Date()) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '定时时间必须在未来', 400)
+      }
+
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: {
+          status: 'SCHEDULED',
+          scheduledAt: scheduledDate,
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          campaignId: campaign.id,
+          status: 'SCHEDULED',
+          scheduledAt: scheduledDate.toISOString(),
+          message: `活动将在 ${scheduledDate.toLocaleString('zh-CN')} 自动启动`,
+        },
+      })
+    }
+
+    // 立即启动
     // 获取可用的发件账户（优先使用绑定账户，否则自动选择）
     const availableAccountId = await getAvailableAccount(auth.userId!, campaign.emailAccountId)
     if (!availableAccountId) {

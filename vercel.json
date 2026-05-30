@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-replies",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/launch-scheduled",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}

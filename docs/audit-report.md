@@ -408,13 +408,13 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 | # | 任务 | 关键文件 | 验收标准 |
 |---|------|----------|----------|
-| P1-1 | IMAP 多账户：读 EmailAccount 而非 `.env` | `imap.ts`, `api/imap/*` | check-replies 遍历用户 active 账户 |
-| P1-2 | 定时轮询回复（Cron API Route） | 新建 `api/cron/check-replies/route.ts` + `vercel.json` cron 或文档说明本地手动调 | 可调通；文档写清如何触发 |
-| P1-3 | EmailLog 存独立 `replyBody` 字段 | `schema.prisma`, `imap.ts`, `inbox/threads` | 收件箱「对方消息」显示回复正文 |
-| P1-4 | 注册成功欢迎邮件 | `api/auth/register/route.ts`, `sendPlatformMail` | 注册后收到平台 SMTP 邮件 |
-| P1-5 | `dailySent` 归零逻辑 | `select-email-account.ts` 或 Launch 前 | 跨天自动 reset dailySent |
-| P1-6 | Campaign 调度：`SCHEDULED` 类型 | Launch 或 Cron：到点自动 launch | scheduledAt 到期可触发（最小实现） |
-| P1-7 | 更新 `.env.example` 注释 | `.env.example` | 区分平台 SMTP vs 用户 EmailAccount |
+| P1-1 | ✅ IMAP 多账户：读 EmailAccount 而非 `.env` | `lib/imap-multi.ts` | check-replies 遍历用户 active 账户 |
+| P1-2 | ✅ 定时轮询回复（Cron API Route） | `api/cron/check-replies/route.ts`, `vercel.json` | 可调通；文档写清如何触发 |
+| P1-3 | ✅ EmailLog 存独立 `replyBody` 字段 | `schema.prisma`, `imap-multi.ts`, `inbox/threads` | 收件箱「对方消息」显示回复正文 |
+| P1-4 | ✅ 注册成功欢迎邮件 | `api/auth/register/route.ts`, `sendPlatformMail` | 注册后收到平台 SMTP 邮件 |
+| P1-5 | ✅ `dailySent` 归零逻辑 | `select-email-account.ts`, `email-account-mail.ts` | 跨天自动 reset dailySent |
+| P1-6 | ✅ Campaign 调度：`SCHEDULED` 类型 | `api/campaigns/[id]/launch/route.ts`, `api/cron/launch-scheduled/route.ts` | scheduledAt 到期可触发（最小实现） |
+| P1-7 | ✅ 更新 `.env.example` 注释 | `.env.example` | 区分平台 SMTP vs 用户 EmailAccount |
 
 **Phase 2 完成后：** `npm run build` ✅ → 进入 Phase 3
 
