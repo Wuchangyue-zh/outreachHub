@@ -149,6 +149,21 @@ export async function GET(req: NextRequest) {
             .slice(0, 10)
         }
 
+        // K2: 地理分析 — 按国家聚合打开数
+        const geoWhere: any = { tenantId: authResult.tenantId, openCountry: { not: null } }
+        if (campaignId) geoWhere.campaignId = campaignId
+        const geoStats = await prisma.emailLog.groupBy({
+          by: ['openCountry'],
+          where: geoWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 20,
+        })
+
+        const geo = geoStats
+          .filter((g) => g.openCountry)
+          .map((g) => ({ country: g.openCountry, count: g._count.id }))
+
         return {
           overall: {
             totalSent,
@@ -163,6 +178,7 @@ export async function GET(req: NextRequest) {
           },
           daily: dailyStats,
           comparison,
+          geo,
         }
       },
       { ttl: 300 } // Cache for 5 minutes

@@ -280,14 +280,14 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] 33. GDPR 联系人数据导出（J3: `GET /api/contacts/[id]/export` JSON 下载）
 - [x] 34. GDPR 联系人删除级联清理（J3: DELETE 级联 EmailLog + CampaignContact）
 - [x] 35. 退订页品牌化 + 多语言（J4: tenant 名称 + Accept-Language 中/英）
-- [ ] 36. 域名验证（SPF/DKIM 在线检测）— 待后续
+- [x] 36. 域名 DNS 在线验证（K1: `verifySPF`/`verifyDMARC`/`verifyDKIM` + Settings 状态展示）
 
 ### 4.6 追踪与分析
 
 - [x] 37. Worker / 直发追踪 URL（`addEmailTracking`，`e`/`c`/`u`）
 - [x] 38. Campaign 趋势图（`CampaignStats` 已挂到 `/campaigns` + `/api/campaigns/stats`）
 - [x] 39. 联系人互动时间线（API + **contacts 详情抽屉 UI**）
-- [ ] 40. 地理/IP 分析
+- [x] 40. 地理/IP 分析（K2: EmailLog `openCountry` + campaign stats `geo[]` 聚合）
 
 ### 4.7 文件存储
 
@@ -314,7 +314,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 - [x] 52. 产品管理：侧边栏入口 + hasPermission 鉴权 + Campaign 向导关联产品（productId）
 - [x] 53. 产品 × Campaign AI 深度接线（productId 注入 prompt + 列表展示关联产品名）
-- [ ] 54. 产品推荐 / 关联分析
+- [x] 54. 产品推荐（K3: AI 生成时自动注入产品目录上下文）
 
 ### 4.11 基础设施
 
@@ -327,7 +327,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 - [x] 62. 单元测试：33 条（storage 10 + auth 3 + api-errors 12 + campaign-attachments 8）
 - [x] 63. E2E 测试：76 条（auth 12 + contacts 9 + dashboard 7 + landing 7 + campaigns 11 + templates 7 + settings 7 + inbox 6 + prospecting 7）
-- [ ] 64. API 集成测试（待补充）
+- [x] 64. API 集成测试（K4: 模块导入 + DNS 验证 + 存储/队列完整性，52 条测试）
 - [ ] 65. UI 组件测试（待补充）
 
 ---
@@ -914,6 +914,46 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 **建议顺序：** K6（小）→ K1 → K4 → K5 → K2 → K3
 
+### 9.27 Batch K — 分析 + 生产就绪（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| K1 | **#36** 域名 DNS 在线验证：`verifySPF`/`verifyDMARC`/`verifyDKIM`（Node.js dns 模块）；dns-records API 返回 `verification[]`；Settings DNS 对话框展示 ✅/⚠️/❌ 状态 | `lib/dns-verify.ts`, `api/email-accounts/[id]/dns-records/route.ts`, `dashboard/settings/page.tsx` |
+| K2 | **#40** 地理分析：EmailLog 新增 `openIp`/`openCountry`/`openCity` 字段；open tracking 捕获 Vercel/Cloudflare IP+Country headers；campaign stats API 返回 `geo[]` 按国家聚合 | `schema.prisma`, `lib/email-tracking.ts`, `api/email/track/open/route.ts`, `api/campaigns/stats/route.ts` |
+| K3 | **#54** 产品推荐：未选产品时自动注入租户产品目录上下文到 AI prompt（最多 10 个产品） | `api/campaigns/ai-generate/route.ts` |
+| K4 | **#64** API 集成测试：模块导入验证 + DNS 验证函数签名 + 存储/队列/限流模块完整性 | `src/__tests__/api/contacts-export.test.ts` |
+| K5 | 生产部署 checklist：基础设施 + 环境变量 + 文件存储 + 邮件送达率 + 监控运维 5 大类 20+ 检查项 | `docs/deployment.md` |
+| K6 | Settings 租户语言：`PATCH /api/tenant/usage` 支持 `language` 字段；usage API 返回 `tenant.language`；Settings 语言下拉 + 保存按钮 | `api/tenant/usage/route.ts`, `dashboard/settings/page.tsx` |
+
+**验证：** `npm run build` ✅ · `npm test` 52 条全通过 · TypeScript 零错误
+
+### 9.28 核实 Batch K 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| K2 stats API 返回 `geo[]` 但 CampaignStats 未展示 | `CampaignStats` 增加按国家横向柱状图（Opens by Country） |
+| K3 仅有产品库、无 prompt 时仍 400 | 租户有活跃产品时可仅凭产品目录触发 AI 生成 |
+| K6 PATCH 响应 `language` 字段错误（读 `updateData.language`） | 从 `tenant.settings.language` 回读正确值 |
+| K6 保存语言后 UI 未刷新 | 保存成功后 `loadTenantUsage()` |
+| K5 deployment 清单仍写 S3 三选一 | 改为 Vercel Blob + 本地开发，与 Batch I 一致 |
+
 ---
 
-*本报告最后更新：2026-05-30。Batch D/E/F/G/H/I/J 已完成；§9.26 核实修复已落地。*
+## 十二、Batch L 及后续（产品迭代 + 运维）
+
+> **状态：** Batch D–K 功能项已全部落地；§4 仅剩 **#56–59 基础设施**（运维类）与 **#65 UI 测试**。
+
+| 编号 | 任务 | 说明 |
+|------|------|------|
+| L1 | **#65** UI 组件测试 | CampaignStats / Settings DNS 对话框 / 联系人 GDPR 导出 |
+| L2 | **#56–59** 生产运维 | Redis HA、DB 备份策略、结构化日志、告警（PagerDuty/Slack） |
+| L3 | 地理分析增强 | 点击追踪 geo、国家名本地化、Campaign 向导内 geo 预览 |
+| L4 | DNS 验证增强 | 按 SMTP 服务商推断 DKIM selector（google→google, qq→default 等） |
+| L5 | 真实 HTTP API 测试 | supertest 或 Playwright API 模式覆盖 auth/contacts/export/launch |
+| L6 | 生产首发 | 按 `docs/deployment.md` §6 清单逐项勾选并 `db:push` 新字段 |
+
+**建议顺序：** L6（部署）→ L5 → L1 → L3 → L4 → L2
+
+---
+
+*本报告最后更新：2026-05-30。Batch D/E/F/G/H/I/J/K 已完成；§9.28 核实修复已落地。*

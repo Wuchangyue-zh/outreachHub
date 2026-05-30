@@ -14,7 +14,12 @@ export async function POST(req: NextRequest) {
     const { productPrompt, tone, productId } = body
 
     if (!productPrompt?.trim() && !productId) {
-      return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请输入产品描述或选择产品', 400)
+      const productCount = await prisma.product.count({
+        where: { tenantId: auth.tenantId, isActive: true },
+      })
+      if (productCount === 0) {
+        return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请输入产品描述或选择产品', 400)
+      }
     }
 
     // D1: 若选了 productId，读取产品信息注入 prompt
@@ -32,6 +37,25 @@ export async function POST(req: NextRequest) {
         if (product.price != null) parts.push(`参考价格：${product.price} ${product.currency}`)
         if (enrichedPrompt) parts.push(`补充说明：${enrichedPrompt}`)
         enrichedPrompt = parts.join('\n')
+      }
+    }
+
+    // K3: 注入产品目录上下文（让 AI 可推荐关联产品）
+    if (!productId) {
+      const products = await prisma.product.findMany({
+        where: { tenantId: auth.tenantId, isActive: true },
+        select: { name: true, description: true, category: true, features: true },
+        take: 10,
+        orderBy: { updatedAt: 'desc' },
+      })
+      if (products.length > 0) {
+        const catalog = products.map((p) => {
+          const parts = [p.name]
+          if (p.category) parts.push(`[${p.category}]`)
+          if (p.description) parts.push(p.description.slice(0, 80))
+          return parts.join(' ')
+        }).join('\n')
+        enrichedPrompt = `${enrichedPrompt}\n\n---\n可用产品目录（可适当推荐关联产品）：\n${catalog}`
       }
     }
 

@@ -144,7 +144,7 @@ interface EmailAccount {
 }
 
 interface TenantUsage {
-  tenant: { id: string; name: string; plan: string; expiresAt: string | null; createdAt: string }
+  tenant: { id: string; name: string; plan: string; expiresAt: string | null; createdAt: string; language?: string }
   limits: { maxContacts: number; maxUsers: number; maxEmailsPerDay: number }
   usage: {
     contactCount: number; userCount: number; emailsSentToday: number; campaignCount: number
@@ -174,10 +174,13 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('')
   const [upgradingPlan, setUpgradingPlan] = useState(false)
+  // K6: 租户语言
+  const [tenantLanguage, setTenantLanguage] = useState('zh')
+  const [savingLanguage, setSavingLanguage] = useState(false)
 
   // J1: DNS 记录
   const [dnsAccountId, setDnsAccountId] = useState<string | null>(null)
-  const [dnsData, setDnsData] = useState<{ domain: string; records: Array<{ type: string; host: string; value: string; description: string; status: string }>; tips: string[] } | null>(null)
+  const [dnsData, setDnsData] = useState<{ domain: string; records: Array<{ type: string; host: string; value: string; description: string; status: string }>; verification?: Array<{ record: string; found: boolean; valid: boolean; message: string }>; tips: string[] } | null>(null)
   const [dnsLoading, setDnsLoading] = useState(false)
 
   // 加载邮件账户列表
@@ -200,7 +203,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/tenant/usage')
       const data = await res.json()
-      if (data.success) setTenantData(data.data)
+      if (data.success) {
+        setTenantData(data.data)
+        if (data.data.tenant.language) setTenantLanguage(data.data.tenant.language)
+      }
       if (data.success && data.data?.tenant?.plan) setSelectedPlan(data.data.tenant.plan)
     } catch { /* silent */ } finally {
       setTenantLoading(false)
@@ -250,6 +256,25 @@ export default function SettingsPage() {
     } finally {
       setUpgradingPlan(false)
     }
+  }
+
+  // K6: 保存租户语言
+  const handleSaveLanguage = async () => {
+    setSavingLanguage(true)
+    try {
+      const res = await fetch('/api/tenant/usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: tenantLanguage }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('退订页语言已更新')
+        await loadTenantUsage()
+      } else {
+        toast.error(data.error?.message || '保存失败')
+      }
+    } catch { toast.error('保存失败') } finally { setSavingLanguage(false) }
   }
 
   // H3d: 撤销邀请
@@ -871,6 +896,31 @@ export default function SettingsPage() {
                   </CardContent>
                 </Card>
 
+                {/* K6: 退订页语言 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      🌐 退订页语言
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-gray-500 mb-3">设置邮件退订页面的显示语言（影响收件人看到的退订确认页）</p>
+                    <div className="flex items-center gap-3">
+                      <select
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                        value={tenantLanguage}
+                        onChange={(e) => setTenantLanguage(e.target.value)}
+                      >
+                        <option value="zh">中文</option>
+                        <option value="en">English</option>
+                      </select>
+                      <Button size="sm" onClick={handleSaveLanguage} disabled={savingLanguage}>
+                        {savingLanguage ? '保存中...' : '保存'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* 团队成员 */}
                 <Card>
                   <CardHeader>
@@ -961,6 +1011,22 @@ export default function SettingsPage() {
           ) : dnsData ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">域名：<strong>{dnsData.domain}</strong></p>
+
+              {/* K1: DNS 验证状态 */}
+              {dnsData.verification && dnsData.verification.length > 0 && (
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2">
+                  <p className="text-xs font-medium text-gray-700">当前 DNS 状态</p>
+                  {dnsData.verification.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className={v.found && v.valid ? 'text-green-600' : v.found ? 'text-amber-600' : 'text-red-500'}>
+                        {v.found && v.valid ? '✅' : v.found ? '⚠️' : '❌'}
+                      </span>
+                      <span className="font-medium w-16">{v.record}</span>
+                      <span className="text-gray-600 text-xs">{v.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {dnsData.records.map((rec, idx) => (
                 <div key={idx} className="rounded-lg border border-gray-200 p-4 space-y-2">

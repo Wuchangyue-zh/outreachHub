@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const [tenant, limits, usage] = await Promise.all([
       prisma.tenant.findUnique({
         where: { id: auth.tenantId },
-        select: { id: true, name: true, plan: true, expiresAt: true, createdAt: true },
+        select: { id: true, name: true, plan: true, expiresAt: true, createdAt: true, settings: true },
       }),
       getTenantLimits(auth.tenantId),
       getTenantUsage(auth.tenantId),
@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
           plan: tenant.plan,
           expiresAt: tenant.expiresAt,
           createdAt: tenant.createdAt,
+          language: ((tenant.settings as Record<string, unknown>)?.language as string) || 'zh',
         },
         limits,
         usage: {
@@ -79,29 +80,66 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { plan } = body
-    const validPlans = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE']
-    if (!plan || !validPlans.includes(plan)) {
-      return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效套餐，可选：${validPlans.join(', ')}`, 400)
+    const { plan, language } = body
+
+    const updateData: Record<string, unknown> = {}
+
+    // 套餐变更
+    if (plan !== undefined) {
+      const validPlans = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE']
+      if (!validPlans.includes(plan)) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效套餐，可选：${validPlans.join(', ')}`, 400)
+      }
+      updateData.plan = plan
     }
 
-    // 更新套餐
+    // K6: 语言设置（写入 tenant.settings.language）
+    if (language !== undefined) {
+      const validLangs = ['zh', 'en']
+      if (!validLangs.includes(language)) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效语言，可选：${validLangs.join(', ')}`, 400)
+      }
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: auth.tenantId },
+        select: { settings: true },
+      })
+      const currentSettings = (tenant?.settings as Record<string, unknown>) || {}
+      updateData.settings = { ...currentSettings, language }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供要更新的字段', 400)
+    }
+
     await prisma.tenant.update({
       where: { id: auth.tenantId },
-      data: { plan },
+      data: updateData,
     })
 
-    // I1: 同步限额
-    await syncTenantLimits(auth.tenantId, plan)
+    // I1: 同步限额（仅套餐变更时）
+    if (updateData.plan) {
+      await syncTenantLimits(auth.tenantId, updateData.plan as string)
+    }
 
-    const [limits, usage] = await Promise.all([
+    const [limits, usage, updatedTenant] = await Promise.all([
       getTenantLimits(auth.tenantId),
       getTenantUsage(auth.tenantId),
+      prisma.tenant.findUnique({
+        where: { id: auth.tenantId },
+        select: { plan: true, settings: true },
+      }),
     ])
+
+    const savedLanguage = ((updatedTenant?.settings as Record<string, unknown>)?.language as string) || 'zh'
 
     return NextResponse.json({
       success: true,
-      data: { plan, limits, usage },
+      data: {
+        plan: updateData.plan || updatedTenant?.plan,
+        language: language !== undefined ? savedLanguage : undefined,
+        limits,
+        usage,
+      },
     })
   } catch (error) {
     return handleApiError(error)

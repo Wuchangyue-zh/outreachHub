@@ -39,12 +39,18 @@ interface CampaignComparison {
   replyRate: number
 }
 
+interface GeoStats {
+  country: string
+  count: number
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 export function CampaignStats({ campaignId }: CampaignStatsProps) {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [campaignComparison, setCampaignComparison] = useState<CampaignComparison[]>([])
+  const [geoStats, setGeoStats] = useState<GeoStats[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -61,6 +67,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
         setStats(statsData.data.overall)
         setDailyStats(statsData.data.daily || [])
         setCampaignComparison(statsData.data.comparison || [])
+        setGeoStats(statsData.data.geo || [])
       }
     } catch (e) {
       console.error('Failed to fetch campaign stats:', e)
@@ -210,6 +217,29 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                 <Bar dataKey="openRate" fill="#10b981" name="Open Rate %" />
                 <Bar dataKey="clickRate" fill="#f59e0b" name="Click Rate %" />
                 <Bar dataKey="replyRate" fill="#8b5cf6" name="Reply Rate %" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* K2: 打开地理分布 */}
+      {geoStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Opens by Country
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(200, geoStats.length * 32)}>
+              <BarChart data={geoStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="country" width={48} />
+                <Tooltip formatter={(value) => [value, 'Opens']} />
+                <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

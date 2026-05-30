@@ -55,7 +55,11 @@ export function addEmailTracking(
 }
 
 // Record email open event
-export async function recordEmailOpen(emailLogId: string, contactId: string) {
+export async function recordEmailOpen(
+  emailLogId: string,
+  contactId: string,
+  geo?: { ip?: string; country?: string; city?: string }
+) {
   try {
     const emailLog = await prisma.emailLog.findUnique({
       where: { id: emailLogId },
@@ -66,6 +70,12 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
       return
     }
 
+    // K2: 仅首次打开记录 IP/国家
+    const geoData: Record<string, unknown> = {}
+    if (!emailLog.openedAt && geo?.ip) geoData.openIp = geo.ip
+    if (!emailLog.openedAt && geo?.country) geoData.openCountry = geo.country.toUpperCase()
+    if (!emailLog.openedAt && geo?.city) geoData.openCity = geo.city
+
     // Update email log
     await prisma.emailLog.update({
       where: { id: emailLogId },
@@ -73,6 +83,7 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
         status: emailLog.status === 'SENT' || emailLog.status === 'DELIVERED' ? 'OPENED' : emailLog.status,
         openedAt: emailLog.openedAt || new Date(),
         openedCount: { increment: 1 },
+        ...geoData,
       },
     })
 

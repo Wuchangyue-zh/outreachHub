@@ -89,9 +89,34 @@ npm run worker:cron         # 可选
 
 ## 6. 上线检查清单
 
-- [ ] Redis + Email Worker 7×24 运行
-- [ ] `DATABASE_URL` 使用 pooler URL
-- [ ] `CRON_SECRET`、`NEXTAUTH_SECRET`、`ENCRYPTION_KEY` 已设置
-- [ ] `APP_URL` / `NEXTAUTH_URL` 与生产域名一致
-- [ ] `BLOB_READ_WRITE_TOKEN` 已配置（Vercel 部署）
-- [ ] 监控队列：`GET /api/email-queue` stats
+### 基础设施
+- [ ] PostgreSQL 连接池 URL（Neon `-pooler` / Supabase Transaction pooler）
+- [ ] Redis（Upstash）已创建，`REDIS_URL` 已配置
+- [ ] Email Worker 7×24 运行（`docker compose up -d worker`）
+- [ ] Vercel Cron 已启用（`vercel.json` crons 自动触发）
+
+### 环境变量
+- [ ] `CRON_SECRET` — 生产必填，32+ 随机字符
+- [ ] `NEXTAUTH_SECRET` — 生产必填，32+ 随机字符
+- [ ] `ENCRYPTION_KEY` — 生产必填，64 hex 字符（`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`）
+- [ ] `APP_URL` / `NEXTAUTH_URL` — 与生产域名一致（`https://your-domain.com`）
+- [ ] `DATABASE_URL` — pooler URL + `sslmode=require`
+
+### 文件存储
+- [ ] **Vercel Blob**（生产推荐）：Storage → 创建 Blob Store 并关联项目
+- [ ] 本地开发：`BLOB_READ_WRITE_TOKEN` 留空，文件写入 `public/uploads/`
+- [ ] `APP_URL` 与生产域名一致（邮件 HTML 图片公网化依赖此项）
+
+### 邮件送达率
+- [ ] SPF 记录已配置（`GET /api/email-accounts/[id]/dns-records` 验证）
+- [ ] DKIM 记录已配置
+- [ ] DMARC 记录已配置（建议先 `p=none` 观察，再改 `p=quarantine`）
+- [ ] `APP_URL` 非 localhost（否则邮件追踪链接和图片不可用）
+- [ ] EmailAccount Warm-up 已启用（新账户建议 21 天递增）
+
+### 监控与运维
+- [ ] 队列监控：`GET /api/email-queue` stats
+- [ ] Worker 健康检查：`GET http://worker:8080/health`
+- [ ] `npm run build` 通过
+- [ ] `npm test` 通过
+- [ ] 演示账户可登录（`admin@outreachhub.com` / `admin123`）

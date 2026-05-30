@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { verifyAllDnsRecords } from '@/lib/dns-verify'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -81,11 +82,20 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       },
     ]
 
+    // K1: 在线验证已有 DNS 记录
+    let verification: Array<{ record: string; host: string; found: boolean; value: string | null; valid: boolean; message: string }> = []
+    try {
+      verification = await verifyAllDnsRecords(sendDomain)
+    } catch {
+      // 验证失败不影响建议记录返回
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         domain: sendDomain,
         records,
+        verification,
         tips: [
           'DNS 记录生效通常需要 24-48 小时',
           'SPF 记录每个域名只能有一条，多条需要合并',

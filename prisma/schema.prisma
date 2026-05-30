@@ -442,6 +442,10 @@ model EmailLog {
   repliedAt   DateTime?
   replyCategory String?  // INTERESTED, NOT_INTERESTED, OUT_OF_OFFICE, QUESTION, UNSUBSCRIBE, AUTO_REPLY, FORWARD, NEGOTIATION, REFERRAL
   replyConfidence Float?
+  // K2: 地理追踪
+  openIp      String?   // 首次打开 IP
+  openCountry String?   // IP 解析国家代码
+  openCity    String?   // IP 解析城市
   replyKeywords String[]
   replyBody   String?    @db.Text  // P1-3: 存储回复正文
   bouncedAt   DateTime?
