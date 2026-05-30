@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { prisma } from './prisma'
 import { safeDecrypt } from './encryption'
+import { getWarmupDailyLimit, advanceWarmupDay, isWarmupComplete } from './warmup'
 
 export interface SendAccountMailOptions {
   emailAccountId: string
@@ -153,7 +154,10 @@ export async function sendAccountBatchEmails(
 export async function checkDailyLimit(accountId: string): Promise<boolean> {
   const account = await prisma.emailAccount.findUnique({
     where: { id: accountId },
-    select: { dailySent: true, dailyLimit: true, lastResetAt: true },
+    select: {
+      dailySent: true, dailyLimit: true, lastResetAt: true,
+      warmupEnabled: true, warmupDay: true, warmupTarget: true,
+    },
   })
 
   if (!account) {
@@ -168,9 +172,22 @@ export async function checkDailyLimit(accountId: string): Promise<boolean> {
     now.getFullYear() !== lastReset.getFullYear()
 
   if (isNewDay) {
+    // J2: Warm-up 推进
+    const updateData: Record<string, unknown> = { dailySent: 0, lastResetAt: now }
+    if (account.warmupEnabled) {
+      if (!isWarmupComplete(account.warmupDay)) {
+        const newDay = advanceWarmupDay(account.warmupDay)
+        updateData.warmupDay = newDay
+        updateData.dailyLimit = getWarmupDailyLimit(newDay, account.warmupTarget)
+      } else {
+        // warmup 完成后 dailyLimit 应等于目标值（曲线封顶 50 可能低于 warmupTarget）
+        updateData.dailyLimit = account.warmupTarget
+      }
+    }
+
     await prisma.emailAccount.update({
       where: { id: accountId },
-      data: { dailySent: 0, lastResetAt: now },
+      data: updateData as any,
     })
     return true
   }

@@ -103,9 +103,12 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '客户不存在或无权操作', 404)
     }
 
+    // J3: GDPR — 级联删除关联数据
     await prisma.contactEmail.deleteMany({ where: { contactId: id } })
+    await prisma.emailLog.deleteMany({ where: { contactId: id } })
+    await prisma.campaignContact.deleteMany({ where: { contactId: id } })
     await prisma.contact.delete({ where: { id, tenantId: auth.tenantId } })
-    return NextResponse.json({ success: true, message: '客户已删除' })
+    return NextResponse.json({ success: true, message: '客户及关联数据已删除' })
   } catch (error) {
     return handleApiError(error)
   }

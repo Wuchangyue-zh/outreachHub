@@ -11,6 +11,7 @@ import {
   ArrowLeft, Sparkles, Loader2, Copy, Check, Variable,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   CampaignAttachmentPicker,
   type CampaignAttachmentItem,
@@ -218,6 +219,10 @@ export function StepAiWriter() {
         setLaunchError(launchJson.error?.message || launchJson.message || '启动活动失败')
         router.push('/campaigns')
         return
+      }
+
+      if (launchJson.warnings?.length) {
+        toast.warning(launchJson.warnings[0])
       }
 
       router.push('/campaigns')

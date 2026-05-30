@@ -275,7 +275,12 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 ### 4.5 域名与合规
 
 - [x] 30. 退订功能（`/api/unsubscribe` + Contact.unsubscribed + 邮件退订链接）
-- [ ] 31–36. 域名验证、SPF/DKIM/DMARC、Warm-up、GDPR
+- [x] 31. SPF/DKIM/DMARC DNS 记录建议（J1: `GET /api/email-accounts/[id]/dns-records` + Settings DNS 对话框）
+- [x] 32. EmailAccount Warm-up（J2: 21 天递增曲线 + `checkDailyLimit` 自动推进）
+- [x] 33. GDPR 联系人数据导出（J3: `GET /api/contacts/[id]/export` JSON 下载）
+- [x] 34. GDPR 联系人删除级联清理（J3: DELETE 级联 EmailLog + CampaignContact）
+- [x] 35. 退订页品牌化 + 多语言（J4: tenant 名称 + Accept-Language 中/英）
+- [ ] 36. 域名验证（SPF/DKIM 在线检测）— 待后续
 
 ### 4.6 追踪与分析
 
@@ -343,10 +348,11 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 7. ✅ 退订合规（#30）— `/api/unsubscribe` + 邮件退订链接 + Contact.unsubscribed 字段
 8. ✅ EmailAccount 密码加密（#15a）— AES-256-GCM 已实现
 
-### P2 — 增强（部分已完成，见 §十 Batch H）
+### P2 — 增强
 
 9. ✅ A/B、Sequence、S3、E2E 扩展（Batch C/G）
-10. **下一批：Batch H** — 附件×Campaign、邮件公网 URL、Batch E 遗留
+10. ✅ Batch H — 附件×Campaign、邮件公网 URL、Batch E 遗留
+11. **下一批：Batch I** — 套餐升级 sync、部署文档、failed 任务 Cron、审计同步
 
 ---
 
@@ -467,9 +473,9 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### Phase 4 — 暂缓（除非 Phase 1–3 都完成且有余力）
 
-- A/B 测试 (#8)、Sequence 多步 (#7)、域名 SPF/DKIM (#30–36)
-- S3 对象存储 (#43)、密码加密 (#15a)
-- 完整 E2E 覆盖 (#63–#65)
+- ~~A/B 测试 (#8)~~ ✅ Batch B、~~Sequence (#7)~~ ✅ §9.9、~~S3 (#43)~~ ✅ G1、~~密码加密 (#15a)~~ ✅ §9.8
+- 域名 SPF/DKIM (#30–36)、地理分析 (#40)、产品推荐 (#54)
+- 完整 E2E 覆盖 (#63–#65）— 已有 76 条，剩余 API 集成 + UI 组件测试
 
 ---
 
@@ -844,6 +850,70 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 | CSV 限额仅拦已满、未拦「导入量超剩余配额」 | 比较 `totalRows` vs `max - current` |
 | Launch 附件查询重复 | 抽取 `lib/campaign-attachments.ts` 复用 |
 
+### 9.23 Batch I — 运维闭环 + 部署文档（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| I1 | 套餐升级时调用 `syncTenantLimits`：新增 `PATCH /api/tenant/usage`（仅 ADMIN/OWNER） | `api/tenant/usage/route.ts` |
+| I2 | Campaign PUT/PATCH tenantId 隔离 — 核实已全部到位（campaigns/contacts/templates 所有写操作均 `where: { id, tenantId }`） | `api/campaigns/[id]/route.ts` 等 |
+| I3 | 本地无 APP_URL 时 Launch 警告：`console.warn` 提示追踪链接和图片不可用 | `api/campaigns/[id]/launch/route.ts` |
+| I4 | 部署文档更新：S3/R2 存储选项 + docker-compose 服务说明 | `docs/deployment.md` |
+| I5 | 队列 failed 任务优化：`getFailedJobs()` API + 队列页展示失败详情表 + `retry-failed` Cron（每 30 分钟） | `lib/email-queue.ts`, `api/email-queue/route.ts`, `email-queue/page.tsx`, `api/cron/retry-failed/route.ts`, `vercel.json` |
+| I6 | 审计同步：Phase 4 已完成项标记、§5 优先级更新、§9.23 记录 | `docs/audit-report.md` |
+
+**验证：** `npm run build` ✅ · `npm test` 33 条全通过 · TypeScript 零错误
+
+### 9.24 核实 Batch I 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| I1 仅有 PATCH API、Settings 无套餐切换 UI | Settings 套餐下拉 + 「应用套餐」；PATCH 返回更新后 limits/usage |
+| I3 仅 console.warn、前端无感知 | Launch 响应 `warnings[]` + 向导 `toast.warning` |
+| I4 deployment.md 仍写 S3 三选一 | 改为 Vercel Blob + 本地磁盘，补充 APP_URL 说明 |
+| I5 Cron 注释限 20 条/1h 但实现重试全部 | `retryFailedJobs({ limit: 20, maxAgeMs: 1h })`；队列页文案同步 |
+| usage/route 合并 import 误删 errorResponse | 恢复 import |
+
+### 9.25 Batch J — 邮件合规与送达率（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| J1 | 发信域名管理页：`GET /api/email-accounts/[id]/dns-records` 返回 SPF/DKIM/DMARC/MTA-STS 建议 DNS 记录（基于邮箱域名 + SMTP Host 智能推断）；Settings 页 DNS 按钮 + 对话框（含复制、状态标签、配置建议） | `api/email-accounts/[id]/dns-records/route.ts`, `dashboard/settings/page.tsx` |
+| J2 | EmailAccount Warm-up：`warmupEnabled`/`warmupDay`/`warmupTarget` 字段；21 天递增曲线（5→15→30→50→target）；`checkDailyLimit` 跨天自动推进；API 支持启用/配置 warmup | `schema.prisma`, `lib/warmup.ts`, `lib/email-account-mail.ts`, `api/email-accounts/[id]/route.ts` |
+| J3 | GDPR：联系人数据导出 API（`GET /api/contacts/[id]/export`，JSON 下载含邮件/Campaign 关联）；删除联系人级联清理 EmailLog + CampaignContact | `api/contacts/[id]/export/route.ts`, `api/contacts/[id]/route.ts` |
+| J4 | 退订页品牌化：`/unsubscribe` 支持 tenant 名称 + Accept-Language 语言检测（中/英）+ tenant settings 语言配置；双语完整文案 | `api/unsubscribe/route.ts` |
+| — | 单元测试：warmup 策略 10 条 | `src/__tests__/warmup.test.ts` |
+
+**验证：** `npm run build` ✅ · `npm test` 43 条全通过 · TypeScript 零错误
+
+### 9.26 核实 Batch J 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| J1 MTA-STS TXT 与 SPF 同 host（根域名） | MTA-STS 改为 `_mta-sts.{domain}` + `v=STSv1` 格式 |
+| J2 warmup 完成后 dailyLimit 卡在曲线封顶 50 | `checkDailyLimit` 跨天在 warmup 完成后写入 `warmupTarget` |
+| J2 PATCH 启用 warmup 未重置 warmupDay | PATCH 与 PUT 一致：启用时从 Day 1 开始并设 dailyLimit |
+| J2 Settings 无 Warm-up 配置 UI | 编辑账户表单增加开关 + 目标限额；列表展示 Warm-up 天数 |
+| J3 导出 API 无权限校验、邮件正文被占位符替换 | 增加 `contacts:manage` 校验；导出完整 emailLogs.content |
+| J3 联系人页无 GDPR 导出入口 | 详情抽屉增加「导出个人数据 (GDPR)」按钮 |
+
 ---
 
-*本报告最后更新：2026-05-30。Batch D/E/F/G/H 已完成。*
+## 十一、Batch K 执行计划（下一批 — 分析 + 生产就绪）
+
+> **目标：** 补齐审计剩余 P1/P2 项；完成生产部署闭环。  
+> **前置：** `npm run db:push`（含 warmup 字段）；Vercel Blob + Upstash Redis 已配置。
+
+| 编号 | 任务 | 关键文件 | 验收 |
+|------|------|----------|------|
+| K1 | **#36** 域名 DNS 在线验证（SPF/DKIM/DMARC 解析检测 + Settings DNS 对话框状态） | `lib/dns-verify.ts`, `api/email-accounts/[id]/dns-records/route.ts` | 配置后显示 ✅/❌ |
+| K2 | **#40** 打开/点击地理分析（EmailLog IP → 国家/城市聚合） | `api/campaigns/stats/route.ts`, `CampaignStats` | Campaign 页地图/表格 |
+| K3 | **#54** 产品推荐（Campaign AI 生成时注入 Product 库） | `api/campaigns/ai-generate/route.ts`, `dashboard/products` | 向导可选产品 |
+| K4 | **#64** API 集成测试（auth + contacts CRUD + export + launch smoke） | `src/__tests__/api/` | CI 可跑 |
+| K5 | 生产部署 checklist：Vercel + Blob + Worker docker-compose + `APP_URL` | `docs/deployment.md` | 一键对照清单 |
+| K6 | Settings 租户语言（`tenant.settings.language`）写入 UI，联动退订页 | `api/tenant/usage/route.ts`, `dashboard/settings/page.tsx` | 切换后退订页语言变化 |
+
+**建议顺序：** K6（小）→ K1 → K4 → K5 → K2 → K3
+
+---
+
+*本报告最后更新：2026-05-30。Batch D/E/F/G/H/I/J 已完成；§9.26 核实修复已落地。*

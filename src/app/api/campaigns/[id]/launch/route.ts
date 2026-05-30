@@ -12,6 +12,16 @@ import { getStorageBackend } from '@/lib/env'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+function getLaunchWarnings(): string[] {
+  const appUrl = process.env.APP_URL || ''
+  if (!appUrl || appUrl.includes('localhost')) {
+    const msg = `APP_URL 未配置或为 localhost（当前: ${appUrl || '未设置'}），邮件追踪链接和内嵌图片可能无法被收件方访问。`
+    console.warn(`[Launch] ${msg}`)
+    return [msg]
+  }
+  return []
+}
+
 /**
  * POST /api/campaigns/[id]/launch
  *
@@ -78,6 +88,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     }
 
     // 立即启动
+    const launchWarnings = getLaunchWarnings()
+
     // 获取可用的发件账户（优先使用绑定账户，否则自动选择）
     const availableAccountId = await getAvailableAccount(auth.userId!, campaign.emailAccountId)
     if (!availableAccountId) {
@@ -231,6 +243,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
           batches: abBatches.length,
           jobIds: abJobIds,
         },
+        warnings: launchWarnings.length > 0 ? launchWarnings : undefined,
       })
     }
 
@@ -331,6 +344,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
           throttlePerHour: seqPerHour,
           jobIds: seqJobIds,
         },
+        warnings: launchWarnings.length > 0 ? launchWarnings : undefined,
       })
     }
 
@@ -420,6 +434,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         throttlePerHour: perHour,
         jobIds: allJobIds,
       },
+      warnings: launchWarnings.length > 0 ? launchWarnings : undefined,
     })
   } catch (error) {
     return handleApiError(error)

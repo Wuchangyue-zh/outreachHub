@@ -67,6 +67,15 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     }
     if (body.isActive !== undefined) updateData.isActive = body.isActive
     if (body.dailyLimit !== undefined) updateData.dailyLimit = body.dailyLimit
+    // J2: Warm-up 配置
+    if (body.warmupEnabled !== undefined) updateData.warmupEnabled = body.warmupEnabled
+    if (body.warmupTarget !== undefined) updateData.warmupTarget = parseInt(body.warmupTarget)
+    if (body.warmupEnabled === true && body.warmupDay === undefined) {
+      // 启用 warmup 时自动从第 1 天开始
+      const { getWarmupDailyLimit } = await import('@/lib/warmup')
+      updateData.warmupDay = 1
+      updateData.dailyLimit = getWarmupDailyLimit(1, body.warmupTarget || 50)
+    }
 
     const account = await prisma.emailAccount.update({
       where: { id },
@@ -100,6 +109,21 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.dailyLimit !== undefined) updateData.dailyLimit = body.dailyLimit
     if (body.dailySent !== undefined) updateData.dailySent = body.dailySent
     if (body.healthScore !== undefined) updateData.healthScore = body.healthScore
+    // J2: Warm-up 配置
+    if (body.warmupEnabled !== undefined) updateData.warmupEnabled = body.warmupEnabled
+    if (body.warmupTarget !== undefined) updateData.warmupTarget = parseInt(body.warmupTarget)
+    if (body.warmupEnabled === true && body.warmupDay === undefined) {
+      const existingAccount = await prisma.emailAccount.findUnique({
+        where: { id },
+        select: { warmupTarget: true },
+      })
+      const target = body.warmupTarget !== undefined
+        ? parseInt(body.warmupTarget)
+        : (existingAccount?.warmupTarget ?? 50)
+      const { getWarmupDailyLimit } = await import('@/lib/warmup')
+      updateData.warmupDay = 1
+      updateData.dailyLimit = getWarmupDailyLimit(1, target)
+    }
 
     const account = await prisma.emailAccount.update({
       where: { id },

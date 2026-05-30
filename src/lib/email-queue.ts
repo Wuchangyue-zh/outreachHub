@@ -347,16 +347,55 @@ export async function getQueueStats() {
   }
 }
 
-export async function retryFailedJobs() {
+/**
+ * I5: 获取失败任务列表（含错误原因）
+ */
+export async function getFailedJobs(limit = 20) {
+  const queue = getEmailQueue()
+  if (!queue) return []
+
+  try {
+    const failedJobs = await queue.getFailed(0, limit - 1)
+    return failedJobs.map((job) => ({
+      id: job.id,
+      name: job.name,
+      data: { to: job.data.to, subject: job.data.subject, campaignId: job.data.campaignId },
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      timestamp: job.timestamp,
+      processedOn: job.processedOn,
+      finishedOn: job.finishedOn,
+    }))
+  } catch (error) {
+    console.error('[EmailQueue] Failed to get failed jobs:', (error as Error).message)
+    return []
+  }
+}
+
+export async function retryFailedJobs(options?: { limit?: number; maxAgeMs?: number }) {
   const queue = getEmailQueue()
   if (!queue) {
     return 0
   }
 
   try {
-    const failedJobs = await queue.getFailed()
-    const retryPromises = failedJobs.map((job) => job.retry())
-    await Promise.all(retryPromises)
+    const fetchEnd = Math.max((options?.limit ?? 100) - 1, 0)
+    let failedJobs = await queue.getFailed(0, fetchEnd)
+
+    if (options?.maxAgeMs) {
+      const cutoff = Date.now() - options.maxAgeMs
+      failedJobs = failedJobs.filter(
+        (job) => (job.finishedOn ?? job.processedOn ?? job.timestamp) >= cutoff
+      )
+    }
+
+    if (options?.limit) {
+      failedJobs = failedJobs.slice(0, options.limit)
+    }
+
+    if (failedJobs.length === 0) return 0
+
+    await Promise.all(failedJobs.map((job) => job.retry()))
     return failedJobs.length
   } catch (error) {
     console.error('[EmailQueue] Failed to retry failed jobs:', (error as Error).message)

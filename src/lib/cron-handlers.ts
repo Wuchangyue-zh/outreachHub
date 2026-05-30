@@ -26,6 +26,10 @@ export async function runCronHandler(type: CronJobType): Promise<unknown> {
       const { executeCheckReplies } = await import('./imap-worker-handler')
       return executeCheckReplies()
     }
+    case 'retry-failed': {
+      const { executeRetryFailed } = await import('./cron-jobs/retry-failed')
+      return executeRetryFailed()
+    }
     default:
       throw new Error(`Unknown cron job type: ${type}`)
   }

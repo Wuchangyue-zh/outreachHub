@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { addEmailJob, addBulkEmailJobs, getQueueStats } from '@/lib/email-queue'
+import { addEmailJob, addBulkEmailJobs, getQueueStats, getFailedJobs } from '@/lib/email-queue'
 import { handleApiError, errorResponse, ErrorCodes } from '@/lib/api-errors'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 
@@ -64,10 +64,11 @@ export async function GET(req: NextRequest) {
     }
 
     const stats = await getQueueStats()
+    const failedJobs = stats.failed > 0 ? await getFailedJobs(20) : []
 
     return NextResponse.json({
       success: true,
-      data: stats,
+      data: { ...stats, failedJobs },
     })
   } catch (error) {
     return handleApiError(error)

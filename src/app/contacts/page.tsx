@@ -311,6 +311,28 @@ export default function ContactsPage() {
     addToast({ type: 'success', title: '导出成功' })
   }
 
+  const handleExportContactGdpr = async (contactId: string, contactName: string) => {
+    addToast({ type: 'info', title: '导出中...', description: '正在准备 GDPR 数据包' })
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/export`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        addToast({ type: 'error', title: '导出失败', description: data?.error?.message || data?.error || '请求失败' })
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contact-${contactId}-export.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      addToast({ type: 'success', title: '导出成功', description: `${contactName} 的数据已下载` })
+    } catch {
+      addToast({ type: 'error', title: '导出失败', description: '网络错误' })
+    }
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -814,12 +836,21 @@ export default function ContactsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-4 border-t">
-                <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
-                  <Edit className="h-4 w-4 mr-2" /> 编辑
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Send className="h-4 w-4 mr-2" /> 发送邮件
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
+                    <Edit className="h-4 w-4 mr-2" /> 编辑
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <Send className="h-4 w-4 mr-2" /> 发送邮件
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleExportContactGdpr(currentContact.id, currentContact.fullName)}
+                >
+                  <Download className="h-4 w-4 mr-2" /> 导出个人数据 (GDPR)
                 </Button>
               </div>
             </div>

@@ -34,6 +34,8 @@ import {
   Users,
   UserPlus,
   Copy,
+  Globe,
+  Check,
 } from 'lucide-react'
 
 const emptyFormData = {
@@ -47,6 +49,8 @@ const emptyFormData = {
   imapPort: '993',
   imapUser: '',
   imapPassword: '',
+  warmupEnabled: false,
+  warmupTarget: '50',
 }
 
 // 常见邮箱服务商 IMAP 配置
@@ -131,6 +135,9 @@ interface EmailAccount {
   dailySent: number
   dailyLimit: number
   healthScore: number
+  warmupEnabled?: boolean
+  warmupDay?: number
+  warmupTarget?: number
   imapLastError: string | null
   imapLastErrorAt: string | null
   createdAt: string
@@ -165,6 +172,13 @@ export default function SettingsPage() {
   const [tenantLoading, setTenantLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState('')
+  const [upgradingPlan, setUpgradingPlan] = useState(false)
+
+  // J1: DNS 记录
+  const [dnsAccountId, setDnsAccountId] = useState<string | null>(null)
+  const [dnsData, setDnsData] = useState<{ domain: string; records: Array<{ type: string; host: string; value: string; description: string; status: string }>; tips: string[] } | null>(null)
+  const [dnsLoading, setDnsLoading] = useState(false)
 
   // 加载邮件账户列表
   const loadAccounts = async () => {
@@ -187,6 +201,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/tenant/usage')
       const data = await res.json()
       if (data.success) setTenantData(data.data)
+      if (data.success && data.data?.tenant?.plan) setSelectedPlan(data.data.tenant.plan)
     } catch { /* silent */ } finally {
       setTenantLoading(false)
     }
@@ -213,6 +228,30 @@ export default function SettingsPage() {
     } catch { toast.error('邀请失败') } finally { setInviting(false) }
   }
 
+  // I1: 套餐变更（需 settings:manage 权限）
+  const handleUpgradePlan = async () => {
+    if (!selectedPlan || selectedPlan === tenantData?.tenant.plan) return
+    setUpgradingPlan(true)
+    try {
+      const res = await fetch('/api/tenant/usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: selectedPlan }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`套餐已切换为 ${PLAN_LABELS[selectedPlan] || selectedPlan}`)
+        await loadTenantUsage()
+      } else {
+        toast.error(data.error?.message || '套餐变更失败')
+      }
+    } catch {
+      toast.error('套餐变更失败')
+    } finally {
+      setUpgradingPlan(false)
+    }
+  }
+
   // H3d: 撤销邀请
   const handleRevokeInvite = async (inviteId: string) => {
     try {
@@ -225,6 +264,23 @@ export default function SettingsPage() {
         toast.error(data.error?.message || '撤销失败')
       }
     } catch { toast.error('撤销失败') }
+  }
+
+  // J1: 获取 DNS 记录
+  const fetchDnsRecords = async (accountId: string) => {
+    setDnsAccountId(accountId)
+    setDnsLoading(true)
+    setDnsData(null)
+    try {
+      const res = await fetch(`/api/email-accounts/${accountId}/dns-records`)
+      const data = await res.json()
+      if (data.success) setDnsData(data.data)
+      else toast.error(data.error?.message || '获取 DNS 记录失败')
+    } catch { toast.error('获取 DNS 记录失败') } finally { setDnsLoading(false) }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => toast.success('已复制到剪贴板'))
   }
 
   useEffect(() => {
@@ -271,6 +327,8 @@ export default function SettingsPage() {
       imapPort: account.imapPort ? String(account.imapPort) : '993',
       imapUser: account.imapUser || account.email,
       imapPassword: '',
+      warmupEnabled: account.warmupEnabled ?? false,
+      warmupTarget: String(account.warmupTarget ?? 50),
     })
     setDialogOpen(true)
   }
@@ -279,7 +337,7 @@ export default function SettingsPage() {
     e.preventDefault()
     setSaving(true)
     try {
-      const payload: Record<string, string> = {
+      const payload: Record<string, string | boolean> = {
         email: formData.email,
         displayName: formData.displayName,
         smtpHost: formData.smtpHost,
@@ -291,6 +349,10 @@ export default function SettingsPage() {
       }
       if (formData.smtpPassword) payload.smtpPassword = formData.smtpPassword
       if (formData.imapPassword) payload.imapPassword = formData.imapPassword
+      if (editingId) {
+        payload.warmupEnabled = formData.warmupEnabled
+        payload.warmupTarget = formData.warmupTarget
+      }
 
       const res = await fetch(
         editingId ? `/api/email-accounts/${editingId}` : '/api/email-accounts',
@@ -558,6 +620,39 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
+                  {editingId && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="warmupEnabled" className="text-sm font-medium">Warm-up 预热</Label>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            新账户 21 天递增发信限额（5→15→30→50→目标值），降低进垃圾箱风险
+                          </p>
+                        </div>
+                        <input
+                          id="warmupEnabled"
+                          type="checkbox"
+                          checked={formData.warmupEnabled}
+                          onChange={(e) => setFormData({ ...formData, warmupEnabled: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </div>
+                      {formData.warmupEnabled && (
+                        <div className="space-y-2">
+                          <Label htmlFor="warmupTarget">目标每日限额</Label>
+                          <Input
+                            id="warmupTarget"
+                            type="number"
+                            min={10}
+                            max={500}
+                            value={formData.warmupTarget}
+                            onChange={(e) => setFormData({ ...formData, warmupTarget: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={resetForm}>
                       取消
@@ -651,6 +746,11 @@ export default function SettingsPage() {
                               <span>
                                 健康度: {account.healthScore}%
                               </span>
+                              {account.warmupEnabled && (
+                                <Badge className="bg-orange-100 text-orange-700">
+                                  Warm-up 第 {account.warmupDay ?? 0} 天
+                                </Badge>
+                              )}
                             </div>
                             {/* #19: IMAP 错误提示 */}
                             {account.imapLastError && (
@@ -695,6 +795,14 @@ export default function SettingsPage() {
                             测试
                           </Button>
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchDnsRecords(account.id)}
+                          >
+                            <Globe className="mr-1 h-3 w-3" />
+                            DNS
+                          </Button>
+                          <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteAccount(account.id)}
@@ -737,6 +845,28 @@ export default function SettingsPage() {
                       <UsageMeter label="联系人" current={tenantData.usage.contactCount} max={tenantData.limits.maxContacts} percent={tenantData.usage.contactPercent} />
                       <UsageMeter label="今日发信" current={tenantData.usage.emailsSentToday} max={tenantData.limits.maxEmailsPerDay} percent={tenantData.usage.emailPercent} />
                       <UsageMeter label="团队成员" current={tenantData.usage.userCount} max={tenantData.limits.maxUsers} percent={tenantData.usage.userPercent} />
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-gray-500">切换套餐（管理员）</Label>
+                        <select
+                          value={selectedPlan || tenantData.tenant.plan}
+                          onChange={(e) => setSelectedPlan(e.target.value)}
+                          className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+                        >
+                          {Object.entries(PLAN_LABELS).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button
+                        size="sm"
+                        disabled={upgradingPlan || selectedPlan === tenantData.tenant.plan}
+                        onClick={handleUpgradePlan}
+                      >
+                        {upgradingPlan ? '保存中...' : '应用套餐'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -811,6 +941,66 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* J1: DNS 记录对话框 */}
+      <Dialog open={!!dnsAccountId} onOpenChange={(open) => { if (!open) { setDnsAccountId(null); setDnsData(null) } }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" /> 发信域名 DNS 配置
+            </DialogTitle>
+            <DialogDescription>
+              配置以下 DNS 记录以提高邮件送达率。添加后等待 24-48 小时生效。
+            </DialogDescription>
+          </DialogHeader>
+
+          {dnsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : dnsData ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">域名：<strong>{dnsData.domain}</strong></p>
+
+              {dnsData.records.map((rec, idx) => (
+                <div key={idx} className="rounded-lg border border-gray-200 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge className={rec.status === 'required' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}>
+                        {rec.type}
+                      </Badge>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${rec.status === 'required' ? 'bg-red-100 text-red-700' : rec.status === 'recommended' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {rec.status === 'required' ? '必须' : rec.status === 'recommended' ? '推荐' : '可选'}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(rec.value)}>
+                      <Copy className="h-3 w-3 mr-1" /> 复制
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">{rec.description}</p>
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-xs text-gray-400">主机记录</p>
+                    <p className="text-sm font-mono text-gray-800">{rec.host}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2">
+                    <p className="text-xs text-gray-400">记录值</p>
+                    <p className="text-sm font-mono text-gray-800 break-all">{rec.value}</p>
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                <p className="text-sm font-medium text-blue-800 mb-2">💡 配置建议</p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  {dnsData.tips.map((tip, idx) => (
+                    <li key={idx}>• {tip}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }

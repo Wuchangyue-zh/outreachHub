@@ -17,6 +17,18 @@ interface QueueStats {
   failed: number
   delayed: number
   queueAvailable: boolean
+  failedJobs?: FailedJob[]
+}
+
+interface FailedJob {
+  id: string | null
+  name: string
+  data: { to: string; subject: string; campaignId?: string }
+  failedReason: string | null
+  attemptsMade: number
+  timestamp: number
+  processedOn: number | null
+  finishedOn: number | null
 }
 
 interface EmailJob {
@@ -142,7 +154,7 @@ export default function EmailQueuePage() {
                     有 {stats.failed} 个邮件发送失败
                   </h3>
                   <p className="text-sm text-red-600 mt-1">
-                    失败的任务不会自动重试。请点击「重试失败任务」按钮重新发送，或检查邮件配置是否正确。
+                    系统每 30 分钟会自动重试最近 1 小时内失败的任务（最多 20 条）；也可点击下方按钮立即全部重试。
                   </p>
                 </div>
               </div>
@@ -273,6 +285,50 @@ export default function EmailQueuePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* I5: Failed Jobs Detail */}
+            {stats.failedJobs && stats.failedJobs.length > 0 && (
+              <Card className="border-red-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-700">
+                    <XCircle className="h-5 w-5" />
+                    失败任务详情（{stats.failedJobs.length}）
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-red-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">任务ID</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">收件人</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">主题</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">失败原因</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">重试次数</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">时间</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.failedJobs.map((job, idx) => (
+                          <tr key={job.id || idx} className="border-b border-red-50">
+                            <td className="px-3 py-2 font-mono text-xs">{job.id?.slice(0, 12)}</td>
+                            <td className="px-3 py-2 text-xs">{job.data?.to || '-'}</td>
+                            <td className="px-3 py-2 text-xs max-w-[200px] truncate">{job.data?.subject || '-'}</td>
+                            <td className="px-3 py-2 text-xs text-red-600 max-w-[250px] truncate" title={job.failedReason || ''}>
+                              {job.failedReason || '未知错误'}
+                            </td>
+                            <td className="px-3 py-2 text-xs">{job.attemptsMade}</td>
+                            <td className="px-3 py-2 text-xs text-gray-500">
+                              {new Date(job.timestamp).toLocaleString('zh-CN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recent Jobs */}
             <Card className="border-gray-100">

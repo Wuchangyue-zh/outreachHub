@@ -13,6 +13,7 @@ export type CronJobType =
   | 'ab-test-winner'
   | 'process-follow-ups'
   | 'process-prospecting'
+  | 'retry-failed'
 
 export interface CronJobData {
   type: CronJobType
