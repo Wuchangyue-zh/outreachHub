@@ -174,7 +174,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 **侧边栏：** 仪表盘 · 拓客 · 客户 · 公司 · 邮件营销 · 模板 · **统一收件箱** · 邮箱设置 · 队列监控
 
-**缺失页面：** `/tasks`（middleware 有规则无 page）、`/products`
+**缺失页面：** ~~`/tasks`~~ → 已实现 `/dashboard/tasks`；~~`/products`~~ → 已实现 `/dashboard/products`
 
 ### 2.4 核心 Lib 模块
 
@@ -306,7 +306,8 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 ### 4.10 产品管理
 
 - [x] 52. 产品管理：侧边栏入口 + hasPermission 鉴权 + Campaign 向导关联产品（productId）
-- [ ] 53–54. 产品推荐 / 关联分析
+- [x] 53. 产品 × Campaign AI 深度接线（productId 注入 prompt + 列表展示关联产品名）
+- [ ] 54. 产品推荐 / 关联分析
 
 ### 4.11 基础设施
 
@@ -579,6 +580,7 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 - [x] 队列 failed 任务 UI 醒目提示（`/email-queue` 横幅 + 重试）
 - [ ] 将历史 `contactId='system-reply'` 的数据批量 backfill 为真实 contactId
 - [x] AI 回复：从 Contact 记录取正确称呼，避免与客户/发件人姓名混淆
+- [x] system-reply 历史数据 backfill 脚本（`scripts/backfill-system-reply.ts`）
 - [x] docker-compose 增加 `worker` service 一键启动（含 `env_file`）
 
 ### 9.7 前端接线修复（2026-05-30）
@@ -668,6 +670,15 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 
 **需执行：** `npm run db:push`（新增 `abTestAssignments` 字段）
 
+### 9.14 Batch D — 体验补全（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| D1 | 产品 × Campaign AI 深度接线：productId 注入 AI prompt + 列表展示产品名 | `ai-generate/route.ts`, `StepAiWriter.tsx`, `campaigns/route.ts`, `campaigns/page.tsx` |
+| D2 | Settings IMAP 主机智能提示：jafron 等已知域映射 + imap.→mail. 一键修正 | `settings/page.tsx` |
+| D3 | system-reply 历史数据 backfill 脚本 | `scripts/backfill-system-reply.ts` |
+| D4 | `/dashboard/tasks` 任务页：API + UI + 侧边栏（展示 OOO 跟进 Task） | `api/tasks/route.ts`, `dashboard/tasks/page.tsx`, `dashboard-layout.tsx` |
+
 ---
 
-*本报告最后更新：2026-05-30。Batch A/B/C 已核实并修补；后续从 Batch D 继续。*
+*本报告最后更新：2026-05-30。Batch D 已完成；后续从 Batch E 继续。*

@@ -60,6 +60,36 @@ const KNOWN_IMAP_HOSTS: Record<string, { host: string; port: number }> = {
   'smtp.mail.yahoo.com': { host: 'imap.mail.yahoo.com', port: 993 },
   'smtp.zoho.com': { host: 'imap.zoho.com', port: 993 },
   'smtp.yandex.com': { host: 'imap.yandex.com', port: 993 },
+  // D2: 企业邮箱 — imap.xxx DNS 不存在，必须用 mail.xxx
+  'smtp.jafron.com': { host: 'mail.jafron.com', port: 993 },
+}
+
+// D2: 已知 imap. 前缀 DNS 不存在，应改用 mail. 的域
+const IMAP_TO_MAIL_OVERRIDES: Record<string, string> = {
+  'imap.jafron.com': 'mail.jafron.com',
+}
+
+// D2: 检测 imapHost 是否应改为 mail. 前缀
+function suggestImapFix(imapHost: string, smtpHost: string): string | null {
+  if (!imapHost) return null
+  const lower = imapHost.toLowerCase().trim()
+
+  // 精确匹配已知问题域
+  if (IMAP_TO_MAIL_OVERRIDES[lower]) {
+    return IMAP_TO_MAIL_OVERRIDES[lower]
+  }
+
+  // 通用规则：imap.xxx.com 且与 smtpHost 同域 → 建议 mail.xxx.com
+  if (lower.startsWith('imap.')) {
+    const imapDomain = lower.slice(5)
+    const smtpLower = smtpHost.toLowerCase().trim()
+    // 只有同域时才建议（避免误改第三方）
+    if (smtpLower.endsWith(imapDomain)) {
+      return `mail.${imapDomain}`
+    }
+  }
+
+  return null
 }
 
 // 根据 SMTP 主机推断 IMAP 主机
@@ -408,6 +438,22 @@ export default function SettingsPage() {
                         <p className="text-xs text-amber-500">
                           ⚠️ IMAP 主机格式可能不正确，通常为 mail.xxx.com
                         </p>
+                      )}
+                      {/* D2: imap. 前缀警告 — 已知域 DNS 不存在 */}
+                      {formData.imapHost && suggestImapFix(formData.imapHost, formData.smtpHost) && (
+                        <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 mt-1">
+                          <span className="text-xs text-amber-700">
+                            ⚠️ <strong>{formData.imapHost}</strong> 的 DNS 可能不存在。
+                            建议改为 <strong>{suggestImapFix(formData.imapHost, formData.smtpHost)}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, imapHost: suggestImapFix(formData.imapHost, formData.smtpHost)! })}
+                            className="ml-auto text-xs font-medium text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                          >
+                            一键修正
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div className="space-y-2">

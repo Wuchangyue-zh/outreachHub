@@ -31,6 +31,7 @@ interface Campaign {
   createdAt: string
   sentAt: string | null
   completedAt: string | null
+  product?: { id: string; name: string } | null
 }
 
 interface CampaignsStats {
@@ -363,6 +364,9 @@ export default function CampaignsPage() {
                     {/* Name + created */}
                     <td className="px-5 py-4">
                       <p className="font-semibold text-gray-900">{campaign.name}</p>
+                      {campaign.product && (
+                        <p className="mt-0.5 text-xs text-blue-600">📦 {campaign.product.name}</p>
+                      )}
                       <p className="mt-0.5 text-xs text-gray-400">
                         {new Date(campaign.createdAt).toLocaleDateString('zh-CN')}
                       </p>

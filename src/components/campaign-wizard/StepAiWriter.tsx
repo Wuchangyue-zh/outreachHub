@@ -230,7 +230,7 @@ export function StepAiWriter() {
       const res = await fetch('/api/campaigns/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productPrompt, tone, targetTags }),
+        body: JSON.stringify({ productPrompt, tone, targetTags, productId }),
       })
       const data = await res.json()
       if (data.success) {

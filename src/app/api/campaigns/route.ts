@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        include: { product: { select: { id: true, name: true } } },
       }),
       prisma.campaign.count({ where }),
     ])
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        include: { product: { select: { id: true, name: true } } },
       })
     }
 
@@ -53,6 +55,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        include: { product: { select: { id: true, name: true } } },
       })
     }
 
