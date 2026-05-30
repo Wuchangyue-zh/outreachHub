@@ -21,136 +21,190 @@ function categoryToIntent(category: string | null): 'interested' | 'opt-out' | '
   }
 }
 
-// GET /api/inbox/threads — fetch inbox threads from replied EmailLogs (tenant-scoped)
+type ThreadMessage = {
+  id: string
+  from: 'us' | 'them'
+  senderName: string
+  senderEmail: string
+  subject: string
+  body: string
+  timestamp: string
+  sortAt: Date
+}
+
+// GET /api/inbox/threads — fetch inbox threads with full conversation history
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
     if (!auth.tenantId) return NextResponse.json({ success: true, data: [] })
 
-    const tenantContacts = await prisma.contact.findMany({
+    const contacts = await prisma.contact.findMany({
       where: { tenantId: auth.tenantId },
-      select: { id: true },
+      include: {
+        company: true,
+        emails: { where: { isPrimary: true }, take: 1 },
+      },
     })
-    const tenantContactIds = tenantContacts.map((c) => c.id)
-    if (tenantContactIds.length === 0) {
+
+    if (contacts.length === 0) {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    const repliedLogs = await prisma.emailLog.findMany({
+    const contactById = new Map(contacts.map((c) => [c.id, c]))
+    const contactIdByEmail = new Map<string, string>()
+    for (const contact of contacts) {
+      const primaryEmail = contact.emails[0]?.address || ''
+      if (primaryEmail) {
+        contactIdByEmail.set(primaryEmail.toLowerCase(), contact.id)
+      }
+    }
+
+    const tenantContactIds = contacts.map((c) => c.id)
+
+    // 有客户回复的联系人（线程入口）
+    const repliedContactRows = await prisma.emailLog.findMany({
       where: {
         contactId: { in: tenantContactIds },
         repliedAt: { not: null },
       },
-      include: {
-        campaign: true,
+      select: { contactId: true },
+      distinct: ['contactId'],
+    })
+
+    const activeContactIds = new Set(repliedContactRows.map((r) => r.contactId))
+
+    // 兼容历史数据：inbox 回复误用了 system-reply
+    const orphanReplies = await prisma.emailLog.findMany({
+      where: {
+        contactId: 'system-reply',
+        status: 'SENT',
+        toEmail: { in: [...contactIdByEmail.keys()] },
       },
-      orderBy: { repliedAt: 'desc' },
-      take: 100,
+      select: { toEmail: true },
+      distinct: ['toEmail'],
     })
 
-    const contactIds = [...new Set(repliedLogs.map((log) => log.contactId).filter(Boolean))]
+    for (const row of orphanReplies) {
+      const cid = contactIdByEmail.get(row.toEmail.toLowerCase())
+      if (cid) activeContactIds.add(cid)
+    }
 
-    const contacts = await prisma.contact.findMany({
-      where: { id: { in: contactIds }, tenantId: auth.tenantId },
-      include: { company: true },
+    if (activeContactIds.size === 0) {
+      return NextResponse.json({ success: true, data: [] })
+    }
+
+    const activeIds = [...activeContactIds]
+    const activeEmails = activeIds
+      .map((id) => {
+        const c = contactById.get(id)
+        return c?.emails[0]?.address?.toLowerCase()
+      })
+      .filter(Boolean) as string[]
+
+    const allLogs = await prisma.emailLog.findMany({
+      where: {
+        OR: [
+          { contactId: { in: activeIds } },
+          {
+            contactId: 'system-reply',
+            toEmail: { in: activeEmails, mode: 'insensitive' },
+            status: 'SENT',
+          },
+        ],
+      },
+      orderBy: [{ sentAt: 'asc' }, { createdAt: 'asc' }],
     })
-    const contactMap = new Map(contacts.map((c) => [c.id, c]))
 
-    const threadMap = new Map<string, {
-      id: string
-      contactName: string
-      contactEmail: string
-      company: string
-      country: string
-      intent: 'interested' | 'opt-out' | 'ooo'
-      lastSnippet: string
-      lastTime: string
-      unread: boolean
-      messages: Array<{
-        id: string
-        from: 'us' | 'them'
-        senderName: string
-        senderEmail: string
-        subject: string
-        body: string
-        timestamp: string
-      }>
-      aiDraft: string
-      emailLogIds: string[]
-    }>()
+    const logsByContact = new Map<string, typeof allLogs>()
+    for (const log of allLogs) {
+      let contactId = log.contactId
+      if (contactId === 'system-reply') {
+        contactId = contactIdByEmail.get(log.toEmail.toLowerCase()) || contactId
+      }
+      if (!activeContactIds.has(contactId)) continue
 
-    for (const log of repliedLogs) {
-      const contact = contactMap.get(log.contactId)
-      if (!contact) continue
+      const list = logsByContact.get(contactId) || []
+      list.push(log)
+      logsByContact.set(contactId, list)
+    }
 
-      const contactKey = log.contactId
-      const outboundBody = log.htmlContent || log.content || log.subject || ''
-      // P1-3: 优先使用 replyBody 字段，回退到 content
-      const replyBody = log.replyBody || log.content || log.subject || ''
+    const threads = activeIds
+      .map((contactId) => {
+        const contact = contactById.get(contactId)
+        const logs = logsByContact.get(contactId) || []
+        if (!contact || logs.length === 0) return null
 
-      if (!threadMap.has(contactKey)) {
+        const contactEmail = contact.emails[0]?.address || logs[0]?.toEmail || ''
+        const messages: ThreadMessage[] = []
+
+        for (const log of logs) {
+          const outboundBody = log.htmlContent || log.content || log.subject || ''
+          const sentAt = log.sentAt || log.createdAt
+
+          messages.push({
+            id: `msg-out-${log.id}`,
+            from: 'us',
+            senderName: log.fromEmail || 'OutreachHub',
+            senderEmail: log.fromEmail,
+            subject: log.subject,
+            body: outboundBody,
+            timestamp: formatDateTime(sentAt),
+            sortAt: sentAt,
+          })
+
+          if (log.repliedAt) {
+            const replyBody = log.replyBody || log.content || log.subject || ''
+            messages.push({
+              id: `msg-in-${log.id}`,
+              from: 'them',
+              senderName: contact.fullName || contactEmail,
+              senderEmail: contactEmail,
+              subject: `Re: ${log.subject}`,
+              body: replyBody,
+              timestamp: formatDateTime(log.repliedAt),
+              sortAt: log.repliedAt,
+            })
+          }
+        }
+
+        messages.sort((a, b) => a.sortAt.getTime() - b.sortAt.getTime())
+
+        const latestReplyLog = [...logs].reverse().find((l) => l.repliedAt)
+        const latestMessage = messages[messages.length - 1]
         const companyName = contact.company?.name || ''
         const countryCode = contact.countryCode || ''
         const countryFlag = countryCode ? getFlagEmoji(countryCode) : ''
 
-        threadMap.set(contactKey, {
-          id: `thread-${contactKey}`,
-          contactName: contact.fullName || log.toEmail,
-          contactEmail: log.toEmail,
+        return {
+          id: `thread-${contactId}`,
+          contactId,
+          contactName: contact.fullName || contactEmail,
+          contactEmail,
           company: companyName,
           country: `${countryFlag} ${contact.country || ''}`.trim() || 'Unknown',
-          intent: categoryToIntent(log.replyCategory),
-          lastSnippet: truncate(replyBody, 80),
-          lastTime: formatRelativeTime(log.repliedAt!),
-          unread: !log.tracked,
-          messages: [
-            {
-              id: `msg-out-${log.id}`,
-              from: 'us',
-              senderName: log.fromEmail || 'OutreachHub',
-              senderEmail: log.fromEmail,
-              subject: log.subject,
-              body: outboundBody,
-              timestamp: log.sentAt ? formatDateTime(log.sentAt) : '',
-            },
-            {
-              id: `msg-in-${log.id}`,
-              from: 'them',
-              senderName: contact.fullName || log.toEmail,
-              senderEmail: log.toEmail,
-              subject: `Re: ${log.subject}`,
-              body: replyBody,
-              timestamp: log.repliedAt ? formatDateTime(log.repliedAt) : '',
-            },
-          ],
+          intent: categoryToIntent(latestReplyLog?.replyCategory ?? null),
+          lastSnippet: truncate(stripHtml(latestMessage?.body || ''), 80),
+          lastTime: formatRelativeTime(latestMessage?.sortAt || new Date()),
+          lastActivityAt: latestMessage?.sortAt?.getTime() || 0,
+          unread: logs.some((l) => l.repliedAt && !l.tracked),
+          messages: messages.map(({ sortAt: _, ...msg }) => msg),
           aiDraft: '',
-          emailLogIds: [log.id],
-        })
-      } else {
-        const thread = threadMap.get(contactKey)!
-        thread.emailLogIds.push(log.id)
-        thread.lastSnippet = truncate(replyBody, 80)
-        thread.lastTime = formatRelativeTime(log.repliedAt!)
-        thread.messages.push({
-          id: `msg-in-${log.id}`,
-          from: 'them',
-          senderName: contact.fullName || log.toEmail,
-          senderEmail: log.toEmail,
-          subject: `Re: ${log.subject}`,
-          body: replyBody,
-          timestamp: log.repliedAt ? formatDateTime(log.repliedAt) : '',
-        })
-        thread.intent = categoryToIntent(log.replyCategory)
-      }
-    }
-
-    const threads = Array.from(threadMap.values())
+          emailLogIds: logs.map((l) => l.id),
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b!.lastActivityAt || 0) - (a!.lastActivityAt || 0))
+      .map(({ lastActivityAt: _, ...thread }) => thread)
 
     return NextResponse.json({ success: true, data: threads })
   } catch (error) {
     return handleApiError(error)
   }
+}
+
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function truncate(str: string, max: number): string {

@@ -4,14 +4,39 @@ import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { sendAccountMail } from '@/lib/email-account-mail'
 
+async function resolveContactId(
+  tenantId: string,
+  to: string,
+  contactId?: string
+): Promise<string | null> {
+  if (contactId) {
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, tenantId },
+      select: { id: true },
+    })
+    if (contact) return contact.id
+  }
+
+  const contactEmail = await prisma.contactEmail.findFirst({
+    where: {
+      address: { equals: to, mode: 'insensitive' },
+      contact: { tenantId },
+    },
+    select: { contactId: true },
+  })
+
+  return contactEmail?.contactId ?? null
+}
+
 // POST /api/inbox/reply — send a reply email
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
 
     const body = await req.json()
-    const { to, subject, content, emailAccountId, emailLogIds } = body
+    const { to, subject, content, emailAccountId, emailLogIds, contactId } = body
 
     if (!to || !content) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '缺少必要字段: to, content', 400)
@@ -21,7 +46,6 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '请选择发件账户', 400)
     }
 
-    // 验证账户属于当前用户
     const account = await prisma.emailAccount.findFirst({
       where: {
         id: emailAccountId,
@@ -34,21 +58,23 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.NOT_FOUND, '账户不存在或无权使用', 404)
     }
 
-    // 检查发送限额
+    const resolvedContactId = await resolveContactId(auth.tenantId, to, contactId)
+    if (!resolvedContactId) {
+      return errorResponse(ErrorCodes.NOT_FOUND, '未找到对应的联系人，无法记录往来', 404)
+    }
+
     const { checkDailyLimit } = await import('@/lib/email-account-mail')
     const canSend = await checkDailyLimit(emailAccountId)
     if (!canSend) {
       return errorResponse(ErrorCodes.RATE_LIMIT_EXCEEDED, '今日发送已达上限', 429)
     }
 
-    // 构建 HTML 内容
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; white-space: pre-wrap;">
         ${content.replace(/\n/g, '<br>')}
       </div>
     `
 
-    // 发送邮件
     const result = await sendAccountMail({
       emailAccountId,
       to,
@@ -57,25 +83,16 @@ export async function POST(req: NextRequest) {
       html: htmlContent,
     })
 
-    // 记录回复日志
     if (emailLogIds && emailLogIds.length > 0) {
-      // 更新原始邮件的回复状态
       await prisma.emailLog.updateMany({
-        where: {
-          id: { in: emailLogIds },
-        },
-        data: {
-          tracked: true, // 标记为已处理
-        },
+        where: { id: { in: emailLogIds } },
+        data: { tracked: true },
       })
     }
 
-    // 创建新的邮件日志记录回复
-    // 注意：contactId 是必填字段，但回复邮件可能没有关联的联系人
-    // 使用一个特殊的 contactId 来标识系统回复
-    await prisma.emailLog.create({
+    const emailLog = await prisma.emailLog.create({
       data: {
-        contactId: 'system-reply', // 必填字段，用于标识系统回复
+        contactId: resolvedContactId,
         fromEmail: account.email,
         toEmail: to,
         subject: subject || 'Re: 回复',
@@ -90,6 +107,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       messageId: result.messageId,
+      emailLogId: emailLog.id,
     })
   } catch (error) {
     return handleApiError(error)
