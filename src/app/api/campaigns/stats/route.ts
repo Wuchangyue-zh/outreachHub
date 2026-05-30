@@ -7,6 +7,7 @@ import {
   aggregateCampaignStatsFromLogs,
   syncCampaignStatsFromLogs,
 } from '@/lib/campaign-stats-sync'
+import { localizeGeoStats } from '@/lib/geo'
 
 export async function GET(req: NextRequest) {
   try {
@@ -160,9 +161,12 @@ export async function GET(req: NextRequest) {
           take: 20,
         })
 
-        const geo = geoStats
-          .filter((g) => g.openCountry)
-          .map((g) => ({ country: g.openCountry, count: g._count.id }))
+        const geo = localizeGeoStats(
+          geoStats
+            .filter((g) => g.openCountry)
+            .map((g) => ({ country: g.openCountry, count: g._count.id })),
+          'zh'
+        )
 
         return {
           overall: {

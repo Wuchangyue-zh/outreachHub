@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { verifyAllDnsRecords } from '@/lib/dns-verify'
+import { verifyAllDnsRecords, inferDkimSelector } from '@/lib/dns-verify'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
     // 推断 SMTP 发送域名（通常与邮箱域名一致）
     const sendDomain = domain
+    const dkimSelector = inferDkimSelector(account.smtpHost)
 
     const records: DnsRecord[] = [
       {
@@ -54,9 +55,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       },
       {
         type: 'TXT',
-        host: `default._domainkey.${sendDomain}`,
+        host: `${dkimSelector}._domainkey.${sendDomain}`,
         value: `v=DKIM1; k=rsa; p=<YOUR_DKIM_PUBLIC_KEY>`,
-        description: 'DKIM 记录：对邮件进行数字签名，防止篡改。需从邮件服务商获取公钥。',
+        description: `DKIM 记录（推断 selector: ${dkimSelector}）。公钥需从邮件服务商获取。`,
         status: 'required',
       },
       {
@@ -82,10 +83,10 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       },
     ]
 
-    // K1: 在线验证已有 DNS 记录
+    // K1: 在线验证已有 DNS 记录（L4: 传入 smtpHost 自动推断 DKIM selector）
     let verification: Array<{ record: string; host: string; found: boolean; value: string | null; valid: boolean; message: string }> = []
     try {
-      verification = await verifyAllDnsRecords(sendDomain)
+      verification = await verifyAllDnsRecords(sendDomain, account.smtpHost)
     } catch {
       // 验证失败不影响建议记录返回
     }

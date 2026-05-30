@@ -9,9 +9,13 @@ export async function GET(req: NextRequest) {
     const contactId = req.nextUrl.searchParams.get('c')
     const url = req.nextUrl.searchParams.get('u')
 
+    // L3: 提取 IP 和国家
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || undefined
+    const country = req.headers.get('x-vercel-ip-country') || req.headers.get('cf-ipcountry') || undefined
+
     // Record the click event asynchronously
     if (emailLogId && contactId && url) {
-      recordEmailClick(emailLogId, contactId, url).catch(console.error)
+      recordEmailClick(emailLogId, contactId, url, { ip, country }).catch(console.error)
     }
 
     // Redirect to the original URL

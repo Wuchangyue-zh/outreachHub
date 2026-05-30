@@ -120,3 +120,32 @@ npm run worker:cron         # 可选
 - [ ] `npm run build` 通过
 - [ ] `npm test` 通过
 - [ ] 演示账户可登录（`admin@outreachhub.com` / `admin123`）
+
+## 7. 首次上线流程
+
+```bash
+# 1. 推送数据库 schema（含 warmup / geo 字段）
+npm run db:push
+
+# 2. 验证构建
+npm run build
+npm test
+
+# 3. Vercel 部署
+vercel --prod
+
+# 4. 验证 Worker
+docker compose up -d worker
+curl http://worker-host:8080/health
+
+# 5. 验证 Cron
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.com/api/cron/launch-scheduled
+
+# 6. 验证邮件送达
+# - 登录 → Settings → 添加 EmailAccount → 测试发信
+# - Settings → DNS → 检查 SPF/DKIM/DMARC 状态
+# - 创建 Campaign → Launch → 检查收件箱
+
+# 7. 验证退订
+# - 收件邮件 → 点击退订链接 → 确认品牌化页面
+```

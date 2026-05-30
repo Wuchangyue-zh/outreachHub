@@ -3,27 +3,29 @@ import { validateEnv } from '../src/lib/env'
 import { createEmailWorker } from '../src/lib/email-worker'
 import { startWorkerHealthServer } from '../src/lib/worker-health'
 import { getWorkerConcurrency, getWorkerRateLimit } from '../src/lib/env'
+import { logger } from '../src/lib/logger'
+
+const log = logger.child({ worker: 'email' })
 
 validateEnv()
 
 const rateLimit = getWorkerRateLimit()
-console.log('Starting Email Worker...')
-console.log('========================')
-console.log(`Redis URL: ${process.env.REDIS_URL ? 'configured' : 'missing'}`)
-console.log(`Concurrency: ${getWorkerConcurrency(5)}`)
-console.log(`Rate Limit: ${rateLimit.max} emails / ${rateLimit.duration}ms`)
-console.log('========================')
+log.info('Starting Email Worker', {
+  redisConfigured: !!process.env.REDIS_URL,
+  concurrency: getWorkerConcurrency(5),
+  rateLimitMax: rateLimit.max,
+  rateLimitDurationMs: rateLimit.duration,
+})
 
 const worker = createEmailWorker()
 startWorkerHealthServer()
 
-console.log('Email Worker started successfully!')
-console.log('Waiting for email jobs...')
+log.info('Email Worker started, waiting for jobs')
 
 const shutdown = async (signal: string) => {
-  console.log(`\n[${signal}] Shutting down email worker...`)
+  log.info('Shutting down email worker', { signal })
   await worker.close()
-  console.log('Email worker stopped.')
+  log.info('Email worker stopped')
   process.exit(0)
 }
 
@@ -31,11 +33,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error)
+  log.error('Uncaught Exception', { error: error.message, stack: error.stack })
   process.exit(1)
 })
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  log.error('Unhandled Rejection', { reason: String(reason), promise: String(promise) })
   process.exit(1)
 })

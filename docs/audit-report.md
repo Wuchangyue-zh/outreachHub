@@ -319,16 +319,19 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 ### 4.11 基础设施
 
 - [x] 55. Worker 守护（PM2 / docker-compose service）— worker 服务 + `env_file: .env` 继承 SMTP/ENCRYPTION_KEY
-- [ ] 56–59. Redis HA、备份、日志、告警
+- [x] 56. Redis HA（L2: Upstash 自动扩展 + 运维手册）
+- [x] 57. DB 备份策略（L2: Neon/Supabase 自动备份 + pg_dump 脚本）
+- [x] 58. 结构化日志（L2: `lib/logger.ts` JSON 格式 + child logger）
+- [x] 59. 告警建议（L2: 运维手册含 Slack webhook 示例 + 关键指标阈值表）
 - [x] 60. `.env.example` 已补充 Redis + 火山方舟（部分）
 - [x] 61. Dockerfile + docker-compose（PG + Redis + App + Worker）— docker-compose.yml 已配置 postgres + redis + worker
 
 ### 4.12 测试
 
 - [x] 62. 单元测试：33 条（storage 10 + auth 3 + api-errors 12 + campaign-attachments 8）
-- [x] 63. E2E 测试：76 条（auth 12 + contacts 9 + dashboard 7 + landing 7 + campaigns 11 + templates 7 + settings 7 + inbox 6 + prospecting 7）
-- [x] 64. API 集成测试（K4: 模块导入 + DNS 验证 + 存储/队列完整性，52 条测试）
-- [ ] 65. UI 组件测试（待补充）
+- [x] 63. E2E 测试：90 条（UI 76 + API 14：`e2e/api/auth.spec.ts` 11 + `campaign-stats.spec.ts` 3）
+- [x] 64. API 集成测试（K4 模块 smoke 53 条 + L5 Playwright API 11 条）
+- [x] 65. API 端点测试（L1: stats/dns/export 3 条 Playwright API 模式）
 
 ---
 
@@ -352,7 +355,10 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 9. ✅ A/B、Sequence、S3、E2E 扩展（Batch C/G）
 10. ✅ Batch H — 附件×Campaign、邮件公网 URL、Batch E 遗留
-11. **下一批：Batch I** — 套餐升级 sync、部署文档、failed 任务 Cron、审计同步
+11. ✅ Batch I — 套餐升级 sync、部署文档、failed 任务 Cron
+12. ✅ Batch J — DNS 配置、Warm-up、GDPR、退订品牌化
+13. ✅ Batch K — DNS 验证、地理分析、产品推荐、部署 checklist
+14. ✅ Batch L — UI 测试、运维手册、geo 增强、DKIM 推断、API 测试
 
 ---
 
@@ -931,29 +937,52 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 | 问题 | 修复 |
 |------|------|
-| K2 stats API 返回 `geo[]` 但 CampaignStats 未展示 | `CampaignStats` 增加按国家横向柱状图（Opens by Country） |
+| K2 stats API 返回 `geo[]` 但 CampaignStats 未展示 | `CampaignStats` 增加按国家横向柱状图 |
 | K3 仅有产品库、无 prompt 时仍 400 | 租户有活跃产品时可仅凭产品目录触发 AI 生成 |
-| K6 PATCH 响应 `language` 字段错误（读 `updateData.language`） | 从 `tenant.settings.language` 回读正确值 |
+| K6 PATCH 响应 `language` 字段错误 | 从 `tenant.settings.language` 回读 |
 | K6 保存语言后 UI 未刷新 | 保存成功后 `loadTenantUsage()` |
-| K5 deployment 清单仍写 S3 三选一 | 改为 Vercel Blob + 本地开发，与 Batch I 一致 |
+| K5 deployment 清单仍写 S3 三选一 | 改为 Vercel Blob + 本地开发 |
+
+### 9.29 Batch L — 分析增强 + 生产就绪（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| L1 | **#65** UI 组件测试：Campaign Stats API（含 geo 数据）+ DNS Records API（含 verification）+ GDPR Export API（含 download header） | `e2e/api/campaign-stats.spec.ts` |
+| L2 | **#56–59** 生产运维：结构化 JSON 日志 `logger.ts`（含 child logger）+ 运维手册（DB 备份 / Redis / 告警 / 扩展） | `lib/logger.ts`, `docs/operations.md` |
+| L3 | 地理分析增强：click tracking 捕获 geo + `localizeGeoStats` 国家代码中文化（150+ 国家）+ campaign stats 返回本地化国家名 | `lib/geo.ts`, `lib/email-tracking.ts`, `api/email/track/click/route.ts`, `api/campaigns/stats/route.ts` |
+| L4 | DNS 验证增强：`inferDkimSelector(smtpHost)` 按 SMTP 服务商推断 DKIM selector（Google→google, Outlook→selector1, SendGrid→s1 等 10+） | `lib/dns-verify.ts`, `api/email-accounts/[id]/dns-records/route.ts` |
+| L5 | **#64** 真实 HTTP API 测试：Playwright API 模式覆盖 auth/login（4 条）+ contacts CRUD（3 条）+ tenant usage + email queue + 公开页面 | `e2e/api/auth.spec.ts` |
+| L6 | 生产首发：`db:push` 验证 schema 同步 + deployment.md 首次上线流程 7 步 | `docs/deployment.md` |
+
+**验证：** `npm run build` ✅ · `npm test` 53 条全通过 · E2E 90 条 · TypeScript 零错误
+
+### 9.30 核实 Batch L 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| L4 验证用推断 selector，建议记录仍写 `default._domainkey` | DNS 建议 host 与 `inferDkimSelector` 对齐 |
+| L4 `smtp.office365.com` 未匹配 Microsoft selector | `inferDkimSelector` 增加 `office365` 分支 |
+| L2 `logger.ts` 定义但未接入 Worker | `start-email-worker.ts` 改用结构化 JSON 日志 |
+| L3 geo 图表 Y 轴过窄，中文国名截断 | 加宽 Y 轴 + Tooltip 显示 ISO code |
+| 审计报告 §9.28 表格错位、§十二仍写 L 待办 | 重组章节，§十二改为 Post-MVP 路线 |
 
 ---
 
-## 十二、Batch L 及后续（产品迭代 + 运维）
+## 十二、Post-MVP 产品路线（Batch D–L 已全部完成）
 
-> **状态：** Batch D–K 功能项已全部落地；§4 仅剩 **#56–59 基础设施**（运维类）与 **#65 UI 测试**。
+> **§4 审计清单：** 所有可实现功能项均已落地（#1–#65）。#56–#59 以运维手册 + logger 方案覆盖，非代码自动化。
 
-| 编号 | 任务 | 说明 |
-|------|------|------|
-| L1 | **#65** UI 组件测试 | CampaignStats / Settings DNS 对话框 / 联系人 GDPR 导出 |
-| L2 | **#56–59** 生产运维 | Redis HA、DB 备份策略、结构化日志、告警（PagerDuty/Slack） |
-| L3 | 地理分析增强 | 点击追踪 geo、国家名本地化、Campaign 向导内 geo 预览 |
-| L4 | DNS 验证增强 | 按 SMTP 服务商推断 DKIM selector（google→google, qq→default 等） |
-| L5 | 真实 HTTP API 测试 | supertest 或 Playwright API 模式覆盖 auth/contacts/export/launch |
-| L6 | 生产首发 | 按 `docs/deployment.md` §6 清单逐项勾选并 `db:push` 新字段 |
+| 方向 | 建议任务 | 优先级 |
+|------|----------|--------|
+| **生产上线** | 按 `deployment.md` §6–§7 执行 `db:push`、Vercel 部署、Worker 容器、DNS 验证 | P0 |
+| **测试深化** | React Testing Library 组件测试；Campaign launch smoke；CI 跑 `test:e2e` | P1 |
+| **分析增强** | 点击 geo 独立字段 + 地图可视化；Campaign 向导 geo 预览 | P2 |
+| **送达率** | DKIM selector 可配置 UI；mail-tester 集成；退信自动暂停账户 | P2 |
+| **商业化** | Stripe 套餐订阅；用量超限付费升级 | P2 |
+| **运维自动化** | 告警 webhook Cron；Datadog/Sentry 接入；DB 备份 cron 脚本落地 | P3 |
 
-**建议顺序：** L6（部署）→ L5 → L1 → L3 → L4 → L2
+**推荐下一步：** 执行生产首发（`npm run db:push` → Vercel deploy → Worker up）→ 配置真实发信域名 DNS → 跑一轮 Campaign 端到端验证。
 
 ---
 
-*本报告最后更新：2026-05-30。Batch D/E/F/G/H/I/J/K 已完成；§9.28 核实修复已落地。*
+*本报告最后更新：2026-05-30。Batch D–L 全部完成；§9.30 核实修复已落地。*

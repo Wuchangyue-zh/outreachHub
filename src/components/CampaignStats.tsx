@@ -41,6 +41,7 @@ interface CampaignComparison {
 
 interface GeoStats {
   country: string
+  code?: string
   count: number
 }
 
@@ -237,8 +238,14 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
               <BarChart data={geoStats} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="country" width={48} />
-                <Tooltip formatter={(value) => [value, 'Opens']} />
+                <YAxis type="category" dataKey="country" width={72} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => [value, 'Opens']}
+                  labelFormatter={(_, payload) => {
+                    const item = payload?.[0]?.payload as GeoStats | undefined
+                    return item?.code ? `${item.country} (${item.code})` : item?.country
+                  }}
+                />
                 <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>

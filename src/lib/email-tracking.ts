@@ -105,7 +105,12 @@ export async function recordEmailOpen(
 }
 
 // Record email click event
-export async function recordEmailClick(emailLogId: string, contactId: string, url: string) {
+export async function recordEmailClick(
+  emailLogId: string,
+  contactId: string,
+  url: string,
+  geo?: { ip?: string; country?: string }
+) {
   try {
     const emailLog = await prisma.emailLog.findUnique({
       where: { id: emailLogId },
@@ -116,6 +121,11 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
       return
     }
 
+    // L3: 点击也记录 geo（仅当打开时未记录过）
+    const geoData: Record<string, unknown> = {}
+    if (!emailLog.openIp && geo?.ip) geoData.openIp = geo.ip
+    if (!emailLog.openCountry && geo?.country) geoData.openCountry = geo.country.toUpperCase()
+
     // Update email log
     await prisma.emailLog.update({
       where: { id: emailLogId },
@@ -123,6 +133,7 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
         status: emailLog.status !== 'REPLIED' ? 'CLICKED' : emailLog.status,
         clickedAt: emailLog.clickedAt || new Date(),
         clickedCount: { increment: 1 },
+        ...geoData,
       },
     })
 

@@ -93,13 +93,39 @@ export async function verifyDKIM(domain: string, selector: string = 'default'): 
 }
 
 /**
- * 批量验证域名的所有 DNS 记录
+ * L4: 根据 SMTP Host 推断 DKIM selector
+ * 常见服务商的 DKIM selector：
+ * - Google Workspace: google
+ * - Microsoft 365: selector1 / selector2
+ * - QQ 企业邮: default
+ * - 阿里企业邮: default
+ * - Zoho: zoho
+ * - SendGrid: s1 / s2
+ * - Mailgun: mailo / k1
+ * - Amazon SES: selector
  */
-export async function verifyAllDnsRecords(domain: string, dkimSelector?: string): Promise<DnsVerificationResult[]> {
+export function inferDkimSelector(smtpHost: string): string {
+  const host = smtpHost.toLowerCase()
+  if (host.includes('gmail') || host.includes('google')) return 'google'
+  if (host.includes('outlook') || host.includes('microsoft') || host.includes('hotmail') || host.includes('office365')) return 'selector1'
+  if (host.includes('zoho')) return 'zoho'
+  if (host.includes('sendgrid')) return 's1'
+  if (host.includes('mailgun')) return 'mailo'
+  if (host.includes('amazonses') || host.includes('aws')) return 'selector'
+  if (host.includes('yahoo')) return 's2048'
+  return 'default'
+}
+
+/**
+ * 批量验证域名的所有 DNS 记录
+ * @param smtpHost SMTP 主机（用于推断 DKIM selector）
+ */
+export async function verifyAllDnsRecords(domain: string, smtpHost?: string): Promise<DnsVerificationResult[]> {
+  const selector = smtpHost ? inferDkimSelector(smtpHost) : 'default'
   const [spf, dmarc, dkim] = await Promise.all([
     verifySPF(domain),
     verifyDMARC(domain),
-    verifyDKIM(domain, dkimSelector),
+    verifyDKIM(domain, selector),
   ])
   return [spf, dkim, dmarc]
 }

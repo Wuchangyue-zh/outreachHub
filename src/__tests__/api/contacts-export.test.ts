@@ -75,4 +75,11 @@ describe('DNS verification functions', () => {
     expect(result).toHaveProperty('record', 'DMARC')
     expect(result.found).toBe(false)
   })
+
+  it('inferDkimSelector should map known SMTP hosts', async () => {
+    const { inferDkimSelector } = await import('@/lib/dns-verify')
+    expect(inferDkimSelector('smtp.gmail.com')).toBe('google')
+    expect(inferDkimSelector('smtp.office365.com')).toBe('selector1')
+    expect(inferDkimSelector('smtp.example.com')).toBe('default')
+  })
 })
