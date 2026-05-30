@@ -28,6 +28,16 @@ export function startWorkerHealthServer(port = parseInt(process.env.WORKER_HEALT
     res.end('Not Found')
   })
 
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(
+        `[Worker Health] Port ${port} already in use — health server disabled, worker continues`
+      )
+      return
+    }
+    console.error('[Worker Health] Server error:', err)
+  })
+
   server.listen(port, () => {
     console.log(`[Worker Health] Listening on port ${port}`)
   })

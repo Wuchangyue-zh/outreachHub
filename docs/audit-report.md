@@ -729,6 +729,28 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 | GET `/api/prospecting` 无 tenantId 校验 | 403 拒绝未关联租户 |
 | 任务列表 tab 仍显示创建表单 | tab=tasks 时仅展示列表 + 刷新；创建后自动跳转 |
 
+### 9.18 Batch G — 存储 / 附件 / E2E / 文档（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| G1 | S3 兼容存储：`@aws-sdk/client-s3` 集成，支持 Cloudflare R2 / AWS S3 / MinIO；三级存储优先级 Blob > S3 > 本地 | `lib/storage.ts`, `lib/env.ts`, `.env.example` |
+| G2 | Attachment 模型 + DB 追踪：上传自动写库、附件列表/删除 API、租户隔离 | `schema.prisma`, `api/upload/attachment/route.ts`, `api/attachments/route.ts` |
+| G4 | E2E 测试扩展：新增 templates / settings / inbox / prospecting 共 4 个 spec 文件；storage 单元测试 10 条 | `e2e/templates.spec.ts`, `e2e/settings.spec.ts`, `e2e/inbox.spec.ts`, `e2e/prospecting.spec.ts`, `src/__tests__/storage.test.ts` |
+| G5 | 文档更新：`.env.example` S3 配置、审计报告 Batch G 记录 | `.env.example`, `docs/audit-report.md` |
+
+**需执行：** `npm run db:push`（新增 `Attachment` 模型）
+
+### 9.19 核实 Batch G 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| Blob 删除用 pathname 而非 URL | `deleteFile` 增加 `url` 参数，Blob 后端用完整 URL 调用 `del()` |
+| 附件 DELETE 无权限校验 | 仅上传者本人或 ADMIN/OWNER 可删 |
+| 无 tenantId 仍上传文件但不写 DB | 上传前 403，避免孤儿文件 |
+| `.env.example` R2 域名拼写错误 | `cloudflorage` → `cloudflarestorage` |
+
+**核实结果：** G1/G2/G4/G5 均已落地；单元测试 25 条（storage 10 条）；E2E 共 76 条；`npm run build` 通过。
+
 ---
 
-*本报告最后更新：2026-05-30。Batch D/E/F 已完成；剩余 G1(S3)、G2(附件)、G4(E2E)、G5(文档)。*
+*本报告最后更新：2026-05-30。Batch D/E/F/G 已完成。*

@@ -41,9 +41,11 @@ npm run worker:email
 可选扩展：
 - `EMAIL_WORKER_CONCURRENCY=10` — 并发数（默认 5）
 - `EMAIL_WORKER_RATE_MAX=200` — 每分钟最大任务数
-- `WORKER_HEALTH_PORT=8080` — 健康检查端口
+- `WORKER_HEALTH_PORT=8080` — Email Worker 健康检查
+- `CRON_WORKER_HEALTH_PORT=8082` — Cron Worker 健康检查
+- `IMAP_WORKER_HEALTH_PORT=8081` — IMAP Worker 健康检查
 
-健康检查：`GET http://worker-host:8080/health`
+健康检查：`GET http://worker-host:<port>/health`（各 Worker 端口见上）
 
 ## 3. Cron Worker（推荐，50+ 租户）
 

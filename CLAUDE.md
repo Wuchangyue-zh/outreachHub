@@ -114,7 +114,10 @@ Vercel Blob (生产文件存储)
 环境变量（可选）：
 - `EMAIL_WORKER_CONCURRENCY`（默认 5）
 - `EMAIL_WORKER_RATE_MAX` / `EMAIL_WORKER_RATE_DURATION_MS`
-- `WORKER_HEALTH_PORT`（默认 8080，`GET /health`）
+- `WORKER_HEALTH_PORT`（Email，默认 8080）
+- `CRON_WORKER_HEALTH_PORT`（Cron，默认 8082）
+- `IMAP_WORKER_HEALTH_PORT`（IMAP，默认 8081）
+- 各 Worker 暴露 `GET /health`；端口被占用时 Worker 仍运行，仅跳过健康检查
 
 多实例 Worker 共享同一 Redis 队列即可水平扩展。
 

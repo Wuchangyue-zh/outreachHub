@@ -6,6 +6,8 @@ export {
   generateFilename,
   validateFile,
   uploadFile,
+  deleteFile,
+  deleteFromS3,
   type UploadedFile,
   type StorageUploadOptions,
 } from './storage'

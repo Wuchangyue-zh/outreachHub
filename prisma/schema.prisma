@@ -54,6 +54,7 @@ model Tenant {
   emailTemplates EmailTemplate[]
   products    Product[]
   invitations Invitation[]
+  attachments Attachment[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -529,6 +530,28 @@ model SearchHistory {
   @@index([userId])
   @@index([tenantId])
   @@index([type])
+}
+
+// ==================== 文件附件 ====================
+
+model Attachment {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy   String   // 上传者 userId
+  originalName String   // 原始文件名
+  filename     String   // 生成的文件名
+  url          String   // 公开访问 URL
+  mimeType     String   // MIME 类型
+  size         Int      // 文件大小（字节）
+  folder       String   // 存储目录，如 'avatars', 'attachments'
+  relatedType  String?  // 关联类型，如 'campaign', 'email-template', 'contact'
+  relatedId    String?  // 多态关联 ID
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([uploadedBy])
+  @@index([relatedType, relatedId])
 }
 
 // ==================== 枚举类型 ====================

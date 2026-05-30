@@ -5,9 +5,11 @@ import { startWorkerHealthServer } from '../src/lib/worker-health'
 
 validateEnv()
 
+const healthPort = parseInt(process.env.CRON_WORKER_HEALTH_PORT || '8082', 10)
+
 console.log('Starting Cron Worker...')
 const worker = createCronWorker()
-startWorkerHealthServer()
+startWorkerHealthServer(healthPort)
 
 const shutdown = async (signal: string) => {
   console.log(`\n[${signal}] Shutting down cron worker...`)

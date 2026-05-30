@@ -80,7 +80,14 @@ export function getWorkerRateLimit(): { max: number; duration: number } {
   return { max, duration }
 }
 
-export function getStorageBackend(): 'blob' | 'local' {
+export function getStorageBackend(): 'blob' | 's3' | 'local' {
   if (process.env.BLOB_READ_WRITE_TOKEN) return 'blob'
+  if (
+    process.env.S3_ACCESS_KEY &&
+    process.env.S3_SECRET_KEY &&
+    process.env.S3_BUCKET
+  ) {
+    return 's3'
+  }
   return 'local'
 }
