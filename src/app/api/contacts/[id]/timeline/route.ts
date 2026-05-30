@@ -29,6 +29,10 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         company: {
           select: { name: true },
         },
+        emails: {
+          where: { isPrimary: true },
+          take: 1,
+        },
       },
     })
 

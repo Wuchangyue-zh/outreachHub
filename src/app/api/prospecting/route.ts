@@ -151,7 +151,6 @@ export async function POST(req: NextRequest) {
               title: contactData.title || null,
               country: contactData.country || null,
               countryCode: contactData.countryCode || null,
-              industry: contactData.industry || null,
               companyId: companyId || null,
               tags: contactData.tags || [],
               source: 'rocketreach',

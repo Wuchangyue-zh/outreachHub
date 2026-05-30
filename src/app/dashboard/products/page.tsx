@@ -399,7 +399,7 @@ export default function ProductsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <Tag className="h-4 w-4 text-gray-400" />
                         {product.tags.slice(0, 3).map((tag, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
+                          <Badge key={index} className="text-xs bg-gray-100 text-gray-700">
                             {tag}
                           </Badge>
                         ))}
