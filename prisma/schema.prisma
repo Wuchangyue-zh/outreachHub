@@ -22,10 +22,13 @@ model User {
   tenantId      String?
   tenant        Tenant?   @relation(fields: [tenantId], references: [id])
   emailAccounts EmailAccount[]
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([tenantId])
+  @@index([passwordResetToken])
 }
 
 model Tenant {

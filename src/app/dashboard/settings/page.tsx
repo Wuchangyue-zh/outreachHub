@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
   Mail,
@@ -20,7 +28,21 @@ import {
   Settings as SettingsIcon,
   Server,
   Shield,
+  Pencil,
 } from 'lucide-react'
+
+const emptyFormData = {
+  email: '',
+  displayName: '',
+  smtpHost: '',
+  smtpPort: '587',
+  smtpUser: '',
+  smtpPassword: '',
+  imapHost: '',
+  imapPort: '993',
+  imapUser: '',
+  imapPassword: '',
+}
 
 interface EmailAccount {
   id: string
@@ -32,6 +54,8 @@ interface EmailAccount {
   smtpPassword: string
   imapHost: string | null
   imapPort: number | null
+  imapUser: string | null
+  imapPassword?: string | null
   isActive: boolean
   dailySent: number
   dailyLimit: number
@@ -42,21 +66,12 @@ interface EmailAccount {
 export default function SettingsPage() {
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testEmail, setTestEmail] = useState('')
-  const [formData, setFormData] = useState({
-    email: '',
-    displayName: '',
-    smtpHost: '',
-    smtpPort: '587',
-    smtpUser: '',
-    smtpPassword: '',
-    imapHost: '',
-    imapPort: '993',
-    imapUser: '',
-    imapPassword: '',
-  })
+  const [formData, setFormData] = useState(emptyFormData)
 
   // 加载邮件账户列表
   const loadAccounts = async () => {
@@ -77,37 +92,76 @@ export default function SettingsPage() {
     loadAccounts()
   }, [])
 
-  // 添加新账户
-  const handleAddAccount = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setDialogOpen(false)
+    setEditingId(null)
+    setFormData(emptyFormData)
+  }
+
+  const openAddForm = () => {
+    setEditingId(null)
+    setFormData(emptyFormData)
+    setDialogOpen(true)
+  }
+
+  const openEditForm = (account: EmailAccount) => {
+    setEditingId(account.id)
+    setFormData({
+      email: account.email,
+      displayName: account.displayName || '',
+      smtpHost: account.smtpHost,
+      smtpPort: String(account.smtpPort),
+      smtpUser: account.smtpUser,
+      smtpPassword: '',
+      imapHost: account.imapHost || '',
+      imapPort: account.imapPort ? String(account.imapPort) : '993',
+      imapUser: account.imapUser || account.email,
+      imapPassword: '',
+    })
+    setDialogOpen(true)
+  }
+
+  const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSaving(true)
     try {
-      const res = await fetch('/api/email-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
+      const payload: Record<string, string> = {
+        email: formData.email,
+        displayName: formData.displayName,
+        smtpHost: formData.smtpHost,
+        smtpPort: formData.smtpPort,
+        smtpUser: formData.smtpUser,
+        imapHost: formData.imapHost,
+        imapPort: formData.imapPort,
+        imapUser: formData.imapUser,
+      }
+      if (formData.smtpPassword) payload.smtpPassword = formData.smtpPassword
+      if (formData.imapPassword) payload.imapPassword = formData.imapPassword
+
+      const res = await fetch(
+        editingId ? `/api/email-accounts/${editingId}` : '/api/email-accounts',
+        {
+          method: editingId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            editingId
+              ? payload
+              : { ...formData }
+          ),
+        }
+      )
       const data = await res.json()
       if (data.success) {
-        toast.success('账户添加成功')
-        setShowAddForm(false)
-        setFormData({
-          email: '',
-          displayName: '',
-          smtpHost: '',
-          smtpPort: '587',
-          smtpUser: '',
-          smtpPassword: '',
-          imapHost: '',
-          imapPort: '993',
-          imapUser: '',
-          imapPassword: '',
-        })
+        toast.success(editingId ? '账户已更新' : '账户添加成功')
+        resetForm()
         loadAccounts()
       } else {
-        toast.error(data.error || '添加失败')
+        toast.error(data.error?.message || data.message || data.error || '保存失败')
       }
-    } catch (error) {
-      toast.error('添加账户失败')
+    } catch {
+      toast.error('保存账户失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -191,119 +245,144 @@ export default function SettingsPage() {
           <TabsContent value="email-accounts" className="space-y-4">
             {/* 添加账户按钮 */}
             <div className="flex justify-end">
-              <Button onClick={() => setShowAddForm(!showAddForm)}>
+              <Button onClick={openAddForm}>
                 <Plus className="mr-2 h-4 w-4" />
-                {showAddForm ? '取消' : '添加账户'}
+                添加账户
               </Button>
             </div>
 
-            {/* 添加账户表单 */}
-            {showAddForm && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>添加邮件账户</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleAddAccount} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 基本信息 */}
-                      <div className="space-y-2">
-                        <Label htmlFor="email">邮箱地址 *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          placeholder="your@email.com"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="displayName">显示名称</Label>
-                        <Input
-                          id="displayName"
-                          value={formData.displayName}
-                          onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                          placeholder="您的名字"
-                        />
-                      </div>
-
-                      {/* SMTP 配置 */}
-                      <div className="space-y-2">
-                        <Label htmlFor="smtpHost">SMTP 服务器 *</Label>
-                        <Input
-                          id="smtpHost"
-                          value={formData.smtpHost}
-                          onChange={(e) => setFormData({ ...formData, smtpHost: e.target.value })}
-                          placeholder="smtp.gmail.com"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="smtpPort">SMTP 端口 *</Label>
-                        <Input
-                          id="smtpPort"
-                          type="number"
-                          value={formData.smtpPort}
-                          onChange={(e) => setFormData({ ...formData, smtpPort: e.target.value })}
-                          placeholder="587"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="smtpUser">SMTP 用户名 *</Label>
-                        <Input
-                          id="smtpUser"
-                          value={formData.smtpUser}
-                          onChange={(e) => setFormData({ ...formData, smtpUser: e.target.value })}
-                          placeholder="your@email.com"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="smtpPassword">SMTP 密码 *</Label>
-                        <Input
-                          id="smtpPassword"
-                          type="password"
-                          value={formData.smtpPassword}
-                          onChange={(e) => setFormData({ ...formData, smtpPassword: e.target.value })}
-                          placeholder="应用专用密码"
-                          required
-                        />
-                      </div>
-
-                      {/* IMAP 配置（可选） */}
-                      <div className="space-y-2">
-                        <Label htmlFor="imapHost">IMAP 服务器（可选）</Label>
-                        <Input
-                          id="imapHost"
-                          value={formData.imapHost}
-                          onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
-                          placeholder="imap.gmail.com"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="imapPort">IMAP 端口</Label>
-                        <Input
-                          id="imapPort"
-                          type="number"
-                          value={formData.imapPort}
-                          onChange={(e) => setFormData({ ...formData, imapPort: e.target.value })}
-                          placeholder="993"
-                        />
-                      </div>
+            <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>{editingId ? '编辑邮件账户' : '添加邮件账户'}</DialogTitle>
+                  <DialogDescription>
+                    {editingId
+                      ? '修改发信账户配置。密码留空表示不修改。'
+                      : '配置 SMTP 发信账户，可选填 IMAP 用于收件箱同步。'}
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSaveAccount} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">邮箱地址 *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="your@email.com"
+                        required
+                      />
+                      <p className="text-xs text-gray-400">收件人看到的发件人地址</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="displayName">显示名称</Label>
+                      <Input
+                        id="displayName"
+                        value={formData.displayName}
+                        onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                        placeholder="您的名字"
+                      />
                     </div>
 
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
-                        取消
-                      </Button>
-                      <Button type="submit">保存账户</Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpHost">SMTP 服务器 *</Label>
+                      <Input
+                        id="smtpHost"
+                        value={formData.smtpHost}
+                        onChange={(e) => setFormData({ ...formData, smtpHost: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                        required
+                      />
                     </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPort">SMTP 端口 *</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={formData.smtpPort}
+                        onChange={(e) => setFormData({ ...formData, smtpPort: e.target.value })}
+                        placeholder="587 或 465"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpUser">SMTP 用户名 *</Label>
+                      <Input
+                        id="smtpUser"
+                        value={formData.smtpUser}
+                        onChange={(e) => setFormData({ ...formData, smtpUser: e.target.value })}
+                        placeholder="通常与邮箱地址相同"
+                        required
+                      />
+                      <p className="text-xs text-gray-400">登录 SMTP 服务器的账号</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPassword">SMTP 密码 {editingId ? '' : '*'}</Label>
+                      <Input
+                        id="smtpPassword"
+                        type="password"
+                        value={formData.smtpPassword}
+                        onChange={(e) => setFormData({ ...formData, smtpPassword: e.target.value })}
+                        placeholder={editingId ? '留空则不修改' : '应用专用密码'}
+                        required={!editingId}
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <p className="text-sm font-medium text-gray-700">IMAP 配置（可选，用于统一收件箱）</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapHost">IMAP 服务器</Label>
+                      <Input
+                        id="imapHost"
+                        value={formData.imapHost}
+                        onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
+                        placeholder="imap.gmail.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapPort">IMAP 端口</Label>
+                      <Input
+                        id="imapPort"
+                        type="number"
+                        value={formData.imapPort}
+                        onChange={(e) => setFormData({ ...formData, imapPort: e.target.value })}
+                        placeholder="993"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapUser">IMAP 用户名</Label>
+                      <Input
+                        id="imapUser"
+                        value={formData.imapUser}
+                        onChange={(e) => setFormData({ ...formData, imapUser: e.target.value })}
+                        placeholder="通常与邮箱地址相同"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="imapPassword">IMAP 密码</Label>
+                      <Input
+                        id="imapPassword"
+                        type="password"
+                        value={formData.imapPassword}
+                        onChange={(e) => setFormData({ ...formData, imapPassword: e.target.value })}
+                        placeholder={editingId ? '留空则不修改' : '通常与 SMTP 密码相同'}
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={resetForm}>
+                      取消
+                    </Button>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? '保存中...' : editingId ? '保存修改' : '保存账户'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             {/* 测试邮箱输入 */}
             <Card>
@@ -391,6 +470,14 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditForm(account)}
+                          >
+                            <Pencil className="mr-1 h-3 w-3" />
+                            编辑
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

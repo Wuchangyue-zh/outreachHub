@@ -15,7 +15,11 @@ const AUTH_TAG_LENGTH = 16
 function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY
   if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set')
+    // 开发环境回退：未配置时使用固定派生密钥（生产必须设置 ENCRYPTION_KEY）
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY environment variable is not set')
+    }
+    return crypto.createHash('sha256').update('outreachhub-dev-encryption-key').digest()
   }
 
   // 如果是 hex 字符串，转换为 Buffer

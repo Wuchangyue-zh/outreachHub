@@ -34,6 +34,34 @@ const DEFAULT_CONFIG: Required<AccountSelectionConfig> = {
 const lastUsedCache = new Map<string, { accountId: string; timestamp: number }>()
 
 /**
+ * 跨天时重置 dailySent（写入数据库）
+ */
+async function resetDailySentIfNeeded<T extends {
+  id: string
+  dailySent: number
+  dailyLimit: number
+  lastResetAt: Date
+}>(account: T): Promise<T> {
+  const now = new Date()
+  const lastReset = new Date(account.lastResetAt)
+  const isNewDay =
+    now.getDate() !== lastReset.getDate() ||
+    now.getMonth() !== lastReset.getMonth() ||
+    now.getFullYear() !== lastReset.getFullYear()
+
+  if (!isNewDay) {
+    return account
+  }
+
+  await prisma.emailAccount.update({
+    where: { id: account.id },
+    data: { dailySent: 0, lastResetAt: now },
+  })
+
+  return { ...account, dailySent: 0, lastResetAt: now }
+}
+
+/**
  * 内联检查日限额（避免 N+1 查询）
  * 使用已获取的数据，不额外查询数据库
  */
@@ -134,17 +162,19 @@ export async function selectEmailAccount(
     return null
   }
 
-  // 2. 过滤账户
+  // 2. 过滤账户（跨天时先重置计数）
   const eligibleAccounts: typeof accounts = []
 
   for (const account of accounts) {
+    const normalized = await resetDailySentIfNeeded(account)
+
     // 检查健康度阈值
-    if (account.healthScore < mergedConfig.minHealthScore) {
+    if (normalized.healthScore < mergedConfig.minHealthScore) {
       continue
     }
 
-    // 使用内联检查日限额（避免 N+1 查询）
-    if (!isDailyLimitOk(account)) {
+    // 使用内联检查日限额
+    if (!isDailyLimitOk(normalized)) {
       continue
     }
 
@@ -159,7 +189,7 @@ export async function selectEmailAccount(
       }
     }
 
-    eligibleAccounts.push(account)
+    eligibleAccounts.push({ ...account, ...normalized })
   }
 
   // 如果轮换间隔导致没有可用账户，重置该用户的缓存再试
@@ -175,13 +205,14 @@ export async function selectEmailAccount(
 
     // 重新过滤（不考虑轮换间隔）
     for (const account of accounts) {
-      if (account.healthScore < mergedConfig.minHealthScore) {
+      const normalized = await resetDailySentIfNeeded(account)
+      if (normalized.healthScore < mergedConfig.minHealthScore) {
         continue
       }
-      if (!isDailyLimitOk(account)) {
+      if (!isDailyLimitOk(normalized)) {
         continue
       }
-      eligibleAccounts.push(account)
+      eligibleAccounts.push(normalized)
     }
   }
 
@@ -264,16 +295,15 @@ export async function getAvailableAccount(
     })
 
     if (account) {
-      // P2 修复：检查健康度
-      if (account.healthScore < DEFAULT_CONFIG.minHealthScore) {
+      const normalized = await resetDailySentIfNeeded(account)
+
+      if (normalized.healthScore < DEFAULT_CONFIG.minHealthScore) {
         console.warn(
           `[getAvailableAccount] Specified account ${emailAccountId} ` +
-          `health score ${account.healthScore} < ${DEFAULT_CONFIG.minHealthScore}`
+          `health score ${normalized.healthScore} < ${DEFAULT_CONFIG.minHealthScore}`
         )
-        // 降级到自动选择
-      } else if (!isDailyLimitOk(account)) {
+      } else if (!isDailyLimitOk(normalized)) {
         console.warn(`[getAvailableAccount] Specified account ${emailAccountId} reached daily limit`)
-        // 降级到自动选择
       } else {
         return emailAccountId
       }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { encrypt } from '@/lib/encryption'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -53,13 +54,13 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     if (body.smtpPort !== undefined) updateData.smtpPort = parseInt(body.smtpPort)
     if (body.smtpUser !== undefined) updateData.smtpUser = body.smtpUser
     if (body.smtpPassword !== undefined && body.smtpPassword !== '********') {
-      updateData.smtpPassword = body.smtpPassword
+      updateData.smtpPassword = encrypt(body.smtpPassword)
     }
     if (body.imapHost !== undefined) updateData.imapHost = body.imapHost
     if (body.imapPort !== undefined) updateData.imapPort = parseInt(body.imapPort)
     if (body.imapUser !== undefined) updateData.imapUser = body.imapUser
     if (body.imapPassword !== undefined && body.imapPassword !== '********') {
-      updateData.imapPassword = body.imapPassword
+      updateData.imapPassword = encrypt(body.imapPassword)
     }
     if (body.isActive !== undefined) updateData.isActive = body.isActive
     if (body.dailyLimit !== undefined) updateData.dailyLimit = body.dailyLimit

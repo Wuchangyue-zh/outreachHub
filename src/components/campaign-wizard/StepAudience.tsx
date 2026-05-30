@@ -1,20 +1,20 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useCampaignWizardStore } from '@/store/campaign-wizard-store'
-import { ArrowRight, ArrowLeft, Check, Users, ClipboardList } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Check, Users, ClipboardList, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Mock contacts — will be replaced by real API later
-const MOCK_CONTACTS = [
-  { id: 'c1', name: 'Hans Müller', email: 'hans@mueller-auto.de', company: 'Müller Automotive GmbH', country: '🇩🇪 德国' },
-  { id: 'c2', name: 'Sarah Johnson', email: 'sarah.j@precisionparts.co.uk', company: 'Precision Parts Ltd', country: '🇬🇧 英国' },
-  { id: 'c3', name: 'Yuki Tanaka', email: 'tanaka@tokyo-mfg.jp', company: 'Tokyo Manufacturing Corp', country: '🇯🇵 日本' },
-  { id: 'c4', name: 'Carlos Rivera', email: 'carlos@ribera-industrial.mx', company: 'Ribera Industrial SA', country: '🇲🇽 墨西哥' },
-  { id: 'c5', name: 'Anna Kowalski', email: 'anna.k@eurotech-solutions.pl', company: 'EuroTech Solutions', country: '🇵🇱 波兰' },
-]
+interface ContactRecord {
+  id: string
+  name: string
+  email: string
+  company: string
+  country: string
+}
 
 export function StepAudience() {
   const {
@@ -23,6 +23,30 @@ export function StepAudience() {
     selectedContactIds, toggleContact, selectAllContacts, clearContacts,
     nextStep, prevStep,
   } = useCampaignWizardStore()
+
+  const [contacts, setContacts] = useState<ContactRecord[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (audienceTab !== 'contacts') return
+    setLoading(true)
+    fetch('/api/contacts?page=1&limit=100')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          const rows: ContactRecord[] = (json.data || []).map((c: any) => ({
+            id: c.id,
+            name: c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unknown',
+            email: c.emails?.find((e: any) => e.isPrimary)?.address || c.emails?.[0]?.address || '',
+            company: c.company?.name || '',
+            country: c.country || '',
+          })).filter((c: ContactRecord) => c.email)
+          setContacts(rows)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [audienceTab])
 
   const parsedEmails = pastedEmails
     .split(/[\n,;]+/)
@@ -34,8 +58,7 @@ export function StepAudience() {
     : selectedContactIds.length
 
   const canProceed = totalAudience > 0
-
-  const allSelected = selectedContactIds.length === MOCK_CONTACTS.length
+  const allSelected = contacts.length > 0 && selectedContactIds.length === contacts.length
 
   return (
     <div className="space-y-6">
@@ -44,7 +67,6 @@ export function StepAudience() {
         <p className="mt-1 text-sm text-gray-500">粘贴邮箱或从已有联系人中选择</p>
       </div>
 
-      {/* Tab switcher */}
       <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
         <button
           type="button"
@@ -74,102 +96,97 @@ export function StepAudience() {
         </button>
       </div>
 
-      {/* Tab content */}
       {audienceTab === 'paste' ? (
         <div className="space-y-3">
           <Label htmlFor="pastedEmails">邮箱地址</Label>
           <Textarea
             id="pastedEmails"
             rows={8}
-            placeholder={'hans@mueller-auto.de\nsarah.j@precisionparts.co.uk\ntanaka@tokyo-mfg.jp\n\n支持每行一个邮箱，也可用逗号或分号分隔'}
+            placeholder={'每行一个邮箱，或用逗号/分号分隔\n例：\nbuyer@company.com\nsales@example.de'}
             value={pastedEmails}
             onChange={(e) => setPastedEmails(e.target.value)}
-            className="font-mono text-sm"
           />
-          {parsedEmails.length > 0 && (
-            <p className="text-sm text-green-600">
-              ✓ 已识别 {parsedEmails.length} 个有效邮箱
-            </p>
-          )}
+          <p className="text-sm text-gray-500">
+            已识别 <span className="font-semibold text-blue-600">{parsedEmails.length}</span> 个有效邮箱
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label>选择联系人</Label>
+            <p className="text-sm text-gray-500">
+              已选 {selectedContactIds.length} / {contacts.length} 位联系人
+            </p>
             <div className="flex gap-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={() => allSelected ? clearContacts() : selectAllContacts(MOCK_CONTACTS.map((c) => c.id))}
+                onClick={() => selectAllContacts(contacts.map((c) => c.id))}
+                disabled={loading || contacts.length === 0}
               >
-                {allSelected ? '取消全选' : '全选'}
+                全选
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearContacts}>
+                清空
               </Button>
             </div>
           </div>
 
-          <div className="divide-y divide-gray-100 rounded-xl border border-gray-200">
-            {MOCK_CONTACTS.map((contact) => {
-              const isSelected = selectedContactIds.includes(contact.id)
-              return (
-                <button
-                  key={contact.id}
-                  type="button"
-                  onClick={() => toggleContact(contact.id)}
-                  className={cn(
-                    'flex w-full items-center gap-4 px-5 py-3.5 text-left transition-all duration-200',
-                    isSelected ? 'bg-blue-50' : 'hover:bg-gray-50',
-                  )}
-                >
-                  {/* Checkbox */}
-                  <span
+          {loading ? (
+            <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              加载联系人...
+            </div>
+          ) : contacts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-500">暂无联系人，请先在客户管理中添加</p>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto rounded-xl border border-gray-200 p-2">
+              {contacts.map((contact) => {
+                const selected = selectedContactIds.includes(contact.id)
+                return (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => toggleContact(contact.id)}
                     className={cn(
-                      'flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-all',
-                      isSelected
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-gray-300 bg-white',
+                      'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all',
+                      selected
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-transparent bg-gray-50 hover:bg-gray-100',
                     )}
                   >
-                    {isSelected && <Check className="h-3 w-3" />}
-                  </span>
-
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-900">{contact.name}</p>
-                    <p className="text-xs text-gray-500">{contact.email}</p>
-                  </div>
-
-                  {/* Company + Country */}
-                  <div className="hidden text-right sm:block">
-                    <p className="text-sm text-gray-700">{contact.company}</p>
-                    <p className="text-xs text-gray-400">{contact.country}</p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {selectedContactIds.length > 0 && (
-            <p className="text-sm text-blue-600">
-              已选择 {selectedContactIds.length} 位联系人
-            </p>
+                    <div
+                      className={cn(
+                        'flex h-5 w-5 shrink-0 items-center justify-center rounded border',
+                        selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white',
+                      )}
+                    >
+                      {selected && <Check className="h-3 w-3" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{contact.name}</p>
+                      <p className="truncate text-xs text-gray-500">{contact.email}</p>
+                    </div>
+                    <div className="hidden shrink-0 text-right sm:block">
+                      <p className="truncate text-xs text-gray-500">{contact.company}</p>
+                      <p className="text-xs text-gray-400">{contact.country}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
       )}
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex items-center justify-between border-t border-gray-100 pt-6">
         <Button type="button" variant="outline" onClick={prevStep} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           上一步
         </Button>
         <div className="flex items-center gap-4">
-          {totalAudience > 0 && (
-            <span className="text-sm text-gray-500">
-              共 {totalAudience} 位收件人
-            </span>
-          )}
-          <Button type="button" onClick={nextStep} disabled={!canProceed} className="gap-2">
+          <span className="text-sm text-gray-500">共 {totalAudience} 位收件人</span>
+          <Button onClick={nextStep} disabled={!canProceed} className="gap-2">
             下一步：AI 写信
             <ArrowRight className="h-4 w-4" />
           </Button>

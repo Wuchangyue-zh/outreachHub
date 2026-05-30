@@ -35,20 +35,119 @@ export function StepAiWriter() {
     isGenerating, setIsGenerating,
     prevStep,
     campaignName, targetTags, pastedEmails, selectedContactIds,
+    audienceTab, senderAccountId,
   } = useCampaignWizardStore()
 
   const router = useRouter()
   const [copied, setCopied] = useState(false)
   const [launching, setLaunching] = useState(false)
-  const [cursorPos, setCursorPos] = useState<number | null>(null)
+  const [launchError, setLaunchError] = useState('')
   const textareaRef = { current: null as HTMLTextAreaElement | null }
 
-  const handleLaunch = () => {
+  /** 从粘贴邮箱解析或查找/创建联系人，返回 contactIds */
+  async function resolveContactIds(): Promise<string[]> {
+    if (audienceTab === 'contacts') {
+      return selectedContactIds
+    }
+
+    const emails = pastedEmails
+      .split(/[\n,;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e && e.includes('@'))
+
+    const ids: string[] = []
+
+    for (const email of emails) {
+      // 先查是否已有联系人
+      const searchRes = await fetch(`/api/contacts?search=${encodeURIComponent(email)}&limit=5`)
+      const searchJson = await searchRes.json()
+      const existing = searchJson.success
+        ? (searchJson.data || []).find((c: any) =>
+            c.emails?.some((e: any) => e.address.toLowerCase() === email)
+          )
+        : null
+
+      if (existing) {
+        ids.push(existing.id)
+        continue
+      }
+
+      // 创建简易联系人
+      const localPart = email.split('@')[0]
+      const createRes = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: localPart,
+          emails: [email],
+          tags: targetTags ? targetTags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        }),
+      })
+      const createJson = await createRes.json()
+      if (createJson.success && createJson.data?.id) {
+        ids.push(createJson.data.id)
+      }
+    }
+
+    return ids
+  }
+
+  const handleLaunch = async () => {
+    if (!generatedEmail.trim() || !senderAccountId) return
     setLaunching(true)
-    // Mock save — in production this would POST to /api/campaigns
-    setTimeout(() => {
+    setLaunchError('')
+
+    try {
+      const contactIds = await resolveContactIds()
+      if (contactIds.length === 0) {
+        setLaunchError('没有有效的收件人，请返回上一步添加联系人')
+        return
+      }
+
+      // 从生成内容提取主题（首行非空）或使用任务名
+      const lines = generatedEmail.trim().split('\n').filter(Boolean)
+      const subjectLine = lines.find((l) => !l.startsWith('{{') && l.length < 120) || `Re: ${campaignName}`
+      const htmlContent = generatedEmail.replace(/\n/g, '<br/>')
+
+      const createRes = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: campaignName,
+          subject: subjectLine,
+          content: generatedEmail,
+          htmlContent,
+          emailAccountId: senderAccountId,
+          contactIds,
+          type: 'SINGLE',
+          status: 'DRAFT',
+        }),
+      })
+      const createJson = await createRes.json()
+      if (!createRes.ok || !createJson.success) {
+        setLaunchError(createJson.message || createJson.error || '创建活动失败')
+        return
+      }
+
+      const launchRes = await fetch(`/api/campaigns/${createJson.data.id}/launch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const launchJson = await launchRes.json()
+      if (!launchRes.ok || !launchJson.success) {
+        setLaunchError(launchJson.message || launchJson.error || '启动活动失败')
+        router.push('/campaigns')
+        return
+      }
+
       router.push('/campaigns')
-    }, 600)
+    } catch (e) {
+      console.error('Launch failed:', e)
+      setLaunchError('启动失败，请稍后重试')
+    } finally {
+      setLaunching(false)
+    }
   }
 
   const handleGenerate = async () => {
@@ -227,10 +326,6 @@ export function StepAiWriter() {
             rows={14}
             value={generatedEmail}
             onChange={(e) => setGeneratedEmail(e.target.value)}
-            onClick={(e) => {
-              const target = e.target as HTMLTextAreaElement
-              setCursorPos(target.selectionStart)
-            }}
             className="font-mono text-sm leading-relaxed"
           />
 
@@ -254,7 +349,7 @@ export function StepAiWriter() {
           <Button
             type="button"
             onClick={handleLaunch}
-            disabled={launching}
+            disabled={launching || !generatedEmail.trim() || !senderAccountId}
             className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             size="lg"
           >
@@ -272,6 +367,9 @@ export function StepAiWriter() {
           </Button>
         </div>
       </div>
+      {launchError && (
+        <p className="text-sm text-red-600 text-right">{launchError}</p>
+      )}
     </div>
   )
 }
