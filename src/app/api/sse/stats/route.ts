@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, tenantWhere } from '@/lib/auth-middleware'
 import { emailEvents, type EmailEvent } from '@/lib/events'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
     if (!authResult.success) {
       return new Response('Unauthorized', { status: 401 })
     }
+
+    const tenantId = authResult.tenantId
 
     const encoder = new TextEncoder()
     let interval: ReturnType<typeof setInterval> | null = null
@@ -49,6 +51,7 @@ export async function GET(req: NextRequest) {
         // Listen for real-time email events
         unsubscribe = emailEvents.on('*' as any, (event: EmailEvent) => {
           if (closed) return
+          if (tenantId && event.tenantId && event.tenantId !== tenantId) return
           const { type: eventType, ...rest } = event
           safeEnqueue(`data: ${JSON.stringify({ type: 'email_event', eventType, ...rest })}\n\n`)
         })
@@ -58,13 +61,15 @@ export async function GET(req: NextRequest) {
           if (closed) return
 
           try {
+            const tenantFilter = tenantId ? { campaign: { tenantId } } : {}
             const [contactsCount, campaignsCount, emailLogsCount] = await Promise.all([
-              prisma.contact.count(),
-              prisma.campaign.count(),
-              prisma.emailLog.count(),
+              prisma.contact.count({ where: tenantWhere(tenantId) }),
+              prisma.campaign.count({ where: tenantWhere(tenantId) }),
+              prisma.emailLog.count({ where: tenantFilter }),
             ])
 
             const recentEmailLogs = await prisma.emailLog.findMany({
+              where: tenantFilter,
               take: 10,
               orderBy: { createdAt: 'desc' },
               select: {

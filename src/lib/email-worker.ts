@@ -8,6 +8,9 @@ import { applyEmailVariables, buildContactVariables } from './email-variables'
 import type { EmailJobData } from './email-queue'
 import { maybeMarkCampaignCompleted } from './campaign-completion'
 import { isPermanentBounce, markAsBounced } from './bounce-handler'
+import { getWorkerConcurrency, getWorkerRateLimit } from './env'
+import { incrementTenantStat } from './stats-aggregate'
+import { updateCampaignContactStatus } from './campaign-contacts'
 
 async function processEmailJob(job: Job<EmailJobData>) {
   const {
@@ -161,6 +164,16 @@ async function processEmailJob(job: Job<EmailJobData>) {
     // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (campaignId) {
       await maybeMarkCampaignCompleted(campaignId)
+      if (contactId) {
+        await updateCampaignContactStatus(campaignId, contactId, 'SENT').catch(() => {})
+      }
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: campaignId },
+        select: { tenantId: true },
+      })
+      if (campaign?.tenantId) {
+        await incrementTenantStat(campaign.tenantId, 'emailsSent')
+      }
     }
 
     // #14: 发送成功时小幅恢复账户健康度（上限由 select-email-account 控制）
@@ -216,18 +229,20 @@ async function processEmailJob(job: Job<EmailJobData>) {
   }
 }
 
+
 export function createEmailWorker() {
   const connection = getRedisConnection()
   if (!connection) {
     throw new Error('Redis is not configured. Set REDIS_URL or REDIS_HOST in .env to run the email worker.')
   }
 
+  const rateLimit = getWorkerRateLimit()
   const worker = new Worker<EmailJobData>('email-queue', processEmailJob, {
     connection,
-    concurrency: 5, // Process 5 emails concurrently
+    concurrency: getWorkerConcurrency(5),
     limiter: {
-      max: 100, // Max 100 jobs
-      duration: 60000, // Per minute
+      max: rateLimit.max,
+      duration: rateLimit.duration,
     },
   })
 

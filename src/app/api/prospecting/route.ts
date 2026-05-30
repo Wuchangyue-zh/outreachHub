@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import * as rocketreach from '@/lib/rocketreach'
-import { generateCustomerProfile } from '@/lib/openai'
+import { generateCustomerProfile, generateKeywordSuggestions, generatePositionSuggestions } from '@/lib/openai'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,13 +35,45 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === 'create-prospecting-task') {
+      const taskData = body.taskData || {}
+      const keywords: string[] = taskData.keywords || []
+      const positions: string[] = taskData.positions || []
+      const industries: string[] = taskData.industries || []
+      if (keywords.length === 0 && positions.length === 0 && industries.length === 0) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_ERROR,
+          '请至少填写关键词、行业或目标职位之一',
+          400
+        )
+      }
       const task = await prisma.prospectingTask.create({
         data: {
-          ...body.taskData,
+          ...taskData,
           tenantId: auth.tenantId,
+          status: taskData.status || 'PENDING',
         },
       })
       return NextResponse.json({ success: true, data: task })
+    }
+
+    // #27: AI 拓词建议
+    if (type === 'suggest-keywords') {
+      const { industry, productDescription, existingKeywords } = body.params || {}
+      if (!industry) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供行业信息', 400)
+      }
+      const suggestions = await generateKeywordSuggestions({ industry, productDescription, existingKeywords })
+      return NextResponse.json({ success: true, data: { suggestions } })
+    }
+
+    // #27: AI 职位建议
+    if (type === 'suggest-positions') {
+      const { industry, targetLevel } = body.params || {}
+      if (!industry) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供行业信息', 400)
+      }
+      const suggestions = await generatePositionSuggestions({ industry, targetLevel })
+      return NextResponse.json({ success: true, data: { suggestions } })
     }
 
     // P1-8: 将 RocketReach 搜索结果入库
@@ -208,6 +240,7 @@ export async function GET(req: NextRequest) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
 
     const { searchParams } = new URL(req.url)
     const page = parseInt(searchParams.get('page') || '1')

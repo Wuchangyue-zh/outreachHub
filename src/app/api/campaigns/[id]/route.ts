@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { replaceCampaignContacts } from '@/lib/campaign-contacts'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -111,6 +112,10 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       where: { id, tenantId: auth.tenantId },
       data: updateData,
     })
+
+    if (body.contactIds !== undefined && Array.isArray(body.contactIds)) {
+      await replaceCampaignContacts(campaign.id, body.contactIds)
+    }
 
     return NextResponse.json({ success: true, data: campaign })
   } catch (error) {

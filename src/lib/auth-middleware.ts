@@ -14,6 +14,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   OWNER: ['*'], // 所有权限
   ADMIN: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'settings:manage', 'inbox:manage', 'reports:view'],
   MANAGER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view'],
+  USER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view'],
   MEMBER: ['campaigns:view', 'contacts:view', 'templates:view', 'inbox:manage'],
   VIEWER: ['campaigns:view', 'contacts:view', 'templates:view', 'reports:view'],
 }
@@ -98,8 +99,14 @@ export async function verifyAuthToken(req: NextRequest): Promise<AuthResult> {
  * 辅助函数：构建需要 tenantId 的 Prisma where 子句
  * 如果用户没有租户，则返回永远不匹配的条件（安全默认值）
  */
-export function tenantWhere(baseFilter: Record<string, any> = {}): Record<string, any> {
-  return baseFilter
+export function tenantWhere(
+  tenantId: string | undefined,
+  baseFilter: Record<string, unknown> = {}
+): Record<string, unknown> {
+  if (!tenantId) {
+    return { ...baseFilter, id: '__no_tenant__' }
+  }
+  return { ...baseFilter, tenantId }
 }
 
 /**

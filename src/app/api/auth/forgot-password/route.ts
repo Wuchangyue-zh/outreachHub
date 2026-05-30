@@ -12,7 +12,7 @@ function getAppBaseUrl() {
 }
 
 export async function POST(req: NextRequest) {
-  const rateLimitResult = limiter.check(req, 5)
+  const rateLimitResult = await limiter.check(req, 5)
   if (rateLimitResult) return rateLimitResult
 
   try {

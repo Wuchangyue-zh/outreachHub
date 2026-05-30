@@ -1,55 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getRedis } from './redis'
 
 interface RateLimitConfig {
-  interval: number // 时间窗口（毫秒）
-  uniqueTokenPerInterval: number // 每个时间窗口内的唯一请求数
+  interval: number
+  uniqueTokenPerInterval: number
 }
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number
-    lastReset: number
+interface MemoryEntry {
+  count: number
+  lastReset: number
+}
+
+const memoryStore: Record<string, MemoryEntry> = {}
+
+const REDIS_PREFIX = 'ratelimit:'
+
+async function redisRateLimitCheck(
+  key: string,
+  limit: number,
+  intervalMs: number
+): Promise<{ allowed: boolean; retryAfter: number }> {
+  const client = getRedis()
+  if (!client) {
+    return memoryRateLimitCheck(key, limit, intervalMs)
+  }
+
+  const redisKey = `${REDIS_PREFIX}${key}`
+  const windowSec = Math.ceil(intervalMs / 1000)
+
+  try {
+    const count = await client.incr(redisKey)
+    if (count === 1) {
+      await client.expire(redisKey, windowSec)
+    }
+    if (count > limit) {
+      const ttl = await client.ttl(redisKey)
+      return { allowed: false, retryAfter: ttl > 0 ? ttl : windowSec }
+    }
+    return { allowed: true, retryAfter: 0 }
+  } catch {
+    return memoryRateLimitCheck(key, limit, intervalMs)
   }
 }
 
-const store: RateLimitStore = {}
+function memoryRateLimitCheck(
+  key: string,
+  limit: number,
+  intervalMs: number
+): { allowed: boolean; retryAfter: number } {
+  const now = Date.now()
+  if (!memoryStore[key] || now - memoryStore[key].lastReset > intervalMs) {
+    memoryStore[key] = { count: 1, lastReset: now }
+    return { allowed: true, retryAfter: 0 }
+  }
+  if (memoryStore[key].count >= limit) {
+    const retryAfter = Math.ceil((intervalMs - (now - memoryStore[key].lastReset)) / 1000)
+    return { allowed: false, retryAfter }
+  }
+  memoryStore[key].count++
+  return { allowed: true, retryAfter: 0 }
+}
 
 export function rateLimit(config: RateLimitConfig = { interval: 60000, uniqueTokenPerInterval: 100 }) {
   return {
-    check: (req: NextRequest, limit: number = 10): NextResponse | null => {
-      // Disable rate limiting in test environment
+    check: async (req: NextRequest, limit: number = 10): Promise<NextResponse | null> => {
       if (process.env.DISABLE_RATE_LIMIT === 'true') {
         return null
       }
 
-      const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'anonymous'
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || req.headers.get('x-real-ip')
+        || 'anonymous'
       const key = `${ip}:${req.nextUrl.pathname}`
-      const now = Date.now()
 
-      if (!store[key] || now - store[key].lastReset > config.interval) {
-        store[key] = { count: 1, lastReset: now }
-        return null
-      }
-
-      if (store[key].count >= limit) {
+      const result = await redisRateLimitCheck(key, limit, config.interval)
+      if (!result.allowed) {
         return NextResponse.json(
           { error: '请求过于频繁，请稍后再试' },
-          { status: 429, headers: { 'Retry-After': String(Math.ceil(config.interval / 1000)) } }
+          {
+            status: 429,
+            headers: { 'Retry-After': String(result.retryAfter || Math.ceil(config.interval / 1000)) },
+          }
         )
       }
-
-      store[key].count++
       return null
     },
   }
 }
 
-// 定期清理过期的记录
-setInterval(() => {
-  const now = Date.now()
-  for (const key in store) {
-    if (now - store[key].lastReset > 300000) {
-      delete store[key]
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now()
+    for (const key in memoryStore) {
+      if (now - memoryStore[key].lastReset > 300000) {
+        delete memoryStore[key]
+      }
     }
-  }
-}, 60000)
+  }, 60000)
+}

@@ -109,10 +109,14 @@ export async function cacheDeletePattern(pattern: string): Promise<void> {
   if (!client) return
 
   try {
-    const keys = await client.keys(pattern)
-    if (keys.length > 0) {
-      await client.del(...keys)
-    }
+    let cursor = '0'
+    do {
+      const [nextCursor, keys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+      cursor = nextCursor
+      if (keys.length > 0) {
+        await client.del(...keys)
+      }
+    } while (cursor !== '0')
   } catch (error) {
     console.error('Cache delete pattern error:', error)
   }

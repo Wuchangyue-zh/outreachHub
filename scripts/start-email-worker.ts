@@ -1,20 +1,25 @@
 #!/usr/bin/env node
+import { validateEnv } from '../src/lib/env'
 import { createEmailWorker } from '../src/lib/email-worker'
+import { startWorkerHealthServer } from '../src/lib/worker-health'
+import { getWorkerConcurrency, getWorkerRateLimit } from '../src/lib/env'
 
+validateEnv()
+
+const rateLimit = getWorkerRateLimit()
 console.log('Starting Email Worker...')
 console.log('========================')
-console.log(`Redis Host: ${process.env.REDIS_HOST || 'localhost'}`)
-console.log(`Redis Port: ${process.env.REDIS_PORT || '6379'}`)
-console.log(`Concurrency: 5`)
-console.log(`Rate Limit: 100 emails/minute`)
+console.log(`Redis URL: ${process.env.REDIS_URL ? 'configured' : 'missing'}`)
+console.log(`Concurrency: ${getWorkerConcurrency(5)}`)
+console.log(`Rate Limit: ${rateLimit.max} emails / ${rateLimit.duration}ms`)
 console.log('========================')
 
 const worker = createEmailWorker()
+startWorkerHealthServer()
 
 console.log('Email Worker started successfully!')
 console.log('Waiting for email jobs...')
 
-// Handle graceful shutdown
 const shutdown = async (signal: string) => {
   console.log(`\n[${signal}] Shutting down email worker...`)
   await worker.close()
@@ -25,7 +30,6 @@ const shutdown = async (signal: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'))
 process.on('SIGINT', () => shutdown('SIGINT'))
 
-// Keep the process running
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error)
   process.exit(1)

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
-import { ensureUploadDirs, generateFilename, validateFile, ATTACHMENT_DIR } from '@/lib/upload'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { generateFilename, validateFile, uploadFile } from '@/lib/upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +12,6 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.UNAUTHORIZED, 'Unauthorized', 401)
     }
 
-    await ensureUploadDirs()
-
     const formData = await req.formData()
     const file = formData.get('file') as File
 
@@ -23,7 +19,6 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, 'No file provided', 400)
     }
 
-    // Validate
     const validationError = validateFile({
       originalname: file.name,
       mimetype: file.type,
@@ -34,25 +29,25 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, validationError, 400)
     }
 
-    // Generate filename and save
     const filename = generateFilename(file.name)
-    const filePath = path.join(ATTACHMENT_DIR, filename)
     const buffer = Buffer.from(await file.arrayBuffer())
-    await fs.writeFile(filePath, buffer)
-
-    // Return URL
-    const url = `/uploads/attachments/${filename}`
+    const uploaded = await uploadFile({
+      folder: 'attachments',
+      filename,
+      buffer,
+      contentType: file.type,
+    })
 
     return NextResponse.json({
       success: true,
       data: {
-        url,
-        filename,
-        size: file.size,
-        mimeType: file.type,
+        url: uploaded.url,
+        filename: uploaded.filename,
+        size: uploaded.size,
+        mimeType: uploaded.mimeType,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Attachment upload error:', error)
     return errorResponse(ErrorCodes.INTERNAL_ERROR, '附件上传失败', 500)
   }

@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL 数据库
   postgres:
     image: postgres:15-alpine
     container_name: outreachhub-postgres
@@ -20,7 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis（用于 BullMQ 邮件队列）
   redis:
     image: redis:7-alpine
     container_name: outreachhub-redis
@@ -35,27 +33,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Next.js 应用（可选 - 本地开发通常直接 npm run dev）
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: outreachhub-app
-  #   restart: unless-stopped
-  #   ports:
-  #     - "3030:3030"
-  #   environment:
-  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
-  #     REDIS_URL: redis://redis:6379
-  #     NEXTAUTH_SECRET: your-secret-key-change-in-production
-  #     NEXTAUTH_URL: http://localhost:3030
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-
-  # 邮件 Worker（可选 - 独立运行后台任务）
   worker:
     build:
       context: .
@@ -67,11 +44,53 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
       REDIS_URL: redis://redis:6379
+      WORKER_HEALTH_PORT: 8080
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: ["npm", "run", "worker:email"]
+
+  cron-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-cron-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+      WORKER_HEALTH_PORT: 8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "worker:cron"]
+
+  imap-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-imap-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+      IMAP_WORKER_HEALTH_PORT: 8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "worker:imap"]
 
 volumes:
   postgres_data:

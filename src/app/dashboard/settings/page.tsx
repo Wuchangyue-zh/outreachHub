@@ -30,6 +30,10 @@ import {
   Shield,
   Pencil,
   AlertTriangle,
+  Crown,
+  Users,
+  UserPlus,
+  Copy,
 } from 'lucide-react'
 
 const emptyFormData = {
@@ -132,6 +136,19 @@ interface EmailAccount {
   createdAt: string
 }
 
+interface TenantUsage {
+  tenant: { id: string; name: string; plan: string; expiresAt: string | null; createdAt: string }
+  limits: { maxContacts: number; maxUsers: number; maxEmailsPerDay: number }
+  usage: {
+    contactCount: number; userCount: number; emailsSentToday: number; campaignCount: number
+    contactPercent: number; emailPercent: number; userPercent: number
+  }
+  members: Array<{ id: string; email: string; name: string | null; role: string; avatar: string | null; createdAt: string }>
+}
+
+const PLAN_LABELS: Record<string, string> = { FREE: '免费版', BASIC: '基础版', PRO: '专业版', ENTERPRISE: '企业版' }
+const PLAN_COLORS: Record<string, string> = { FREE: 'bg-gray-100 text-gray-700', BASIC: 'bg-blue-100 text-blue-700', PRO: 'bg-purple-100 text-purple-700', ENTERPRISE: 'bg-amber-100 text-amber-700' }
+
 export default function SettingsPage() {
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -141,6 +158,12 @@ export default function SettingsPage() {
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testEmail, setTestEmail] = useState('')
   const [formData, setFormData] = useState(emptyFormData)
+
+  // #46: 租户套餐与用量
+  const [tenantData, setTenantData] = useState<TenantUsage | null>(null)
+  const [tenantLoading, setTenantLoading] = useState(true)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
 
   // 加载邮件账户列表
   const loadAccounts = async () => {
@@ -157,8 +180,41 @@ export default function SettingsPage() {
     }
   }
 
+  // #46: 加载租户用量
+  const loadTenantUsage = async () => {
+    try {
+      const res = await fetch('/api/tenant/usage')
+      const data = await res.json()
+      if (data.success) setTenantData(data.data)
+    } catch { /* silent */ } finally {
+      setTenantLoading(false)
+    }
+  }
+
+  // #47: 邀请成员
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const res = await fetch('/api/tenant/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`邀请已发送至 ${inviteEmail}`)
+        setInviteEmail('')
+        loadTenantUsage()
+      } else {
+        toast.error(data.error?.message || data.error || '邀请失败')
+      }
+    } catch { toast.error('邀请失败') } finally { setInviting(false) }
+  }
+
   useEffect(() => {
     loadAccounts()
+    loadTenantUsage()
   }, [])
 
   const resetForm = () => {
@@ -640,19 +696,98 @@ export default function SettingsPage() {
             )}
           </TabsContent>
 
-          {/* 通用设置 */}
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>通用设置</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500">通用设置功能开发中...</p>
-              </CardContent>
-            </Card>
+          {/* 通用设置 — 套餐 / 用量 / 团队 */}
+          <TabsContent value="general" className="space-y-6">
+            {tenantLoading ? (
+              <div className="text-center py-8"><RefreshCw className="h-6 w-6 animate-spin mx-auto text-gray-400" /></div>
+            ) : tenantData ? (
+              <>
+                {/* 套餐信息 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Crown className="h-5 w-5" /> 套餐信息
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${PLAN_COLORS[tenantData.tenant.plan] || PLAN_COLORS.FREE}`}>
+                        {PLAN_LABELS[tenantData.tenant.plan] || tenantData.tenant.plan}
+                      </span>
+                      <span className="text-sm text-gray-500">企业：{tenantData.tenant.name}</span>
+                    </div>
+
+                    {/* 用量进度条 */}
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <UsageMeter label="联系人" current={tenantData.usage.contactCount} max={tenantData.limits.maxContacts} percent={tenantData.usage.contactPercent} />
+                      <UsageMeter label="今日发信" current={tenantData.usage.emailsSentToday} max={tenantData.limits.maxEmailsPerDay} percent={tenantData.usage.emailPercent} />
+                      <UsageMeter label="团队成员" current={tenantData.usage.userCount} max={tenantData.limits.maxUsers} percent={tenantData.usage.userPercent} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 团队成员 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" /> 团队成员（{tenantData.members.length}）
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* 邀请成员 */}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="输入邮箱地址邀请成员"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        type="email"
+                        className="flex-1"
+                      />
+                      <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className="gap-1">
+                        {inviting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                        邀请
+                      </Button>
+                    </div>
+
+                    {/* 成员列表 */}
+                    <div className="divide-y divide-gray-100">
+                      {tenantData.members.map((m) => (
+                        <div key={m.id} className="flex items-center gap-3 py-3">
+                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                            {(m.name || m.email)[0]?.toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{m.name || m.email.split('@')[0]}</p>
+                            <p className="text-xs text-gray-500 truncate">{m.email}</p>
+                          </div>
+                          <span className="text-xs text-gray-400">{m.role}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card><CardContent className="py-8 text-center text-gray-500">无法加载套餐信息</CardContent></Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
+  )
+}
+
+function UsageMeter({ label, current, max, percent }: { label: string; current: number; max: number; percent: number }) {
+  const color = percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-amber-500' : 'bg-blue-500'
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-gray-600">{label}</span>
+        <span className="font-medium text-gray-900">{current.toLocaleString()} / {max.toLocaleString()}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-gray-100">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(percent, 100)}%` }} />
+      </div>
+    </div>
   )
 }

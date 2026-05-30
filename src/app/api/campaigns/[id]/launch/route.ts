@@ -5,6 +5,8 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { addBulkEmailJobs, addEmailJob } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
 import { getAvailableAccount } from '@/lib/select-email-account'
+import { checkDailyEmailLimit } from '@/lib/plan-limits'
+import { getCampaignContactIds } from '@/lib/campaign-contacts'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -38,7 +40,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, `无法从 ${campaign.status} 状态启动`, 400)
     }
 
-    if (!campaign.contactIds?.length) {
+    const campaignContactIds = await getCampaignContactIds(campaign.id)
+    if (!campaignContactIds.length) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '请先为该活动添加目标联系人', 400)
     }
 
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     const contacts = await prisma.contact.findMany({
       where: {
-        id: { in: campaign.contactIds },
+        id: { in: campaignContactIds },
         tenantId: auth.tenantId,
       },
       include: {
@@ -100,6 +103,27 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     if (contacts.length === 0) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '未找到有效的联系人', 400)
+    }
+
+    // #46: 检查租户每日发信限额（按本次实际待发送数量）
+    const alreadySentForLimit = await prisma.emailLog.findMany({
+      where: {
+        campaignId: campaign.id,
+        status: { in: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'] },
+      },
+      select: { contactId: true },
+    })
+    const sentForLimitIds = new Set(alreadySentForLimit.map((log) => log.contactId))
+    const pendingForLimit = contacts.filter((c) => !sentForLimitIds.has(c.id))
+    const maxQueueForLimit = campaign.throttlePerDay || 200
+    const emailsToAdd = Math.min(pendingForLimit.length, maxQueueForLimit)
+    const emailLimit = await checkDailyEmailLimit(auth.tenantId!, emailsToAdd)
+    if (!emailLimit.allowed) {
+      return errorResponse(
+        ErrorCodes.FORBIDDEN,
+        `今日发信量已达上限（${emailLimit.current}/${emailLimit.max}），请升级套餐或等待明日重置`,
+        403
+      )
     }
 
     // #8: A/B 测试 — 50/50 分流，两变体各发一半联系人

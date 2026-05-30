@@ -3,11 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
+import { checkContactLimit } from '@/lib/plan-limits'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function GET(req: NextRequest) {
-  const rateLimitResult = limiter.check(req, 30)
+  const rateLimitResult = await limiter.check(req, 30)
   if (rateLimitResult) return rateLimitResult
 
   try {
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const rateLimitResult = limiter.check(req, 10)
+  const rateLimitResult = await limiter.check(req, 10)
   if (rateLimitResult) return rateLimitResult
 
   try {
@@ -75,6 +76,16 @@ export async function POST(req: NextRequest) {
     // #48: 创建联系人需要 contacts:manage 权限
     if (!hasPermission(auth.role, 'contacts:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
+
+    // #46: 检查联系人数量限额
+    const limitCheck = await checkContactLimit(auth.tenantId)
+    if (!limitCheck.allowed) {
+      return errorResponse(
+        ErrorCodes.FORBIDDEN,
+        `联系人数量已达上限（${limitCheck.current}/${limitCheck.max}），请升级套餐`,
+        403
+      )
     }
 
     const body = await req.json()

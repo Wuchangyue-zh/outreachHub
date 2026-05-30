@@ -391,6 +391,86 @@ Return a structured analysis with:
   return completion.choices[0]?.message?.content || ''
 }
 
+/**
+ * #27: AI 拓词建议 — 根据行业/产品生成相关搜索关键词
+ */
+export async function generateKeywordSuggestions(input: {
+  industry: string
+  productDescription?: string
+  existingKeywords?: string[]
+}): Promise<string[]> {
+  const completion = await createChatCompletion(
+    [
+      {
+        role: 'system',
+        content: 'You are a B2B market research expert. Generate targeted search keywords for finding potential business leads. Return a JSON array of keyword strings, nothing else.',
+      },
+      {
+        role: 'user',
+        content: `Industry: ${input.industry}
+${input.productDescription ? `Product: ${input.productDescription}` : ''}
+${input.existingKeywords?.length ? `Existing keywords: ${input.existingKeywords.join(', ')}` : ''}
+
+Generate 10-15 search keywords (English) that would help find potential buyers/importers in this industry. Focus on:
+1. Product category names
+2. Industry-specific terms
+3. Buyer role titles
+4. Trade/commerce terms
+
+Return ONLY a JSON array of strings, e.g. ["keyword1", "keyword2"]`,
+      },
+    ],
+    { temperature: 0.8, max_tokens: 400 }
+  )
+
+  try {
+    const content = completion.choices[0]?.message?.content || '[]'
+    const match = content.match(/\[[\s\S]*\]/)
+    return match ? JSON.parse(match[0]) : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * #27: AI 职位建议 — 根据目标行业生成相关决策者职位
+ */
+export async function generatePositionSuggestions(input: {
+  industry: string
+  targetLevel?: string
+}): Promise<string[]> {
+  const completion = await createChatCompletion(
+    [
+      {
+        role: 'system',
+        content: 'You are a B2B sales strategist. Generate job title suggestions for targeting decision makers. Return a JSON array of title strings, nothing else.',
+      },
+      {
+        role: 'user',
+        content: `Industry: ${input.industry}
+Target level: ${input.targetLevel || 'decision makers'}
+
+Generate 8-12 job titles (English) that are key decision makers or influencers for B2B purchasing in this industry. Include:
+1. C-level executives
+2. VP/Director level
+3. Department heads
+4. Procurement/purchasing roles
+
+Return ONLY a JSON array of strings.`,
+      },
+    ],
+    { temperature: 0.8, max_tokens: 300 }
+  )
+
+  try {
+    const content = completion.choices[0]?.message?.content || '[]'
+    const match = content.match(/\[[\s\S]*\]/)
+    return match ? JSON.parse(match[0]) : []
+  } catch {
+    return []
+  }
+}
+
 function buildEmailPrompt(input: EmailGenerationInput): string {
   const languageMap: Record<string, string> = {
     en: 'English',

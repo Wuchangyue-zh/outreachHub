@@ -1,0 +1,111 @@
+import { prisma } from './prisma'
+
+export interface PlanLimits {
+  maxContacts: number
+  maxUsers: number
+  maxEmailsPerDay: number
+}
+
+export interface UsageInfo {
+  contactCount: number
+  userCount: number
+  emailsSentToday: number
+  campaignCount: number
+}
+
+// 各套餐默认限额
+const PLAN_DEFAULTS: Record<string, PlanLimits> = {
+  FREE: { maxContacts: 1000, maxUsers: 1, maxEmailsPerDay: 50 },
+  BASIC: { maxContacts: 10000, maxUsers: 3, maxEmailsPerDay: 500 },
+  PRO: { maxContacts: 100000, maxUsers: 10, maxEmailsPerDay: 5000 },
+  ENTERPRISE: { maxContacts: 1000000, maxUsers: 50, maxEmailsPerDay: 50000 },
+}
+
+/**
+ * 获取租户的实际限额（优先用 Tenant 表自定义值，否则用套餐默认值）
+ */
+export async function getTenantLimits(tenantId: string): Promise<PlanLimits> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { plan: true, maxContacts: true, maxUsers: true, maxEmailsPerDay: true },
+  })
+  if (!tenant) return PLAN_DEFAULTS.FREE
+
+  const defaults = PLAN_DEFAULTS[tenant.plan] || PLAN_DEFAULTS.FREE
+  // 以套餐默认值为准；Tenant 表字段可高于套餐（Enterprise 定制）
+  return {
+    maxContacts: Math.max(defaults.maxContacts, tenant.maxContacts),
+    maxUsers: Math.max(defaults.maxUsers, tenant.maxUsers),
+    maxEmailsPerDay: Math.max(defaults.maxEmailsPerDay, tenant.maxEmailsPerDay),
+  }
+}
+
+/**
+ * 获取租户当前用量
+ */
+export async function getTenantUsage(tenantId: string): Promise<UsageInfo> {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  const [contactCount, userCount, campaignCount, emailsSentToday] = await Promise.all([
+    prisma.contact.count({ where: { tenantId } }),
+    prisma.user.count({ where: { tenantId } }),
+    prisma.campaign.count({ where: { tenantId } }),
+    prisma.emailLog.count({
+      where: {
+        campaign: { tenantId },
+        sentAt: { gte: todayStart },
+        status: { in: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'] },
+      },
+    }),
+  ])
+
+  return { contactCount, userCount, emailsSentToday, campaignCount }
+}
+
+/**
+ * 检查联系人数量是否超限
+ */
+export async function checkContactLimit(tenantId: string): Promise<{ allowed: boolean; current: number; max: number }> {
+  const [limits, usage] = await Promise.all([
+    getTenantLimits(tenantId),
+    getTenantUsage(tenantId),
+  ])
+  return {
+    allowed: usage.contactCount < limits.maxContacts,
+    current: usage.contactCount,
+    max: limits.maxContacts,
+  }
+}
+
+/**
+ * 检查用户数量是否超限（含待接受邀请）
+ */
+export async function checkUserLimit(tenantId: string): Promise<{ allowed: boolean; current: number; max: number }> {
+  const [limits, usage, pendingInvites] = await Promise.all([
+    getTenantLimits(tenantId),
+    getTenantUsage(tenantId),
+    prisma.invitation.count({ where: { tenantId, status: 'PENDING' } }),
+  ])
+  const reserved = usage.userCount + pendingInvites
+  return {
+    allowed: reserved < limits.maxUsers,
+    current: usage.userCount,
+    max: limits.maxUsers,
+  }
+}
+
+/**
+ * 检查今日发信量是否超限
+ */
+export async function checkDailyEmailLimit(tenantId: string, emailsToAdd: number): Promise<{ allowed: boolean; current: number; max: number }> {
+  const [limits, usage] = await Promise.all([
+    getTenantLimits(tenantId),
+    getTenantUsage(tenantId),
+  ])
+  return {
+    allowed: (usage.emailsSentToday + emailsToAdd) <= limits.maxEmailsPerDay,
+    current: usage.emailsSentToday,
+    max: limits.maxEmailsPerDay,
+  }
+}

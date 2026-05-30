@@ -10,7 +10,7 @@ const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
   // Rate limiting: 3 requests per minute
-  const rateLimitResult = limiter.check(req, 3)
+  const rateLimitResult = await limiter.check(req, 3)
   if (rateLimitResult) return rateLimitResult
 
   try {

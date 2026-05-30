@@ -48,10 +48,37 @@ model Tenant {
   prospectingTasks ProspectingTask[]
   emailTemplates EmailTemplate[]
   products    Product[]
+  invitations Invitation[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([plan])
+}
+
+// #47: 团队邀请
+model Invitation {
+  id          String           @id @default(cuid())
+  email       String
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role        String           @default("USER")
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  invitedBy   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([email])
+  @@index([token])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 // ==================== 邮箱账户 ====================
@@ -197,6 +224,9 @@ model Contact {
   unsubscribedAt      DateTime?
   unsubscribeReason   String?  // 退订原因：manual, reply-unsubscribe, link-click
 
+  campaignContacts    CampaignContact[]
+  emailLogs           EmailLog[]
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -337,6 +367,7 @@ model Campaign {
   completedAt     DateTime?
 
   emailLogs       EmailLog[]
+  campaignContacts CampaignContact[]
 
   @@index([tenantId])
   @@index([status])
@@ -382,6 +413,7 @@ model EmailLog {
   campaign    Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   taskId      String?
   contactId   String
+  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
   fromEmail   String
   toEmail     String
   subject     String
@@ -413,6 +445,24 @@ model EmailLog {
   @@index([status])
   @@index([toEmail])
   @@index([createdAt])
+}
+
+// ==================== Campaign 联系人关联 ====================
+
+model CampaignContact {
+  id          String                @id @default(cuid())
+  campaignId  String
+  campaign    Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status      CampaignContactStatus @default(PENDING)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([status])
 }
 
 // ==================== 拓客任务 ====================
@@ -464,6 +514,7 @@ model ProspectingTask {
 model SearchHistory {
   id          String   @id @default(cuid())
   userId      String
+  tenantId    String?
   type        String   // keyword, position
   value       String
   suggestions Json?
@@ -471,10 +522,21 @@ model SearchHistory {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+  @@index([tenantId])
   @@index([type])
 }
 
 // ==================== 枚举类型 ====================
+
+enum CampaignContactStatus {
+  PENDING
+  SENT
+  OPENED
+  REPLIED
+  BOUNCED
+  FAILED
+  SKIPPED
+}
 
 enum UserRole {
   ADMIN

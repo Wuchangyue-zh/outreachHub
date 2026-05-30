@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
-import { ensureUploadDirs, generateFilename, validateFile, AVATAR_DIR } from '@/lib/upload'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { generateFilename, validateFile, uploadFile } from '@/lib/upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +12,6 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.UNAUTHORIZED, 'Unauthorized', 401)
     }
 
-    await ensureUploadDirs()
-
     const formData = await req.formData()
     const file = formData.get('file') as File
 
@@ -23,7 +19,6 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, 'No file provided', 400)
     }
 
-    // Validate
     const validationError = validateFile({
       originalname: file.name,
       mimetype: file.type,
@@ -34,29 +29,28 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, validationError, 400)
     }
 
-    // Only allow images for avatars
     if (!file.type.startsWith('image/')) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '头像必须是图片文件', 400)
     }
 
-    // Generate filename and save
     const filename = generateFilename(file.name)
-    const filePath = path.join(AVATAR_DIR, filename)
     const buffer = Buffer.from(await file.arrayBuffer())
-    await fs.writeFile(filePath, buffer)
-
-    // Return URL
-    const url = `/uploads/avatars/${filename}`
+    const uploaded = await uploadFile({
+      folder: 'avatars',
+      filename,
+      buffer,
+      contentType: file.type,
+    })
 
     return NextResponse.json({
       success: true,
       data: {
-        url,
-        filename,
-        size: file.size,
+        url: uploaded.url,
+        filename: uploaded.filename,
+        size: uploaded.size,
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Avatar upload error:', error)
     return errorResponse(ErrorCodes.INTERNAL_ERROR, '头像上传失败', 500)
   }

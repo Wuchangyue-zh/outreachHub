@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Search, Building, Globe, Users, Send, Loader2, Download, UserPlus } from 'lucide-react'
+import { Search, Building, Globe, Users, Send, Loader2, Download, UserPlus, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Tab = 'search' | 'task'
+type Tab = 'search' | 'task' | 'tasks'
 
 interface CompanyResult {
   _id: number
@@ -43,6 +43,10 @@ export default function ProspectingPage() {
   const [selectedPersonIds, setSelectedPersonIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
 
+  const [suggesting, setSuggesting] = useState(false)
+  const [tasks, setTasks] = useState<any[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
+
   const [formData, setFormData] = useState({
     keywords: '',
     positions: '',
@@ -51,6 +55,33 @@ export default function ProspectingPage() {
     companySizes: '',
     domain: '',
   })
+
+  const fetchTasks = async () => {
+    setTasksLoading(true)
+    try {
+      const res = await fetch('/api/prospecting?page=1&limit=50')
+      const data = await res.json()
+      if (data.success) setTasks(data.data || [])
+    } catch { /* silent */ } finally {
+      setTasksLoading(false)
+    }
+  }
+
+  const apiErrorMessage = (data: { error?: { message?: string }; message?: string }, fallback: string) =>
+    data.error?.message || data.message || fallback
+
+  // 任务列表 tab：定时刷新进度
+  useEffect(() => {
+    if (tab !== 'tasks') return
+    const id = setInterval(fetchTasks, 8000)
+    return () => clearInterval(id)
+  }, [tab])
+
+  // 切换到 tasks tab 时加载
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab)
+    if (newTab === 'tasks') fetchTasks()
+  }
 
   const handleSearch = async () => {
     setSearching(true)
@@ -214,14 +245,59 @@ export default function ProspectingPage() {
       })
       const data = await res.json()
       if (data.success) {
-        setMessage('拓客任务已创建，等待后台执行')
+        setMessage('拓客任务已创建，等待后台执行（本地可 curl process-prospecting cron）')
+        handleTabChange('tasks')
       } else {
-        setMessage(data.message || '创建任务失败')
+        setMessage(apiErrorMessage(data, '创建任务失败'))
       }
     } catch {
       setMessage('创建任务失败')
     } finally {
       setSearching(false)
+    }
+  }
+
+  // #27: AI 拓词/职位建议
+  const handleAISuggest = async (type: 'keywords' | 'positions') => {
+    const industry = formData.industries.split(',')[0]?.trim() || formData.keywords.split(',')[0]?.trim()
+    if (!industry) {
+      setMessage('请先填写行业或关键词')
+      return
+    }
+    setSuggesting(true)
+    try {
+      const res = await fetch('/api/prospecting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: type === 'keywords' ? 'suggest-keywords' : 'suggest-positions',
+          params: {
+            industry,
+            existingKeywords: formData.keywords.split(',').map((s) => s.trim()).filter(Boolean),
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.success && data.data?.suggestions?.length) {
+        const suggestions = data.data.suggestions as string[]
+        if (type === 'keywords') {
+          const existing = formData.keywords.split(',').map((s) => s.trim()).filter(Boolean)
+          const merged = [...new Set([...existing, ...suggestions])].slice(0, 20)
+          setFormData({ ...formData, keywords: merged.join(', ') })
+          setMessage(`AI 建议了 ${suggestions.length} 个关键词，已添加到列表`)
+        } else {
+          const existing = formData.positions.split(',').map((s) => s.trim()).filter(Boolean)
+          const merged = [...new Set([...existing, ...suggestions])].slice(0, 15)
+          setFormData({ ...formData, positions: merged.join(', ') })
+          setMessage(`AI 建议了 ${suggestions.length} 个职位，已添加到列表`)
+        }
+      } else {
+        setMessage(apiErrorMessage(data, 'AI 未能生成建议，请检查行业信息'))
+      }
+    } catch {
+      setMessage('AI 建议请求失败')
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -252,12 +328,13 @@ export default function ProspectingPage() {
             [
               { id: 'search' as Tab, label: 'RocketReach 搜索', icon: Search },
               { id: 'task' as Tab, label: '创建拓客任务', icon: Send },
+              { id: 'tasks' as Tab, label: '任务列表', icon: Download },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => handleTabChange(id)}
               className={cn(
                 'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
                 tab === id
@@ -286,6 +363,79 @@ export default function ProspectingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {tab === 'tasks' ? (
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" size="sm" onClick={fetchTasks} disabled={tasksLoading}>
+                      {tasksLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      刷新列表
+                    </Button>
+                  </div>
+                  {tasksLoading ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-500">加载中...</p>
+                    </div>
+                  ) : tasks.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>暂无拓客任务</p>
+                      <p className="text-xs text-gray-400 mt-1">切换到「创建拓客任务」开始</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                      {tasks.map((task: any) => {
+                        const statusCfg: Record<string, { label: string; color: string }> = {
+                          DRAFT: { label: '草稿', color: 'bg-gray-100 text-gray-700' },
+                          PENDING: { label: '待执行', color: 'bg-yellow-100 text-yellow-700' },
+                          RUNNING: { label: '执行中', color: 'bg-blue-100 text-blue-700' },
+                          COMPLETED: { label: '已完成', color: 'bg-green-100 text-green-700' },
+                          FAILED: { label: '失败', color: 'bg-red-100 text-red-700' },
+                        }
+                        const cfg = statusCfg[task.status] || statusCfg.DRAFT
+                        const progress = Math.round(task.crawlerProgress || task.progress || 0)
+
+                        return (
+                          <div key={task.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-gray-900 truncate">{task.name}</p>
+                              <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${cfg.color}`}>
+                                {cfg.label}
+                              </span>
+                            </div>
+                            {task.status === 'FAILED' && task.description && (
+                              <p className="text-xs text-red-600">{task.description}</p>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              {task.keywords?.length > 0 && (
+                                <span>关键词: {task.keywords.slice(0, 3).join(', ')}{task.keywords.length > 3 ? '...' : ''}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-gray-200">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    task.status === 'COMPLETED' ? 'bg-green-500' :
+                                    task.status === 'RUNNING' ? 'bg-blue-500' :
+                                    task.status === 'FAILED' ? 'bg-red-500' : 'bg-gray-400'
+                                  }`}
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-500 w-8 text-right">{progress}%</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-400">
+                              <span>公司: {task.totalCompaniesSaved || 0}/{task.totalCompaniesFound || 0}</span>
+                              <span>联系人: {task.totalContactsSaved || 0}/{task.totalContactsFound || 0}</span>
+                              <span>{new Date(task.createdAt).toLocaleDateString('zh-CN')}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+              <>
               {tab === 'search' && (
                 <div className="flex gap-2">
                   <Button
@@ -308,7 +458,22 @@ export default function ProspectingPage() {
               )}
 
               <div>
-                <Label>{searchMode === 'companies' || tab === 'task' ? '关键词 / 公司名' : '公司 / 关键词'}</Label>
+                <div className="flex items-center justify-between">
+                  <Label>{searchMode === 'companies' || tab === 'task' ? '关键词 / 公司名' : '公司 / 关键词'}</Label>
+                  {tab === 'task' && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAISuggest('keywords')}
+                      disabled={suggesting}
+                      className="h-6 gap-1 text-xs text-purple-600 hover:text-purple-700"
+                    >
+                      {suggesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      AI 拓词
+                    </Button>
+                  )}
+                </div>
                 <Input
                   placeholder="例如：SaaS, Acme Corp"
                   value={formData.keywords}
@@ -317,7 +482,22 @@ export default function ProspectingPage() {
               </div>
               {(tab === 'task' || searchMode === 'people') && (
                 <div>
-                  <Label>目标职位（逗号分隔）</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>目标职位（逗号分隔）</Label>
+                    {tab === 'task' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAISuggest('positions')}
+                        disabled={suggesting}
+                        className="h-6 gap-1 text-xs text-purple-600 hover:text-purple-700"
+                      >
+                        {suggesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        AI 职位
+                      </Button>
+                    )}
+                  </div>
                   <Input
                     placeholder="例如：CTO, VP Engineering"
                     value={formData.positions}
@@ -476,6 +656,8 @@ export default function ProspectingPage() {
                     </table>
                   </div>
                 </div>
+              )}
+              </>
               )}
             </CardContent>
           </Card>

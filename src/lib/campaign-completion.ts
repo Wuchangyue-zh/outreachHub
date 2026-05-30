@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { getCampaignContactIds } from './campaign-contacts'
 
 const TERMINAL_STATUSES = [
   'SENT',
@@ -39,12 +40,14 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
   if (campaign.scheduleType === 'RECURRING') return false
   if (campaign.type === 'SEQUENCE') return false
   if (campaign.type === 'AB_TEST') return false
-  if (!campaign.contactIds?.length) return false
+
+  const contactIds = await getCampaignContactIds(campaignId)
+  if (!contactIds.length) return false
 
   const logs = await prisma.emailLog.findMany({
     where: {
       campaignId,
-      contactId: { in: campaign.contactIds },
+      contactId: { in: contactIds },
       status: { in: [...TERMINAL_STATUSES] },
     },
     select: { contactId: true, status: true },
@@ -56,7 +59,7 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
     processedByContact.set(log.contactId, log.status)
   }
 
-  if (processedByContact.size < campaign.contactIds.length) {
+  if (processedByContact.size < contactIds.length) {
     return false
   }
 
@@ -73,7 +76,7 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
   })
 
   console.log(
-    `[Campaign] ${campaignId} marked ${hasSuccess ? 'COMPLETED' : 'FAILED'} (${processedByContact.size}/${campaign.contactIds.length} contacts processed)`
+    `[Campaign] ${campaignId} marked ${hasSuccess ? 'COMPLETED' : 'FAILED'} (${processedByContact.size}/${contactIds.length} contacts processed)`
   )
 
   return true

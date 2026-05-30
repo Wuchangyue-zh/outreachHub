@@ -264,10 +264,10 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### 4.4 智能拓客
 
-- [ ] 25. 爬虫/采集引擎
+- [x] 25. 爬虫/采集引擎（`/api/cron/process-prospecting` + RocketReach 搜索 → Company/Contact 入库 + 去重）
 - [x] 26. RocketReach → 保存 Company/Contact（API + **prospecting 页勾选导入**）
-- [ ] 27. AI 拓词/职位建议
-- [ ] 28. 爬虫进度更新
+- [x] 27. AI 拓词/职位建议（`generateKeywordSuggestions` + `generatePositionSuggestions` + 拓客页 AI 按钮）
+- [x] 28. 爬虫进度更新（任务列表 tab + 进度条 + 状态标签 + 统计）
 - [x] 29. 去重（`import-companies` 按 domain/name 去重；`import-contacts` 按 email 去重）
 
 ### 4.5 域名与合规
@@ -293,8 +293,8 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 ### 4.8 用户与租户
 
 - [x] 45. 注册邮箱验证 + **平台 SMTP 发欢迎信**（已有 `/api/auth/forgot-password` + `/reset-password` + 注册欢迎信）
-- [ ] 46. 套餐限额
-- [ ] 47. 团队邀请
+- [x] 46. 套餐限额（`plan-limits.ts` + contacts/launch 限额校验 + Settings 套餐用量展示）
+- [x] 47. 团队邀请（`Invitation` 模型 + invite/accept-invite API + 邮件邀请 + Settings 成员列表）
 - [x] 48. 角色差异化鉴权（五角色矩阵 + 写 API：campaigns/contacts/templates/companies/prospecting/inbox/email-accounts/queue-retry）
 
 ### 4.9 模板与 AI
@@ -679,6 +679,50 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 | D3 | system-reply 历史数据 backfill 脚本 | `scripts/backfill-system-reply.ts` |
 | D4 | `/dashboard/tasks` 任务页：API + UI + 侧边栏（展示 OOO 跟进 Task） | `api/tasks/route.ts`, `dashboard/tasks/page.tsx`, `dashboard-layout.tsx` |
 
+### 9.15 Batch E — 商业化（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #46 | 套餐限额：`plan-limits.ts` 工具库 + contacts 创建限额 + launch 每日发信限额 + Settings 套餐用量展示 | `lib/plan-limits.ts`, `contacts/route.ts`, `launch/route.ts`, `settings/page.tsx`, `api/tenant/usage/route.ts` |
+| #47 | 团队邀请：`Invitation` 模型 + invite API（邮件邀请）+ accept-invite API + 注册/加入流程 + Settings 成员列表 | `schema.prisma`, `api/tenant/invite/route.ts`, `api/auth/accept-invite/route.ts`, `accept-invite/page.tsx`, `settings/page.tsx` |
+
+**需执行：** `npm run db:push`（新增 `Invitation` 模型 + `InvitationStatus` 枚举）
+
+### 9.16 核实 Batch E 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| `getTenantLimits` 用 `\|\|` 导致 PRO 租户仍读 schema 默认 maxUsers=1 | 改为 `Math.max(套餐默认值, Tenant 表值)` |
+| Launch 每日限额按 `contacts.length` 而非本次实际待发数 | 按 pending + throttlePerDay 计算 `emailsToAdd` |
+| 邀请角色 `USER` 无 `hasPermission` 映射 | `auth-middleware` 为 USER 补权限 |
+| accept-invite 用 `tenant.maxUsers` 而非套餐限额 | 改用 `getTenantLimits()` |
+| 待处理邀请未计入成员上限 | `checkUserLimit` 含 PENDING 邀请数 |
+| GET `/api/tenant/invite` 无权限校验 | 需 `settings:manage` |
+
+**遗留：** CSV 批量导入联系人未校验 `maxContacts`；无撤销邀请 API；套餐升级未自动 sync Tenant 表限额字段。
+
+### 9.16 Batch F — 拓客引擎（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #25 | 爬虫/采集引擎：`/api/cron/process-prospecting` 处理 PENDING 任务，RocketReach 搜索 → Company/Contact 入库 | `api/cron/process-prospecting/route.ts`, `vercel.json` |
+| #27 | AI 拓词/职位建议：`generateKeywordSuggestions` + `generatePositionSuggestions` + 拓客页 AI 按钮 | `lib/openai.ts`, `api/prospecting/route.ts`, `prospecting/page.tsx` |
+| #28 | 爬虫进度 UI：任务列表 tab + 进度条 + 状态标签 + 公司/联系人统计 | `prospecting/page.tsx` |
+
+**需执行：** `npm run db:push`（`abTestAssignments` 字段已同步）
+
+### 9.17 核实 Batch F 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| `process-prospecting` 仅 POST、无 `verifyCronSecret` | 对齐其他 cron：GET+POST + `lib/cron-auth.ts` |
+| 无 API Key 时任务仍 COMPLETED（0 结果） | 缺 `ROCKETREACH_API_KEY` 时标 FAILED 并写 description |
+| 空搜索条件任务仍执行 | 创建与 cron 均校验至少有关键词/行业/职位之一 |
+| 采集联系人未受套餐限额约束 | 入库前调用 `checkContactLimit` |
+| RUNNING 任务崩溃后永久卡住 | 30 分钟超时自动重置为 PENDING |
+| GET `/api/prospecting` 无 tenantId 校验 | 403 拒绝未关联租户 |
+| 任务列表 tab 仍显示创建表单 | tab=tasks 时仅展示列表 + 刷新；创建后自动跳转 |
+
 ---
 
-*本报告最后更新：2026-05-30。Batch D 已完成；后续从 Batch E 继续。*
+*本报告最后更新：2026-05-30。Batch D/E/F 已完成；剩余 G1(S3)、G2(附件)、G4(E2E)、G5(文档)。*
