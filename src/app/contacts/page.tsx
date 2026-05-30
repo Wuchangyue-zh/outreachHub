@@ -11,8 +11,27 @@ import { useToast } from '@/components/ui/toast'
 import { CSVImport } from '@/components/CSVImport'
 import {
   Users, Plus, Download, Upload, Search, Mail, Building, Tag,
-  ChevronRight, Edit, Trash2, X, Loader2, UserPlus, Send, Check
+  ChevronRight, Edit, Trash2, X, Loader2, UserPlus, Send, Check,
+  Eye, MousePointer, MessageSquare, AlertCircle,
 } from 'lucide-react'
+
+interface TimelineEvent {
+  id: string
+  type: 'sent' | 'opened' | 'clicked' | 'replied' | 'bounced' | 'failed'
+  timestamp: string
+  campaign?: { id: string; name: string }
+  details: {
+    subject?: string
+    replyCategory?: string
+    error?: string
+  }
+}
+
+interface TimelineSummary {
+  totalEmailsSent: number
+  totalOpened: number
+  totalReplied: number
+}
 
 interface ContactEmail {
   id: string
@@ -55,6 +74,9 @@ export default function ContactsPage() {
   const [showDetailDrawer, setShowDetailDrawer] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [currentContact, setCurrentContact] = useState<Contact | null>(null)
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([])
+  const [timelineSummary, setTimelineSummary] = useState<TimelineSummary | null>(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const limit = 20
 
@@ -126,9 +148,24 @@ export default function ContactsPage() {
     setShowEditDialog(true)
   }
 
-  const openDetailDrawer = (contact: Contact) => {
+  const openDetailDrawer = async (contact: Contact) => {
     setCurrentContact(contact)
     setShowDetailDrawer(true)
+    setTimelineEvents([])
+    setTimelineSummary(null)
+    setTimelineLoading(true)
+    try {
+      const res = await fetch(`/api/contacts/${contact.id}/timeline`)
+      const data = await res.json()
+      if (data.success) {
+        setTimelineEvents(data.data.timeline || [])
+        setTimelineSummary(data.data.summary || null)
+      }
+    } catch (e) {
+      console.error('Failed to load timeline:', e)
+    } finally {
+      setTimelineLoading(false)
+    }
   }
 
   const confirmDelete = (contact: Contact) => {
@@ -699,6 +736,76 @@ export default function ContactsPage() {
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{currentContact.notes}</p>
                 </div>
               )}
+
+              {/* Interaction Timeline */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900">互动时间线</h4>
+                {timelineSummary && (
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="rounded-lg bg-blue-50 p-2">
+                      <p className="font-semibold text-blue-700">{timelineSummary.totalEmailsSent}</p>
+                      <p className="text-gray-500">已发送</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-2">
+                      <p className="font-semibold text-emerald-700">{timelineSummary.totalOpened}</p>
+                      <p className="text-gray-500">已打开</p>
+                    </div>
+                    <div className="rounded-lg bg-violet-50 p-2">
+                      <p className="font-semibold text-violet-700">{timelineSummary.totalReplied}</p>
+                      <p className="text-gray-500">已回复</p>
+                    </div>
+                  </div>
+                )}
+                {timelineLoading ? (
+                  <div className="flex items-center justify-center py-6 text-sm text-gray-500">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+                  </div>
+                ) : timelineEvents.length === 0 ? (
+                  <p className="text-sm text-gray-400">暂无邮件互动记录</p>
+                ) : (
+                  <ul className="space-y-2 max-h-64 overflow-y-auto">
+                    {timelineEvents.map((ev) => {
+                      const iconMap = {
+                        sent: { icon: Send, color: 'text-blue-600 bg-blue-50' },
+                        opened: { icon: Eye, color: 'text-emerald-600 bg-emerald-50' },
+                        clicked: { icon: MousePointer, color: 'text-amber-600 bg-amber-50' },
+                        replied: { icon: MessageSquare, color: 'text-violet-600 bg-violet-50' },
+                        bounced: { icon: AlertCircle, color: 'text-orange-600 bg-orange-50' },
+                        failed: { icon: AlertCircle, color: 'text-red-600 bg-red-50' },
+                      }
+                      const labelMap: Record<string, string> = {
+                        sent: '发送邮件',
+                        opened: '打开邮件',
+                        clicked: '点击链接',
+                        replied: '收到回复',
+                        bounced: '退信',
+                        failed: '发送失败',
+                      }
+                      const cfg = iconMap[ev.type]
+                      const Icon = cfg.icon
+                      return (
+                        <li key={ev.id} className="flex gap-3 rounded-lg border border-gray-100 p-3">
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.color}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900">{labelMap[ev.type]}</p>
+                            {ev.details.subject && (
+                              <p className="truncate text-xs text-gray-500">{ev.details.subject}</p>
+                            )}
+                            {ev.campaign && (
+                              <p className="text-xs text-gray-400">活动：{ev.campaign.name}</p>
+                            )}
+                            <p className="text-xs text-gray-400">
+                              {new Date(ev.timestamp).toLocaleString('zh-CN')}
+                            </p>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
 
               {/* Timestamps */}
               <div className="text-xs text-gray-400 space-y-1">

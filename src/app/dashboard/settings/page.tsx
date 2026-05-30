@@ -44,6 +44,42 @@ const emptyFormData = {
   imapPassword: '',
 }
 
+// 常见邮箱服务商 IMAP 配置
+const KNOWN_IMAP_HOSTS: Record<string, { host: string; port: number }> = {
+  'smtp.gmail.com': { host: 'imap.gmail.com', port: 993 },
+  'smtp.outlook.com': { host: 'outlook.office365.com', port: 993 },
+  'smtp.office365.com': { host: 'outlook.office365.com', port: 993 },
+  'smtp-mail.outlook.com': { host: 'outlook.office365.com', port: 993 },
+  'smtp.qq.com': { host: 'imap.qq.com', port: 993 },
+  'smtp.163.com': { host: 'imap.163.com', port: 993 },
+  'smtp.126.com': { host: 'imap.126.com', port: 993 },
+  'smtp.aliyun.com': { host: 'imap.aliyun.com', port: 993 },
+  'smtp.sina.com': { host: 'imap.sina.com', port: 993 },
+  'smtp.yahoo.com': { host: 'imap.mail.yahoo.com', port: 993 },
+  'smtp.mail.yahoo.com': { host: 'imap.mail.yahoo.com', port: 993 },
+  'smtp.zoho.com': { host: 'imap.zoho.com', port: 993 },
+  'smtp.yandex.com': { host: 'imap.yandex.com', port: 993 },
+}
+
+// 根据 SMTP 主机推断 IMAP 主机
+function inferImapHost(smtpHost: string): { host: string; port: number } | null {
+  if (!smtpHost) return null
+  const lower = smtpHost.toLowerCase().trim()
+
+  // 精确匹配已知服务商
+  if (KNOWN_IMAP_HOSTS[lower]) {
+    return KNOWN_IMAP_HOSTS[lower]
+  }
+
+  // 通用规则：smtp.xxx.com → mail.xxx.com
+  if (lower.startsWith('smtp.')) {
+    const domain = lower.slice(5)
+    return { host: `mail.${domain}`, port: 993 }
+  }
+
+  return null
+}
+
 interface EmailAccount {
   id: string
   email: string
@@ -96,6 +132,20 @@ export default function SettingsPage() {
     setDialogOpen(false)
     setEditingId(null)
     setFormData(emptyFormData)
+  }
+
+  // 处理 SMTP 主机变化，自动推断 IMAP
+  const handleSmtpHostChange = (value: string) => {
+    const newFormData = { ...formData, smtpHost: value }
+    // 仅当 IMAP 主机为空时自动填充
+    if (!formData.imapHost) {
+      const inferred = inferImapHost(value)
+      if (inferred) {
+        newFormData.imapHost = inferred.host
+        newFormData.imapPort = String(inferred.port)
+      }
+    }
+    setFormData(newFormData)
   }
 
   const openAddForm = () => {
@@ -290,10 +340,15 @@ export default function SettingsPage() {
                       <Input
                         id="smtpHost"
                         value={formData.smtpHost}
-                        onChange={(e) => setFormData({ ...formData, smtpHost: e.target.value })}
+                        onChange={(e) => handleSmtpHostChange(e.target.value)}
                         placeholder="smtp.gmail.com"
                         required
                       />
+                      {formData.smtpHost && inferImapHost(formData.smtpHost) && !formData.imapHost && (
+                        <p className="text-xs text-blue-500">
+                          已自动推断 IMAP: {inferImapHost(formData.smtpHost)?.host}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="smtpPort">SMTP 端口 *</Label>
@@ -331,6 +386,9 @@ export default function SettingsPage() {
 
                     <div className="space-y-2 md:col-span-2">
                       <p className="text-sm font-medium text-gray-700">IMAP 配置（可选，用于统一收件箱）</p>
+                      <p className="text-xs text-gray-400">
+                        填写 SMTP 后会自动推断 IMAP 主机。常见服务商：Gmail、Outlook、QQ、163 等已内置配置。
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="imapHost">IMAP 服务器</Label>
@@ -338,11 +396,16 @@ export default function SettingsPage() {
                         id="imapHost"
                         value={formData.imapHost}
                         onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
-                        placeholder={formData.smtpHost.replace(/^smtp\./i, 'mail.') || 'mail.example.com'}
+                        placeholder={formData.smtpHost ? inferImapHost(formData.smtpHost)?.host || 'mail.example.com' : 'mail.example.com'}
                       />
                       <p className="text-xs text-gray-500">
-                        若 SMTP 为 smtp.example.com，IMAP 通常为 mail.example.com（不一定存在 imap 子域名）
+                        常见规律：smtp.xxx.com → mail.xxx.com（而非 imap.xxx.com）
                       </p>
+                      {formData.imapHost && formData.smtpHost && !formData.imapHost.includes('.') && (
+                        <p className="text-xs text-amber-500">
+                          ⚠️ IMAP 主机格式可能不正确，通常为 mail.xxx.com
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="imapPort">IMAP 端口</Label>

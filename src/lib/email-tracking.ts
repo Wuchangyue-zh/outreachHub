@@ -16,18 +16,26 @@ export function generateTrackingPixel(): Buffer {
 export function addEmailTracking(
   htmlContent: string,
   emailLogId: string,
-  contactId: string
+  contactId: string,
+  campaignId?: string
 ): string {
   // Generate tracking pixel
   const pixelUrl = `${TRACKING_BASE_URL}/api/email/track/open?e=${emailLogId}&c=${contactId}&t=${Date.now()}`
   const trackingPixel = `<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`
 
+  // Generate unsubscribe link
+  const unsubscribeUrl = `${TRACKING_BASE_URL}/api/unsubscribe?cid=${contactId}&lid=${emailLogId}${campaignId ? `&camp=${campaignId}` : ''}`
+  const unsubscribeFooter = `
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
+  <p>如果您不想再收到此类邮件，可以 <a href="${unsubscribeUrl}" style="color: #6366f1; text-decoration: underline;">退订</a></p>
+</div>`
+
   // Replace all links with tracking URLs
   let trackedContent = htmlContent.replace(
     /href="([^"]+)"/g,
     (match, url) => {
-      // Skip internal links and mailto/tel links
-      if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:')) {
+      // Skip internal links, mailto/tel links, and unsubscribe links
+      if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:') || url.includes('/unsubscribe')) {
         return match
       }
 
@@ -36,11 +44,11 @@ export function addEmailTracking(
     }
   )
 
-  // Append tracking pixel before closing body tag
+  // Append unsubscribe footer and tracking pixel before closing body tag
   if (trackedContent.includes('</body>')) {
-    trackedContent = trackedContent.replace('</body>', `${trackingPixel}</body>`)
+    trackedContent = trackedContent.replace('</body>', `${unsubscribeFooter}${trackingPixel}</body>`)
   } else {
-    trackedContent += trackingPixel
+    trackedContent += unsubscribeFooter + trackingPixel
   }
 
   return trackedContent

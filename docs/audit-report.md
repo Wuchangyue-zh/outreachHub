@@ -1,7 +1,7 @@
 # OutreachHub 项目现状与开发缺口报告
 
 > **生成日期**：2026-05-29  
-> **最后更新**：2026-05-29（P0 首轮完成 + 代码审查修复 + 邮件架构澄清）  
+> **最后更新**：2026-05-30（前端接线：Campaign 调度向导 / Prospecting 导入 / CampaignStats / 联系人时间线 / docker worker env）  
 > **分支**：`feat/landing-page`  
 > **审计范围**：Prisma Schema、API Routes、Frontend Pages、Lib 模块、Store、本地开发环境  
 > **用途**：交给 Claude / 开发 Agent 按优先级逐项实现
@@ -55,7 +55,9 @@ OPENAI_MODEL="doubao-seed-2-0-pro-260215"
 - 使用 `npm run db:*`，**不要**裸跑 `npx prisma`（会拉到 Prisma 7）
 - 项目锁定 **Prisma 5.22**
 - Redis 未配置时邮件队列降级 SMTP 直发
-- **用户营销邮件目前仍走 `.env` SMTP**（EmailAccount 仅存库未接入发信，见 1.1）
+- **用户营销邮件已走 EmailAccount SMTP**（见 Phase 1 完成情况）；平台系统邮件仍用 `.env`
+- **Email Worker 需单独终端运行**；失败任务不会自动重试，需手动 `/api/email-queue/retry` 或队列监控页
+- **本地开发 Cron 不自动执行**；IMAP 收信需手动刷新收件箱或 `POST /api/cron/check-replies`
 
 ---
 
@@ -65,31 +67,30 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### 1.1 邮件架构（重要 — Claude 必读）
 
-**目标架构（产品应有，尚未完全实现）：**
+**当前架构（Phase 1 已实现）：**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  .env SMTP（平台级）                                          │
-│  noreply@outreachhub.com                                     │
-│  用途：注册成功、找回密码、账单通知、系统告警                    │
-│  入口：sendPlatformMail()  ← ❌ 尚未拆分，目前与营销共用       │
+│  用途：注册欢迎信、找回密码、系统告警                          │
+│  入口：sendPlatformMail()  ← ✅ 已实现                       │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
 │  EmailAccount 表（用户级，Settings 配置）                      │
-│  sales@客户公司.com + smtpHost/smtpUser/smtpPassword           │
 │  用途：Campaign 发信、Inbox 回复、邮件测试                      │
-│  入口：sendUserMail({ emailAccountId })  ← ❌ 尚未实现         │
+│  入口：sendAccountMail({ emailAccountId })  ← ✅ 已实现       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 | 邮件类型 | 应使用的 SMTP | 当前实际 |
 |----------|---------------|----------|
-| 平台系统通知 | `.env` SMTP | ⚠️ 未单独实现（注册等尚无发信） |
-| Campaign / Inbox / 队列 | 数据库 `EmailAccount` | ❌ **仍全部走 `.env`** |
-| Settings 保存的邮箱 | 存 DB ✅ | 发信时未读取 ❌ |
+| 平台系统通知 | `.env` SMTP | ✅ `sendPlatformMail`（注册欢迎信等） |
+| Campaign / 队列 / Worker | 数据库 `EmailAccount` | ✅ `sendAccountMail` + `selectEmailAccount` |
+| Inbox 回复 / 邮件测试 | 用户选定 `EmailAccount` | ✅ `/api/inbox/reply` + Settings 测试 |
+| Settings 保存的邮箱 | 存 DB + 发信读取 | ✅ |
 
-**Claude 下一优先级任务：** 实现双通道发信（见 **4.2 #12a–#12e**）。
+**Claude 后续可关注：** 多账户轮换优化（#12）、密码加密（#15a）、IMAP 配置 UX（见 §九）。
 
 ### 1.2 技术栈
 
@@ -118,7 +119,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 |------|------|------|
 | Prisma Schema | ✅ | **13 个模型**，15+ 枚举 |
 | User / Tenant | ✅ | 多租户、角色、套餐 |
-| EmailAccount | ⚠️ | 模型 + CRUD API ✅；**发信未接入** ❌ |
+| EmailAccount | ✅ | 模型 + CRUD + **发信/IMAP 已接入** |
 | Company / Contact / ContactEmail | ✅ | 完整 CRUD |
 | Product | ⚠️ | 模型有，无前端页 |
 | EmailTemplate / Campaign / Task | ✅ | Schema 完整；Campaign 调度逻辑部分完成 |
@@ -131,18 +132,20 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 |----------|------|------|
 | `/api/auth/*` | ✅ | login / logout / register |
 | `/api/campaigns` + `[id]` + `stats` + `ai-generate` | ✅ | CRUD + PATCH 状态 + 统计 + AI |
-| `/api/campaigns/[id]/launch` | ⚠️ | 批量入队 ✅；变量替换 ✅；**仍用 .env SMTP** |
+| `/api/campaigns/[id]/launch` | ✅ | 批量入队 + 变量替换 + EmailAccount 发信 |
 | `/api/contacts` + import | ✅ | CRUD + CSV |
 | `/api/companies` / `/api/templates` | ✅ | CRUD |
 | `/api/prospecting` | ⚠️ | 创建任务 ✅；无采集引擎 |
 | `/api/ai/generate` | ✅ | generate-email / generate-subject / **generate-reply** |
 | `/api/email-queue/*` | ✅ | 队列 + 降级直发 |
-| `/api/email/test` | ⚠️ | 测试发信；**用 .env SMTP**；支持 `plain` 模式 |
+| `/api/email/test` | ✅ | 测试发信；支持 EmailAccount；`plain` 模式 |
 | `/api/email/track/*` | ✅ | open / click(302) / event |
-| `/api/imap/*` | ⚠️ | fetch / check-replies；**单全局 IMAP 账户** |
+| `/api/imap/*` + `/api/cron/check-replies` | ✅ | 多账户 IMAP（`imap-multi.ts`）；生产 Cron 每 5 分钟 |
 | `/api/email-accounts` + `[id]` | ✅ | CRUD；GET 密码脱敏 `********` |
 | `/api/users/me` | ✅ | GET/PUT 个人资料 + avatar |
-| `/api/inbox/threads` | ⚠️ | 从 **EmailLog.repliedAt** 聚合；**非实时 IMAP**；已 tenant 过滤 |
+| `/api/inbox/threads` | ✅ | 完整往来（全部 EmailLog + replyBody）；按时间排序 |
+| `/api/inbox/reply` | ✅ | 专用回复发信；写入真实 `contactId` |
+| `/api/inbox/ai-reply` | ✅ | AI 撰写/扩写；带入 EmailAccount 签名 |
 | `/api/stats` / `/api/sse/stats` | ✅ | 统计 + SSE（SSE 已修 cleanup） |
 | `/api/upload/*` | ✅ | 头像/附件 → 本地磁盘 |
 
@@ -150,9 +153,8 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 | API 路由 | 说明 |
 |----------|------|
-| `/api/products` | Product CRUD |
-| `/api/inbox/reply` | 专用回复发信（可选，当前复用 `/api/email/test`） |
-| 平台系统邮件 | 注册确认、密码重置等（尚无） |
+| `/api/products` | Product CRUD（Phase 3 已有基础页，可按需扩展） |
+| 密码重置发信 | 平台 SMTP 发重置链接（注册欢迎信已有） |
 
 ### 2.3 前端页面
 
@@ -161,14 +163,14 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | `/` Landing | ✅ | 14 区块 |
 | `/login` `/register` | ✅ | 含演示账户提示 |
 | `/dashboard` | ✅ | 统计卡片、图表 |
-| `/campaigns` | ✅ | 对接 API；Launch / 暂停 / 删除 |
-| `/campaigns/new` | ✅ | 3 步向导 + AI 生成 |
-| `/contacts` `/companies` | ✅ | 完整 CRUD |
+| `/campaigns` | ✅ | 对接 API；Launch / 暂停 / 删除；**CampaignStats 趋势图** |
+| `/campaigns/new` | ✅ | 3 步向导 + AI 生成；**IMMEDIATE / SCHEDULED / RECURRING + 发送窗口** |
+| `/contacts` `/companies` | ✅ | 完整 CRUD；**联系人详情抽屉展示互动时间线** |
 | `/templates` | ✅ | 对接 API + AI |
-| `/inbox` | ⚠️ | UI 完整；真实数据来自 EmailLog；AI 草稿 + 发信已接 API；**无回复数据时为空** |
+| `/dashboard/inbox` | ✅ | IMAP 同步 + 完整往来 + AI 回复/扩写 + EmailAccount 发信 |
 | `/settings` | ✅ | EmailAccount CRUD + 个人资料 + 头像写回 |
 | `/email-queue` `/email-test` | ✅ | 队列监控、SMTP 测试 |
-| `/prospecting` | ⚠️ | 创建任务 UI；无采集 |
+| `/prospecting` | ⚠️ | RocketReach 搜索 + 勾选导入公司/联系人；创建任务 UI；无自动采集引擎 |
 
 **侧边栏：** 仪表盘 · 拓客 · 客户 · 公司 · 邮件营销 · 模板 · **统一收件箱** · 邮箱设置 · 队列监控
 
@@ -178,15 +180,17 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| `email.ts` | ⚠️ | 仅 `.env` SMTP；**待拆 platform / user** |
-| `email-worker.ts` | ✅ | Worker + `addEmailTracking`；**仍用 .env transporter** |
-| `email-queue.ts` | ✅ | 队列 + 直发追踪（先建 log 再 inject） |
+| `email.ts` | ✅ | `sendPlatformMail` / 平台 SMTP |
+| `email-account-mail.ts` | ✅ | `sendAccountMail` + dailyLimit |
+| `email-worker.ts` | ✅ | Worker + 追踪 + 变量替换；**创建 EmailLog 须含 `content`** |
+| `email-queue.ts` | ✅ | 队列 + 直发；`attempts: 3` 后入 failed，需手动 retry |
+| `imap-multi.ts` | ✅ | 多账户 IMAP；SINCE 拉信；In-Reply-To/References 匹配 |
+| `openai.ts` | ✅ | Campaign / `generateInboxReply`（往来历史 + 签名） |
+| `imap.ts` | ⚠️ | 旧单账户实现；新代码优先 `imap-multi.ts` |
 | `email-tracking.ts` | ✅ | 标准 `e`/`c`/`u` 参数 |
-| `email-variables.ts` | ✅ | Launch 变量替换 `{{firstName}}` 等 |
-| `openai.ts` | ✅ | 火山方舟兼容；Campaign/Reply/Email 生成 |
-| `imap.ts` | ⚠️ | 单全局账户 |
+| `email-variables.ts` | ✅ | Launch / Worker 变量替换 |
 | `reply-classifier.ts` | ✅ | 10 类回复分类 |
-| `rocketreach.ts` | ⚠️ | SDK 有；未入库 |
+| `rocketreach.ts` | ✅ | SDK + `/api/prospecting` 搜索/入库已接线 |
 | 其他 auth/redis/upload 等 | ✅ | 正常 |
 
 ---
@@ -196,17 +200,17 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | 任务 | 状态 | 备注 |
 |------|------|------|
 | P0-1 Campaign 列表 API 对接 | ✅ | `campaigns/page.tsx` |
-| P0-2 EmailAccount CRUD API | ✅ | 密码脱敏；**发信未接** |
+| P0-2 EmailAccount CRUD API | ✅ | 密码脱敏 + 发信/IMAP 已接入 |
 | P0-3 Settings + `/api/users/me` | ✅ | |
 | P0-4 Worker 追踪参数 | ✅ | 使用 `addEmailTracking` |
-| P0-5 Inbox 导航/鉴权/数据 | ⚠️ | EmailLog 线程非 IMAP；AI/发信已修 |
-| P0-6 Campaign Launch 入队 | ⚠️ | 入队 ✅；跳过已发联系人 ✅；**SMTP 仍 .env** |
+| P0-5 Inbox 导航/鉴权/数据 | ✅ | IMAP 同步 + 完整往来 + AI 回复/扩写 |
+| P0-6 Campaign Launch 入队 | ✅ | EmailAccount 发信 + 入队 + 跳过已发 |
 
-**P0 遗留 → 升为 P0'（下一 sprint）：**
+**P0' / Phase 1–3 已完成（2026-05-29～30）。当前遗留重点：**
 
-- **双通道 SMTP**（#12a–#12e）— 阻塞真实 multi-tenant 发信
-- **Worker 进程部署说明**（#55）— 文档/脚本
-- **Inbox 真实 IMAP 数据源**（#16b–#16d）— 当前仅 EmailLog 聚合
+- **Worker / Cron 本地运维说明**（#55）— 文档/脚本
+- **IMAP 配置 UX** — 常见坑：`smtp.xxx.com` 对应 IMAP 常为 `mail.xxx.com`（见 §九）
+- **队列 failed 任务手动重试** — 无自动 Cron（见 §九）
 
 ---
 
@@ -219,59 +223,63 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] 1. `/campaigns` 列表对接 API
 - [x] 2. 启动/暂停/删除前后端对接
 - [x] 3. Launch 批量入 BullMQ；跳过已发送联系人
-- [ ] 4. 调度引擎：`scheduleType`（IMMEDIATE / SCHEDULED / RECURRING）
+- [x] 4. 调度引擎：`scheduleType`（IMMEDIATE / SCHEDULED / RECURRING）— API + **向导 UI** 已接线
 - [x] 5. `throttlePerDay` 入队上限（Launch 已 slice；**throttlePerHour 未实现**）
-- [ ] 6. 发送时间窗口：`timezone` + `sendingWindows`
+- [x] 6. 发送时间窗口：`timezone` + `sendingWindows` — RECURRING + **向导 UI** 已接线
 - [ ] 7. 多步序列：`type=SEQUENCE` 按间隔发送
 - [ ] 8. A/B 测试：流量分割、胜出版本判定
 - [ ] 9. Campaign 统计从 EmailLog 聚合（减少 Worker 直接 +1 漂移）
 - [x] 9a. Launch 模板变量替换（`email-variables.ts`，含 `{{CompanyName}}` 等）
 
-### 4.2 邮箱账户与 SMTP 双通道（🔴 下一优先级）
+### 4.2 邮箱账户与 SMTP 双通道
 
 - [x] 10. `/api/email-accounts` CRUD
 - [x] 11. Settings 页对接 API
-- [ ] **12a. 拆分 `sendPlatformMail()` / `sendUserMail()`**（`email.ts`）
-- [ ] **12b. Worker / 队列 / Launch 使用 EmailAccount SMTP 发信**
-- [ ] **12c. Inbox 回复 / 邮件测试使用用户选定 EmailAccount**
-- [ ] **12d. Campaign 绑定 `emailAccountId`（Schema 可选字段 + 向导选择）**
-- [ ] 12. 多账户轮换：按 `healthScore` / `dailyLimit` / `dailySent` 选账户
-- [ ] 13. `dailySent` 每日归零（Cron 或 Launch 前 lazy reset）
+- [x] **12a. 拆分 `sendPlatformMail()` / `sendAccountMail()`**（`email.ts`, `email-account-mail.ts`）
+- [x] **12b. Worker / 队列 / Launch 使用 EmailAccount SMTP 发信**
+- [x] **12c. Inbox 回复 / 邮件测试使用用户选定 EmailAccount**
+- [x] **12d. Campaign 绑定 `emailAccountId`（Schema + 向导 + Launch）**
+- [x] **12e. `selectEmailAccount` 轮换与健康度选账户**（同 #12）
+- [x] 12. 多账户轮换：按 `healthScore` / `dailyLimit` / `dailySent` 选账户
+- [x] 13. `dailySent` 每日归零（Launch 前 lazy reset，`email-account-mail.ts`）
 - [ ] 14. 健康度：bounce rate 自动降级
 - [ ] 15. SMTP 连接池（可选优化）
-- [ ] 15a. EmailAccount 密码加密存储（当前明文；Schema 注释写加密但未做）
+- [x] 15a. EmailAccount 密码加密存储（`encryption.ts` 已实现 AES-256-GCM；`safeDecrypt` 向后兼容）
 
 ### 4.3 IMAP 与统一收件箱
 
-- [x] 16. Inbox 基础数据 API（`/api/inbox/threads`，EmailLog 聚合 + tenant 过滤）
+- [x] 16. Inbox 基础数据 API（`/api/inbox/threads`，完整 EmailLog 往来 + tenant 过滤）
 - [x] 17. 侧边栏 + middleware 鉴权
-- [ ] **16b. 改名为/文档化：当前非 IMAP 实时，依赖 EmailLog.repliedAt**
-- [ ] **16c. 定时 IMAP 轮询 Worker**（Cron 调 `/api/imap/check-replies` 或独立 job）
-- [ ] 18. 多 EmailAccount 并行 IMAP（读 DB 账户，非 `.env`）
-- [ ] 19. 单账户 IMAP 失败隔离
-- [ ] 20. 回复正文入库（当前 thread 出站/入站都用 `log.content`，**缺独立 replyBody 字段**）
-- [ ] 21. In-Reply-To / References 关联 EmailLog
-- [x] 22. AI 回复草稿（`generate-reply` + 火山方舟）
-- [x] 23. Inbox 发送回复（`/api/email/test?plain=true`；**待改走 EmailAccount**）
+- [x] **16b. 文档化：UI 读 EmailLog；收信靠 IMAP 轮询写入 EmailLog**
+- [x] **16c. 定时 IMAP 轮询**（`api/cron/check-replies` + `vercel.json` 每 5 分钟；**本地需手动触发**）
+- [x] 18. 多 EmailAccount 并行 IMAP（`lib/imap-multi.ts` 读 DB）
+- [ ] 19. 单账户 IMAP 失败隔离（基础有 try/catch；可加强告警）
+- [x] 20. 回复正文入库（`EmailLog.replyBody` + threads 展示）
+- [x] 21. In-Reply-To / References 关联 EmailLog.messageId
+- [x] 22. AI 回复草稿（`/api/inbox/ai-reply` + 往来历史 + 自动签名）
+- [x] 23. Inbox 发送回复（`/api/inbox/reply` + EmailAccount）
+- [x] 23a. 收件箱刷新触发 IMAP 同步（`inbox/page.tsx` → `POST /api/imap/check-replies`）
+- [x] 23b. 完整往来展示（含我方后续回复；修复 `system-reply` 假 contactId）
 - [ ] 24. OOO 自动跟进
 
 ### 4.4 智能拓客
 
 - [ ] 25. 爬虫/采集引擎
-- [ ] 26. RocketReach → 保存 Company/Contact
+- [x] 26. RocketReach → 保存 Company/Contact（API + **prospecting 页勾选导入**）
 - [ ] 27. AI 拓词/职位建议
 - [ ] 28. 爬虫进度更新
-- [ ] 29. 去重
+- [x] 29. 去重（`import-companies` 按 domain/name 去重；`import-contacts` 按 email 去重）
 
 ### 4.5 域名与合规
 
-- [ ] 30–36. 域名验证、SPF/DKIM/DMARC、Warm-up、退订、GDPR
+- [x] 30. 退订功能（`/api/unsubscribe` + Contact.unsubscribed + 邮件退订链接）
+- [ ] 31–36. 域名验证、SPF/DKIM/DMARC、Warm-up、GDPR
 
 ### 4.6 追踪与分析
 
 - [x] 37. Worker / 直发追踪 URL（`addEmailTracking`，`e`/`c`/`u`）
-- [ ] 38. Campaign 趋势图
-- [ ] 39. 联系人互动时间线
+- [x] 38. Campaign 趋势图（`CampaignStats` 已挂到 `/campaigns` + `/api/campaigns/stats`）
+- [x] 39. 联系人互动时间线（API + **contacts 详情抽屉 UI**）
 - [ ] 40. 地理/IP 分析
 
 ### 4.7 文件存储
@@ -284,7 +292,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### 4.8 用户与租户
 
-- [ ] 45. 注册邮箱验证 + **平台 SMTP 发欢迎信**
+- [x] 45. 注册邮箱验证 + **平台 SMTP 发欢迎信**（已有 `/api/auth/forgot-password` + `/reset-password` + 注册欢迎信）
 - [ ] 46. 套餐限额
 - [ ] 47. 团队邀请
 - [ ] 48. 角色差异化鉴权
@@ -301,10 +309,10 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ### 4.11 基础设施
 
-- [ ] 55. Worker 守护（PM2 / docker-compose service）
+- [x] 55. Worker 守护（PM2 / docker-compose service）— worker 服务 + `env_file: .env` 继承 SMTP/ENCRYPTION_KEY
 - [ ] 56–59. Redis HA、备份、日志、告警
 - [x] 60. `.env.example` 已补充 Redis + 火山方舟（部分）
-- [ ] 61. Dockerfile + docker-compose（PG + Redis + App + Worker）
+- [x] 61. Dockerfile + docker-compose（PG + Redis + App + Worker）— docker-compose.yml 已配置 postgres + redis + worker
 
 ### 4.12 测试
 
@@ -312,25 +320,25 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 ---
 
-## 五、优先级建议（更新版）
+## 五、优先级建议（更新版 — 2026-05-30）
 
-### P0' — 立即做（阻塞真实发信）
+### P0 — 下一批（体验 + 运维）
 
-1. **SMTP 双通道 #12a–#12d**（用户 EmailAccount 真正用于 Campaign/Inbox）
-2. **Campaign 选发件账户 #12d**
-3. **Worker 使用 EmailAccount transporter #12b**
+1. ✅ **Worker / Cron 本地开发文档**（#55）— docker-compose worker 服务、Cron 手动触发说明
+2. ✅ **IMAP 配置向导** — Settings 根据 SMTP 主机提示 IMAP（`mail.` 非 `imap.`）
+3. ✅ **队列 failed 任务** — 可选 Cron 自动 retry 或 UI 更明显提示
+4. ✅ **密码重置平台邮件**（#45 子项）— 已有 `/api/auth/forgot-password` + `/reset-password`
 
 ### P1 — 重要
 
-4. IMAP 多账户 + 定时轮询（#16c–#19）
-5. 注册/系统邮件 + 平台 SMTP（#45）
-6. 调度引擎 + 时间窗口（#4、#6）
-7. RocketReach 入库（#26）
-8. 域名/退订合规（#30–#36）
+5. ✅ 调度引擎 + 时间窗口（#4、#6）— RECURRING 类型 + sendingWindows 已实现
+6. ✅ RocketReach 入库深化（#26）— import-companies + import-contacts + 去重已实现
+7. ✅ 退订合规（#30）— `/api/unsubscribe` + 邮件退订链接 + Contact.unsubscribed 字段
+8. ✅ EmailAccount 密码加密（#15a）— AES-256-GCM 已实现
 
 ### P2 — 增强
 
-9. A/B、Sequence、产品页、S3、测试覆盖
+9. A/B、Sequence、S3、完整 E2E 覆盖
 
 ---
 
@@ -348,44 +356,53 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | Inbox Mock 误导 | ✅ 已修复 | 无数据时空状态 |
 | Inbox 无 tenant 过滤 | ✅ 已修复 | threads API |
 | EmailAccount GET 泄露密码 | ✅ 已修复 | 脱敏 + PUT 忽略 `********` |
-| **营销邮件仍用 .env SMTP** | ❌ 待实现 | 见 4.2 #12a–#12d |
+| **Email Worker 缺 `content` 字段** | ✅ 已修复 | `email-worker.ts` 写入 `content: finalText \|\| finalHtml` |
+| **BullMQ failed 任务不自动重试** | ⚠️ 设计如此 | 3 次失败后入 failed；重启 Worker 不重试；用 `/api/email-queue/retry` |
+| **IMAP 主机 DNS 错误** | ✅ 已修复 | 例：`imap.jafron.com` 不存在 → 应用 `mail.jafron.com` |
+| **IMAP 只拉 UNSEEN 漏已读回信** | ✅ 已修复 | 改为 SINCE 7 天 + 已回复跳过 |
+| **IMAP fetch 异步竞态** | ✅ 已修复 | `simpleParser` Promise.all 等待解析完成 |
+| **收件箱刷新不触发 IMAP** | ✅ 已修复 | 刷新按钮 → `POST /api/imap/check-replies` |
+| **AI 回复签名占位符 `[你的姓名]`** | ✅ 已修复 | 从 EmailAccount.displayName + Tenant 带入签名 |
+| **Inbox 发出回复不显示在往来** | ✅ 已修复 | `contactId: system-reply` → 真实 contactId；threads 全量排序 |
+| **营销邮件仍用 .env SMTP** | ✅ 已修复 | Phase 1 双通道已完成 |
 | Prisma 7 版本冲突 | ⚠️ 规避 | 用 `npm run db:*` |
 
 ---
 
 ## 七、架构决策记录
 
-1. **发信架构（目标）**：平台 `.env` SMTP ≠ 用户 `EmailAccount` SMTP；当前仅实现后者存储、前者发送
-2. **队列**：BullMQ + Redis；Worker 独立进程；无 Redis 降级直发
-3. **收信**：IMAP + 规则分类；Inbox UI 暂读 EmailLog 聚合
-4. **AI**：火山方舟 OpenAI 兼容 API（`OPENAI_BASE_URL` + `OPENAI_MODEL`）
+1. **发信架构**：平台 `.env` SMTP（`sendPlatformMail`）≠ 用户 `EmailAccount` SMTP（`sendAccountMail`）— **已实现**
+2. **队列**：BullMQ + Redis；Worker 独立进程；`attempts: 3` 指数退避；失败后需 **手动 retry**（无 Cron）
+3. **收信**：IMAP 多账户（`imap-multi.ts`）→ 写 EmailLog.repliedAt/replyBody；Inbox UI 读 EmailLog 全量往来
+4. **AI**：火山方舟；收件箱 `generateInboxReply` 基于完整 thread + 发件人签名
 5. **追踪**：`email-tracking.ts` 为唯一标准；参数 `e`/`c`/`u`
 6. **多租户**：`tenantId` 字段隔离
 7. **变量**：`email-variables.ts` 大小写不敏感 `{{key}}`
+8. **EmailLog 必填字段**：创建记录时须同时写 `content`（纯文本）与 `htmlContent`
 
 ---
 
 ## 八、Claude 执行指引
 
-> **给 Claude 的说明（用户已休息，请自主连续执行）：**  
-> 1. 严格按 **Phase 1 → 2 → 3** 顺序做，做完一个 Phase 跑 `npm run build`  
-> 2. 每完成一项，在本文第四节 + 下方队列里把 `[ ]` 改为 `[x]`  
-> 3. 不要重复「已完成（勿重复）」里的工作  
-> 4. 每项完成后写 1 行 commit 风格摘要（用户醒来可看 git log）  
-> 5. 遇到 Schema 变更：`npm run db:push` 后说明  
-> 6. Phase 1 全部完成前 **不要** 开 Phase 2
+> **给 Claude 的说明：**  
+> 1. **Phase 1–3 已完成**（见下方队列）；勿重复实现 SMTP 双通道 / IMAP 多账户 / replyBody 等  
+> 2. 从 **§五 P0 下一批** 或 **§四 未勾选项** 继续；每项完成后更新 checkbox  
+> 3. 改 Schema 后：`npm run db:push`  
+> 4. 每个 Phase 结束跑 `npm run build`  
+> 5. 开发 Campaign 发信时 **必须** 另开终端 `npm run worker:email`  
+> 6. 本地测试 IMAP 收信：`POST http://localhost:3030/api/cron/check-replies` 或刷新收件箱
 
 ### 已完成（勿重复）
 
 ```
-[x] P0-1  Campaign 列表 API
-[x] P0-2  EmailAccount CRUD API
-[x] P0-3  Settings + /api/users/me
-[x] P0-4  Worker 追踪
-[x] P0-5  Inbox 基础（EmailLog 线程 + 导航 + AI/发信）
-[x] P0-6  Campaign Launch 入队
-[x] 审查修复  launch 追踪 / inbox API / 密码脱敏 / 直发追踪
-[x] 火山方舟 AI 对接
+[x] P0-1 ～ P0-6  Campaign / Settings / Inbox 基础
+[x] Phase 1  SMTP 双通道 sendPlatformMail / sendAccountMail
+[x] Phase 2  IMAP 多账户 + Cron + replyBody + 注册欢迎信 + SCHEDULED
+[x] Phase 3  RocketReach / products / timeline / docker-compose 等
+[x] 2026-05-30  Email Worker content 字段 / IMAP 收信 / 收件箱 AI / 完整往来（见 §九）
+[x] 2026-05-30  P0 下一批：IMAP 配置向导 / 队列 failed 任务 UI / Worker docker-compose / 密码重置
+[x] 2026-05-30  P1：调度引擎 RECURRING / 时间窗口 / EmailAccount 密码加密 / 退订合规
+[x] 2026-05-30  前端接线：Campaign 调度向导 / Prospecting 导入 / CampaignStats / 联系人时间线 / docker worker env
 ```
 
 ---
@@ -453,7 +470,7 @@ npm run db:push                  # 若改了 schema
 # 手动冒烟（可选）：
 # 1. Settings 添加 EmailAccount → 测试发信
 # 2. Campaign 创建 → Launch（worker 需运行）
-# 3. Inbox 空状态 / 有 repliedAt 数据时显示线程
+# 3. Inbox：刷新同步 IMAP → 选对话 → 应见完整往来（含我方回复）
 ```
 
 ### 关键文件索引
@@ -464,20 +481,112 @@ npm run db:push                  # 若改了 schema
 | Worker/队列 | `email-worker.ts`, `email-queue.ts` |
 | 用户邮箱 | `api/email-accounts/*`, Settings 页 |
 | Campaign | `launch/route.ts`, `campaigns/new/`, `schema.prisma` Campaign |
-| Inbox/IMAP | `inbox/page.tsx`, `imap.ts`, `api/inbox/threads` |
+| Inbox/IMAP | `dashboard/inbox/page.tsx`, `imap-multi.ts`, `api/inbox/*`, `api/cron/check-replies` |
+| AI 收件箱 | `openai.ts` (`generateInboxReply`), `api/inbox/ai-reply` |
 | 平台通知 | `sendPlatformMail` in `email.ts` |
-| AI | `openai.ts`, `api/ai/generate` |
+| AI | `openai.ts`, `api/ai/generate`, `api/inbox/ai-reply` |
 | 拓客 | `api/prospecting`, `rocketreach.ts` |
 
 ### 开发命令
 
 ```bash
 npm run dev          # :3030
-npm run worker:email # 另开终端，Campaign 发信必须
+npm run worker:email # 另开终端，Campaign 队列发信必须
 npm run db:push && npm run db:seed
 npm run build        # 每个 Phase 结束必跑
+
+# 本地手动触发（Vercel Cron 本地不跑）
+curl -X POST http://localhost:3030/api/cron/check-replies
+curl -X POST http://localhost:3030/api/email-queue/retry   # 需登录 Cookie
 ```
 
 ---
 
-*本报告最后更新：2026-05-29。用户休息中：Claude 请从 Phase 1 开始自主执行，Phase 1→2→3 顺序推进，每项更新 checkbox。*
+## 九、2026-05-30 会话修复记录（Claude 必读）
+
+本节记录 Cursor 会话中已落地修复，**请勿重复实现**；后续开发请在此基础上扩展。
+
+### 9.1 Email Worker — EmailLog 创建失败
+
+| 项 | 内容 |
+|----|------|
+| **现象** | Worker 处理队列任务报 `Argument content is missing`，邮件发不出去 |
+| **根因** | `email-worker.ts` 创建 EmailLog 只写 `htmlContent`，Schema 要求必填 `content` |
+| **修复** | `content: finalText \|\| finalHtml \|\| ''`（与 `email-queue.ts` 直发逻辑一致） |
+| **文件** | `src/lib/email-worker.ts` |
+
+**队列重试说明（运维）：**
+
+- BullMQ 默认 `attempts: 3`，指数退避 2s 起
+- 3 次全失败后任务进入 Redis **failed** 状态；**重启 Worker 不会自动重试**
+- 恢复方式：`POST /api/email-queue/retry` 或 `/email-queue` 页面「重试失败任务」
+- **无** Cron 轮询队列失败任务；`vercel.json` Cron 仅 `check-replies` 与 `launch-scheduled`
+
+### 9.2 IMAP 收信 — 客户回复未入库
+
+| 项 | 内容 |
+|----|------|
+| **现象** | 客户已回复邮件，收件箱/统计无记录 |
+| **根因 1** | EmailAccount 配置 `imap.jafron.com` DNS 不存在；实际为 `mail.jafron.com`（与 `smtp.` 同为 CNAME） |
+| **根因 2** | 仅搜索 `UNSEEN` 邮件；若用户在网页邮箱已读回信则漏同步 |
+| **根因 3** | `fetchEmailsFromAccount` 异步解析竞态，可能空结果 |
+| **根因 4** | 本地开发 Vercel Cron 不执行；收件箱刷新原先只读 DB 不拉 IMAP |
+| **修复** | 改 SINCE 7 天拉信；Promise.all 等待 mailparser；In-Reply-To + References 匹配 `messageId`；已回复 log 跳过；收件箱打开/刷新 → `POST /api/imap/check-replies` |
+| **文件** | `src/lib/imap-multi.ts`, `src/app/dashboard/inbox/page.tsx`, `src/app/dashboard/settings/page.tsx`（IMAP 提示文案） |
+
+**本地验证收信：**
+
+```bash
+curl -X POST http://localhost:3030/api/cron/check-replies
+# 或在 /dashboard/inbox 点刷新
+```
+
+### 9.3 收件箱 AI 回复 / 扩写
+
+| 项 | 内容 |
+|----|------|
+| **功能** | 回复框旁 **AI 回复**（根据完整往来生成）、**AI 扩写**（润色当前草稿） |
+| **API** | `POST /api/inbox/ai-reply` — 传 `contactName`, `messages[]`, `emailAccountId`, `mode: draft\|expand` |
+| **文件** | `src/lib/openai.ts` (`generateInboxReply`), `src/app/api/inbox/ai-reply/route.ts`, `src/app/dashboard/inbox/page.tsx` |
+
+### 9.4 AI 签名占位符 `[你的姓名]`
+
+| 项 | 内容 |
+|----|------|
+| **现象** | AI 生成邮件末尾仍为 `[你的姓名]` |
+| **根因** | Prompt 要求 placeholder；未传入发件人信息 |
+| **修复** | 从选定 EmailAccount 解析：`displayName` → `User.name` → 邮箱前缀；Tenant.name 作公司；中文对话用「此致敬礼」；后处理替换残留占位符 |
+| **前置** | 使用 AI 前须选择发件账户 |
+| **文件** | `src/lib/openai.ts`, `src/app/api/inbox/ai-reply/route.ts` |
+
+### 9.5 收件箱往来 — 我方回复不显示
+
+| 项 | 内容 |
+|----|------|
+| **现象** | 在收件箱发出回复后，对话里只有「活动信 + 客户回信」，看不到刚发出的内容 |
+| **根因 1** | `/api/inbox/reply` 写入 `contactId: 'system-reply'`，threads API 查不到 |
+| **根因 2** | `/api/inbox/threads` 每条 log 只渲染一轮（出站 + replyBody），不含后续 outbound |
+| **修复** | reply 写入真实 `contactId`；threads 拉联系人全部 EmailLog 按时间排序；兼容历史 `system-reply`（按 toEmail 匹配） |
+| **文件** | `src/app/api/inbox/reply/route.ts`, `src/app/api/inbox/threads/route.ts`, `inbox/page.tsx`（传 `contactId`） |
+
+### 9.6 Claude 后续建议（部分已完成）
+
+- [x] Settings：保存 EmailAccount 时自动探测/建议 IMAP 主机（`KNOWN_IMAP_HOSTS` + smtp→mail 提示）
+- [x] 队列 failed 任务 UI 醒目提示（`/email-queue` 横幅 + 重试）
+- [ ] 将历史 `contactId='system-reply'` 的数据批量 backfill 为真实 contactId
+- [ ] AI 回复：从 Contact 记录取正确称呼，避免与客户/发件人姓名混淆
+- [x] docker-compose 增加 `worker` service 一键启动（含 `env_file`）
+
+### 9.7 前端接线修复（2026-05-30）
+
+| 缺口 | 修复 |
+|------|------|
+| Campaign 向导无 RECURRING / 发送窗口 UI | `campaign-wizard-store.ts` + `StepBasicInfo.tsx` + `StepAiWriter.tsx` 创建/启动时传 `scheduleType`、`recurrenceRule`、`sendingWindows`、`timezone` |
+| Prospecting 页未调用 import API | `prospecting/page.tsx` RocketReach 搜索 + 勾选导入公司/联系人 |
+| `CampaignStats` 组件未使用 | 挂到 `campaigns/page.tsx` |
+| 联系人 timeline API 未接 UI | `contacts/page.tsx` 详情抽屉加载 `/api/contacts/[id]/timeline` |
+| docker worker 缺 SMTP 等 env | `docker-compose.yml` worker 增加 `env_file: .env`，覆盖容器内 `DATABASE_URL` / `REDIS_URL` |
+
+---
+
+*本报告最后更新：2026-05-30。Phase 1–3 与前端接线（§9.7）已完成；后续从 §四 未勾选项继续。*

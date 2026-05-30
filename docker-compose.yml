@@ -56,20 +56,22 @@ services:
   #       condition: service_healthy
 
   # 邮件 Worker（可选 - 独立运行后台任务）
-  # worker:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.worker
-  #   container_name: outreachhub-worker
-  #   restart: unless-stopped
-  #   environment:
-  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
-  #     REDIS_URL: redis://redis:6379
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

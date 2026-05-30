@@ -126,9 +126,9 @@ async function fetchEmailsFromAccount(
           const fetch = imap.fetch(messageIds, { bodies: '' })
 
           fetch.on('message', (msg) => {
-            msg.on('body', (stream: NodeJS.ReadableStream) => {
+            msg.on('body', (stream) => {
               parsePromises.push(
-                simpleParser(stream)
+                simpleParser(stream as any)
                   .then((parsed) => ({
                     messageId: parsed.messageId || '',
                     inReplyTo: parsed.inReplyTo || null,

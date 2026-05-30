@@ -22,6 +22,12 @@ export function StepBasicInfo() {
     campaignName, setCampaignName,
     targetTags, setTargetTags,
     senderAccountId, setSenderAccountId,
+    scheduleType, setScheduleType,
+    scheduledAt, setScheduledAt,
+    recurrenceRule, setRecurrenceRule,
+    timezone, setTimezone,
+    windowStart, setWindowStart,
+    windowEnd, setWindowEnd,
     nextStep,
   } = useCampaignWizardStore()
 
@@ -44,7 +50,11 @@ export function StepBasicInfo() {
       .finally(() => setLoading(false))
   }, [senderAccountId, setSenderAccountId])
 
-  const canProceed = campaignName.trim() && senderAccountId
+  const canProceed =
+    campaignName.trim() &&
+    senderAccountId &&
+    (scheduleType !== 'SCHEDULED' || !!scheduledAt) &&
+    (scheduleType !== 'RECURRING' || windowStart < windowEnd)
 
   return (
     <div className="space-y-6">
@@ -129,6 +139,98 @@ export function StepBasicInfo() {
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+        <Label>发送方式</Label>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(
+            [
+              { id: 'IMMEDIATE', label: '立即发送', desc: '创建后立即入队' },
+              { id: 'SCHEDULED', label: '定时发送', desc: '指定未来时间启动' },
+              { id: 'RECURRING', label: '重复发送', desc: '按周期自动执行' },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setScheduleType(opt.id)}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                scheduleType === opt.id
+                  ? 'border-blue-500 bg-blue-50 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <p className="text-sm font-semibold text-gray-900">{opt.label}</p>
+              <p className="mt-0.5 text-xs text-gray-500">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {scheduleType === 'SCHEDULED' && (
+          <div className="space-y-2">
+            <Label htmlFor="scheduledAt">计划启动时间 *</Label>
+            <Input
+              id="scheduledAt"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+            />
+          </div>
+        )}
+
+        {scheduleType === 'RECURRING' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="recurrenceRule">重复频率</Label>
+              <select
+                id="recurrenceRule"
+                value={recurrenceRule}
+                onChange={(e) => setRecurrenceRule(e.target.value as typeof recurrenceRule)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="daily">每天</option>
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timezone">时区</Label>
+              <Input
+                id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                placeholder="Asia/Shanghai"
+              />
+            </div>
+          </div>
+        )}
+
+        {(scheduleType === 'RECURRING' || scheduleType === 'SCHEDULED') && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="windowStart">发送窗口开始</Label>
+              <Input
+                id="windowStart"
+                type="time"
+                value={windowStart}
+                onChange={(e) => setWindowStart(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="windowEnd">发送窗口结束</Label>
+              <Input
+                id="windowEnd"
+                type="time"
+                value={windowEnd}
+                onChange={(e) => setWindowEnd(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+        {scheduleType === 'RECURRING' && windowStart >= windowEnd && (
+          <p className="text-xs text-red-600">发送窗口开始时间必须早于结束时间</p>
         )}
       </div>
 

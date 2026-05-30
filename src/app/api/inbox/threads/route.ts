@@ -193,8 +193,8 @@ export async function GET(req: NextRequest) {
           emailLogIds: logs.map((l) => l.id),
         }
       })
-      .filter(Boolean)
-      .sort((a, b) => (b!.lastActivityAt || 0) - (a!.lastActivityAt || 0))
+      .filter((t): t is NonNullable<typeof t> => t !== null)
+      .sort((a, b) => (b.lastActivityAt || 0) - (a.lastActivityAt || 0))
       .map(({ lastActivityAt: _, ...thread }) => thread)
 
     return NextResponse.json({ success: true, data: threads })

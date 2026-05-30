@@ -4,6 +4,7 @@ import { sendPlatformMail } from './email'
 import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
+import { maybeMarkCampaignCompleted } from './campaign-completion'
 
 export interface EmailJobData {
   to: string
@@ -174,7 +175,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
 
     let emailHtml = data.html || ''
     if (data.contactId) {
-      emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId)
+      emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId, data.campaignId)
     }
 
     // 根据是否有 EmailAccount 选择发送方式
@@ -228,6 +229,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
           totalSent: { increment: 1 },
         },
       })
+      await maybeMarkCampaignCompleted(data.campaignId)
     }
 
     return emailLog.id

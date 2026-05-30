@@ -36,6 +36,8 @@ export function StepAiWriter() {
     prevStep,
     campaignName, targetTags, pastedEmails, selectedContactIds,
     audienceTab, senderAccountId,
+    scheduleType, scheduledAt, recurrenceRule, timezone,
+    windowStart, windowEnd,
   } = useCampaignWizardStore()
 
   const router = useRouter()
@@ -108,20 +110,32 @@ export function StepAiWriter() {
       const lines = generatedEmail.trim().split('\n').filter(Boolean)
       const subjectLine = lines.find((l) => !l.startsWith('{{') && l.length < 120) || `Re: ${campaignName}`
       const htmlContent = generatedEmail.replace(/\n/g, '<br/>')
+      const sendingWindows = { start: windowStart, end: windowEnd }
+
+      const createPayload: Record<string, unknown> = {
+        name: campaignName,
+        subject: subjectLine,
+        content: generatedEmail,
+        htmlContent,
+        emailAccountId: senderAccountId,
+        contactIds,
+        type: 'SINGLE',
+        status: 'DRAFT',
+        scheduleType,
+        timezone,
+        sendingWindows,
+      }
+      if (scheduleType === 'RECURRING') {
+        createPayload.recurrenceRule = recurrenceRule
+      }
+      if (scheduleType === 'SCHEDULED' && scheduledAt) {
+        createPayload.scheduledAt = new Date(scheduledAt).toISOString()
+      }
 
       const createRes = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: campaignName,
-          subject: subjectLine,
-          content: generatedEmail,
-          htmlContent,
-          emailAccountId: senderAccountId,
-          contactIds,
-          type: 'SINGLE',
-          status: 'DRAFT',
-        }),
+        body: JSON.stringify(createPayload),
       })
       const createJson = await createRes.json()
       if (!createRes.ok || !createJson.success) {
@@ -129,10 +143,15 @@ export function StepAiWriter() {
         return
       }
 
+      const launchBody: Record<string, unknown> = {}
+      if (scheduleType === 'SCHEDULED' && scheduledAt) {
+        launchBody.scheduledAt = new Date(scheduledAt).toISOString()
+      }
+
       const launchRes = await fetch(`/api/campaigns/${createJson.data.id}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(launchBody),
       })
       const launchJson = await launchRes.json()
       if (!launchRes.ok || !launchJson.success) {

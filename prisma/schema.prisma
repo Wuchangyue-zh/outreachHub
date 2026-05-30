@@ -190,6 +190,11 @@ model Contact {
   emailsReplied       Int      @default(0)
   emailsBounced       Int      @default(0)
 
+  // 退订状态
+  unsubscribed        Boolean  @default(false)
+  unsubscribedAt      DateTime?
+  unsubscribeReason   String?  // 退订原因：manual, reply-unsubscribe, link-click
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -299,6 +304,11 @@ model Campaign {
   sendingWindows  Json?           // 发送时间窗口 {start: "09:00", end: "17:00"}
   throttlePerHour Int             @default(50)
   throttlePerDay  Int             @default(200)
+
+  // 重复规则（RECURRING 类型）
+  recurrenceRule  String?         // 重复规则：daily, weekly, monthly, 或 cron 表达式
+  lastRecurrenceAt DateTime?      // 上次执行时间
+  nextRecurrenceAt DateTime?      // 下次执行时间
 
   // A/B测试
   abTestEnabled   Boolean         @default(false)
@@ -531,4 +541,5 @@ enum EmailStatus {
   REPLIED
   BOUNCED
   FAILED
+  UNSUBSCRIBED
 }

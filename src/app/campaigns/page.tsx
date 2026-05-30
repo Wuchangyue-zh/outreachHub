@@ -10,6 +10,7 @@ import {
   Search, Pause, Play, Trash2, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CampaignStats } from '@/components/CampaignStats'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -274,6 +275,8 @@ export default function CampaignsPage() {
             iconBg="bg-amber-50 text-amber-600"
           />
         </div>
+
+        <CampaignStats />
 
         {/* ─── Filter & Actions Bar ─── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

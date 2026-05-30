@@ -6,6 +6,7 @@ import { prisma } from './prisma'
 import { addEmailTracking } from './email-tracking'
 import { applyEmailVariables, buildContactVariables } from './email-variables'
 import type { EmailJobData } from './email-queue'
+import { maybeMarkCampaignCompleted } from './campaign-completion'
 
 async function processEmailJob(job: Job<EmailJobData>) {
   const {
@@ -100,7 +101,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
   // Prepare email content with tracking using the centralized addEmailTracking function
   let emailHtml = finalHtml
   if (emailLog.id && contactId) {
-    emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId)
+    emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId, campaignId)
   } else if (trackingPixel && emailLog.id) {
     // Fallback: just add tracking pixel if no contactId
     const pixelUrl = `${process.env.APP_URL}/api/email/track/open?e=${emailLog.id}&c=${contactId || ''}&t=${Date.now()}`
@@ -164,6 +165,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
           totalSent: { increment: 1 },
         },
       })
+      await maybeMarkCampaignCompleted(campaignId)
     }
 
     await job.updateProgress(100)
@@ -189,6 +191,10 @@ async function processEmailJob(job: Job<EmailJobData>) {
 
     // P1-6 修复：SMTP 发送失败不计入 totalBounced（那是真实退信统计）
     // 失败记录已保存在 EmailLog 中，可通过查询 EmailLog 统计失败数
+
+    if (campaignId) {
+      await maybeMarkCampaignCompleted(campaignId)
+    }
 
     throw error
   }

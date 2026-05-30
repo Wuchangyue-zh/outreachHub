@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { refreshRunningCampaignStatuses } from '@/lib/campaign-completion'
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (status) where.status = status
     if (type) where.type = type
 
-    const [campaigns, total] = await Promise.all([
+    let [campaigns, total] = await Promise.all([
       prisma.campaign.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -28,6 +29,20 @@ export async function GET(req: NextRequest) {
       }),
       prisma.campaign.count({ where }),
     ])
+
+    // 修正已全部发完但仍显示 RUNNING 的单次/定时活动
+    const staleRunningIds = campaigns
+      .filter((c) => c.status === 'RUNNING' && c.scheduleType !== 'RECURRING')
+      .map((c) => c.id)
+    if (staleRunningIds.length > 0) {
+      await refreshRunningCampaignStatuses(staleRunningIds)
+      campaigns = await prisma.campaign.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      })
+    }
 
     return NextResponse.json({
       success: true,

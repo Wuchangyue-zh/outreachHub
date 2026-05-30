@@ -20,6 +20,9 @@ export interface ContactRecord {
   country: string
 }
 
+export type ScheduleType = 'IMMEDIATE' | 'SCHEDULED' | 'RECURRING'
+export type RecurrenceRule = 'daily' | 'weekly' | 'monthly'
+
 export interface WizardState {
   // Step tracking
   currentStep: WizardStep
@@ -34,6 +37,20 @@ export interface WizardState {
   setTargetTags: (v: string) => void
   senderAccountId: string
   setSenderAccountId: (v: string) => void
+
+  // 发送调度
+  scheduleType: ScheduleType
+  setScheduleType: (v: ScheduleType) => void
+  scheduledAt: string
+  setScheduledAt: (v: string) => void
+  recurrenceRule: RecurrenceRule
+  setRecurrenceRule: (v: RecurrenceRule) => void
+  timezone: string
+  setTimezone: (v: string) => void
+  windowStart: string
+  setWindowStart: (v: string) => void
+  windowEnd: string
+  setWindowEnd: (v: string) => void
 
   // Step 2: Audience
   audienceTab: 'paste' | 'contacts'
@@ -76,6 +93,19 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
   senderAccountId: '',
   setSenderAccountId: (v) => set({ senderAccountId: v }),
 
+  scheduleType: 'IMMEDIATE',
+  setScheduleType: (v) => set({ scheduleType: v }),
+  scheduledAt: '',
+  setScheduledAt: (v) => set({ scheduledAt: v }),
+  recurrenceRule: 'weekly',
+  setRecurrenceRule: (v) => set({ recurrenceRule: v }),
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
+  setTimezone: (v) => set({ timezone: v }),
+  windowStart: '09:00',
+  setWindowStart: (v) => set({ windowStart: v }),
+  windowEnd: '17:00',
+  setWindowEnd: (v) => set({ windowEnd: v }),
+
   // Step 2
   audienceTab: 'paste',
   setAudienceTab: (v) => set({ audienceTab: v }),
@@ -108,6 +138,12 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
       campaignName: '',
       targetTags: '',
       senderAccountId: '',
+      scheduleType: 'IMMEDIATE',
+      scheduledAt: '',
+      recurrenceRule: 'weekly',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
+      windowStart: '09:00',
+      windowEnd: '17:00',
       audienceTab: 'paste',
       pastedEmails: '',
       selectedContactIds: [],
