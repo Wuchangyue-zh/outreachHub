@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -30,6 +30,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -60,6 +63,9 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
 
     const { id } = await ctx.params
 

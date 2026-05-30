@@ -119,7 +119,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 |------|------|------|
 | Prisma Schema | ✅ | **13 个模型**，15+ 枚举 |
 | User / Tenant | ✅ | 多租户、角色、套餐 |
-| EmailAccount | ✅ | 模型 + CRUD + **发信/IMAP 已接入** |
+| EmailAccount | ✅ | 模型 + CRUD + 发信/IMAP；**imapLastError 字段 + 健康度联动** |
 | Company / Contact / ContactEmail | ✅ | 完整 CRUD |
 | Product | ⚠️ | 模型有，无前端页 |
 | EmailTemplate / Campaign / Task | ✅ | Schema 完整；Campaign 调度逻辑部分完成 |
@@ -166,7 +166,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | `/campaigns` | ✅ | 对接 API；Launch / 暂停 / 删除；**CampaignStats 趋势图** |
 | `/campaigns/new` | ✅ | 3 步向导 + AI 生成；**IMMEDIATE / SCHEDULED / RECURRING + 发送窗口** |
 | `/contacts` `/companies` | ✅ | 完整 CRUD；**联系人详情抽屉展示互动时间线** |
-| `/templates` | ✅ | 对接 API + AI |
+| `/templates` | ✅ | 对接 API + AI；**润色/翻译/主题推荐 + 分类筛选统计** |
 | `/dashboard/inbox` | ✅ | IMAP 同步 + 完整往来 + AI 回复/扩写 + EmailAccount 发信 |
 | `/settings` | ✅ | EmailAccount CRUD + 个人资料 + 头像写回 |
 | `/email-queue` `/email-test` | ✅ | 队列监控、SMTP 测试 |
@@ -224,11 +224,11 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] 2. 启动/暂停/删除前后端对接
 - [x] 3. Launch 批量入 BullMQ；跳过已发送联系人
 - [x] 4. 调度引擎：`scheduleType`（IMMEDIATE / SCHEDULED / RECURRING）— API + **向导 UI** 已接线
-- [x] 5. `throttlePerDay` 入队上限（Launch 已 slice；**throttlePerHour 未实现**）
+- [x] 5. `throttlePerDay` 入队上限 + `throttlePerHour` 分批延迟入队（Launch 按 perHour 切片，每批延迟 1h）
 - [x] 6. 发送时间窗口：`timezone` + `sendingWindows` — RECURRING + **向导 UI** 已接线
-- [ ] 7. 多步序列：`type=SEQUENCE` 按间隔发送
-- [ ] 8. A/B 测试：流量分割、胜出版本判定
-- [ ] 9. Campaign 统计从 EmailLog 聚合（减少 Worker 直接 +1 漂移）
+- [x] 7. 多步序列：`type=SEQUENCE`（向导 UI 类型选择 + 步骤编辑器 + launch 首步 + advance-sequences cron）
+- [x] 8. A/B 测试：向导 UI 变体 B + Launch 50/50 分流 + 48h 后 openRate 判定 winner（`/api/cron/ab-test-winner`）
+- [x] 9. Campaign 统计单一数据源：Worker/直发不再直接 totalSent++；stats API 从 EmailLog 聚合后同步 Campaign 模型
 - [x] 9a. Launch 模板变量替换（`email-variables.ts`，含 `{{CompanyName}}` 等）
 
 ### 4.2 邮箱账户与 SMTP 双通道
@@ -242,7 +242,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] **12e. `selectEmailAccount` 轮换与健康度选账户**（同 #12）
 - [x] 12. 多账户轮换：按 `healthScore` / `dailyLimit` / `dailySent` 选账户
 - [x] 13. `dailySent` 每日归零（Launch 前 lazy reset，`email-account-mail.ts`）
-- [ ] 14. 健康度：bounce rate 自动降级
+- [x] 14. 健康度：bounce rate 自动降级（发送失败 -2 / IMAP 失败 -5 / 成功恢复 +0.5 / 上限 100）
 - [ ] 15. SMTP 连接池（可选优化）
 - [x] 15a. EmailAccount 密码加密存储（`encryption.ts` 已实现 AES-256-GCM；`safeDecrypt` 向后兼容）
 
@@ -253,14 +253,14 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] **16b. 文档化：UI 读 EmailLog；收信靠 IMAP 轮询写入 EmailLog**
 - [x] **16c. 定时 IMAP 轮询**（`api/cron/check-replies` + `vercel.json` 每 5 分钟；**本地需手动触发**）
 - [x] 18. 多 EmailAccount 并行 IMAP（`lib/imap-multi.ts` 读 DB）
-- [ ] 19. 单账户 IMAP 失败隔离（基础有 try/catch；可加强告警）
+- [x] 19. 单账户 IMAP 失败隔离（try/catch + healthScore 自动降级/恢复 + imapLastError 追踪）
 - [x] 20. 回复正文入库（`EmailLog.replyBody` + threads 展示）
 - [x] 21. In-Reply-To / References 关联 EmailLog.messageId
 - [x] 22. AI 回复草稿（`/api/inbox/ai-reply` + 往来历史 + 自动签名）
 - [x] 23. Inbox 发送回复（`/api/inbox/reply` + EmailAccount）
 - [x] 23a. 收件箱刷新触发 IMAP 同步（`inbox/page.tsx` → `POST /api/imap/check-replies`）
 - [x] 23b. 完整往来展示（含我方后续回复；修复 `system-reply` 假 contactId）
-- [ ] 24. OOO 自动跟进
+- [x] 24. OOO 自动跟进（IMAP 检测 OUT_OF_OFFICE → 创建 3 天后跟进 Task）
 
 ### 4.4 智能拓客
 
@@ -295,17 +295,18 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 - [x] 45. 注册邮箱验证 + **平台 SMTP 发欢迎信**（已有 `/api/auth/forgot-password` + `/reset-password` + 注册欢迎信）
 - [ ] 46. 套餐限额
 - [ ] 47. 团队邀请
-- [ ] 48. 角色差异化鉴权
+- [x] 48. 角色差异化鉴权（五角色矩阵 + 写 API：campaigns/contacts/templates/companies/prospecting/inbox/email-accounts/queue-retry）
 
 ### 4.9 模板与 AI
 
 - [x] 49. Launch 变量替换（见 9a）
-- [ ] 50. AI 生成模板完整流程
-- [ ] 51. 模板分类与统计
+- [x] 50. AI 生成模板完整流程（生成 + 主题行推荐 + 润色 + 翻译）
+- [x] 51. 模板分类与统计（分类筛选 + 分类统计条）
 
 ### 4.10 产品管理
 
-- [ ] 52–54. `/products` 页与关联推荐
+- [x] 52. 产品管理：侧边栏入口 + hasPermission 鉴权 + Campaign 向导关联产品（productId）
+- [ ] 53–54. 产品推荐 / 关联分析
 
 ### 4.11 基础设施
 
@@ -366,6 +367,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 | **Inbox 发出回复不显示在往来** | ✅ 已修复 | `contactId: system-reply` → 真实 contactId；threads 全量排序 |
 | **营销邮件仍用 .env SMTP** | ✅ 已修复 | Phase 1 双通道已完成 |
 | Prisma 7 版本冲突 | ⚠️ 规避 | 用 `npm run db:*` |
+| **Campaign PUT/PATCH 缺少 tenantId** | ⚠️ 已知 | `where: { id }` 未加 tenantId 隔离；已通过 findUnique 预检查缓解 |
 
 ---
 
@@ -403,6 +405,8 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 [x] 2026-05-30  P0 下一批：IMAP 配置向导 / 队列 failed 任务 UI / Worker docker-compose / 密码重置
 [x] 2026-05-30  P1：调度引擎 RECURRING / 时间窗口 / EmailAccount 密码加密 / 退订合规
 [x] 2026-05-30  前端接线：Campaign 调度向导 / Prospecting 导入 / CampaignStats / 联系人时间线 / docker worker env
+[x] 2026-05-30  后续：Campaign 统计聚合 / AI 模板完整流程 / 模板分类 / IMAP 失败隔离 / 健康度降级 / 角色鉴权
+[x] 2026-05-30  §9.9：权限扩展全写 API / IMAP 错误展示 / Bounce 降级 / SEQUENCE MVP
 ```
 
 ---
@@ -477,10 +481,10 @@ npm run db:push                  # 若改了 schema
 
 | 领域 | 文件 |
 |------|------|
-| 邮件双通道 | `src/lib/email.ts`, `email-account-mail.ts`, `select-email-account.ts` |
+| 邮件双通道 | `src/lib/email.ts`, `email-account-mail.ts`, `select-email-account.ts`, `bounce-handler.ts` |
 | Worker/队列 | `email-worker.ts`, `email-queue.ts` |
 | 用户邮箱 | `api/email-accounts/*`, Settings 页 |
-| Campaign | `launch/route.ts`, `campaigns/new/`, `schema.prisma` Campaign |
+| Campaign | `launch/route.ts`, `campaigns/new/`, `schema.prisma` Campaign, `api/cron/advance-sequences` |
 | Inbox/IMAP | `dashboard/inbox/page.tsx`, `imap-multi.ts`, `api/inbox/*`, `api/cron/check-replies` |
 | AI 收件箱 | `openai.ts` (`generateInboxReply`), `api/inbox/ai-reply` |
 | 平台通知 | `sendPlatformMail` in `email.ts` |
@@ -574,7 +578,7 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 - [x] Settings：保存 EmailAccount 时自动探测/建议 IMAP 主机（`KNOWN_IMAP_HOSTS` + smtp→mail 提示）
 - [x] 队列 failed 任务 UI 醒目提示（`/email-queue` 横幅 + 重试）
 - [ ] 将历史 `contactId='system-reply'` 的数据批量 backfill 为真实 contactId
-- [ ] AI 回复：从 Contact 记录取正确称呼，避免与客户/发件人姓名混淆
+- [x] AI 回复：从 Contact 记录取正确称呼，避免与客户/发件人姓名混淆
 - [x] docker-compose 增加 `worker` service 一键启动（含 `env_file`）
 
 ### 9.7 前端接线修复（2026-05-30）
@@ -587,6 +591,83 @@ curl -X POST http://localhost:3030/api/cron/check-replies
 | 联系人 timeline API 未接 UI | `contacts/page.tsx` 详情抽屉加载 `/api/contacts/[id]/timeline` |
 | docker worker 缺 SMTP 等 env | `docker-compose.yml` worker 增加 `env_file: .env`，覆盖容器内 `DATABASE_URL` / `REDIS_URL` |
 
+### 9.8 本轮开发（2026-05-30）— Campaign 统计 / 模板 AI / 健康度 / 权限
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #9 | Campaign 打开/点击/回复计数与 EmailLog 事件同步（首次 open/click） | `email-tracking.ts`, `imap-multi.ts` |
+| #14 | EmailAccount healthScore：发信失败降级、成功恢复；选账户 cap 100 | `email-worker.ts`, `select-email-account.ts` |
+| #19 | IMAP 失败隔离：记录 `imapLastError`，healthScore -5/+1 | `imap-multi.ts`, `schema.prisma` |
+| #48 | 五角色权限矩阵 + 部分 API 鉴权 | `auth-middleware.ts`, `campaigns/route.ts`, `email-accounts/route.ts` |
+| #50 | 模板 AI 润色/翻译 | `api/ai/generate/route.ts`, `templates/page.tsx` |
+| #51 | 模板分类筛选与统计条 | `templates/page.tsx` |
+
+**遗留（§9.8）：** ~~#7 缺 SEQUENCE 向导 UI；#9 Worker `totalSent` 仍 increment~~ → 已于 §9.9–§9.11 完成。
+
+### 9.9 本轮开发（2026-05-30）— 权限扩展 / IMAP 错误展示 / Bounce 降级 / SEQUENCE MVP
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #48 | 权限扩展：全部写 API 添加 `hasPermission` 鉴权 | `contacts/route.ts`, `contacts/[id]/route.ts`, `templates/route.ts`, `templates/[id]/route.ts`, `campaigns/[id]/route.ts`, `campaigns/[id]/launch/route.ts` |
+| #19 | Settings 展示 `imapLastError` / `imapLastErrorAt`（琥珀色警告条） | `settings/page.tsx` |
+| #14 | Bounce 语义补全：`bounce-handler.ts` + worker 检测永久性退信 + 降级 -5 | `bounce-handler.ts`, `email-worker.ts`, `api/email/bounce/route.ts` |
+| #7 | SEQUENCE 多步邮件 MVP：launch 首步 + advance-sequences cron 推进后续步骤 | `campaigns/[id]/launch/route.ts`, `api/cron/advance-sequences/route.ts`, `vercel.json` |
+| #7 | Campaign 向导 SEQUENCE UI：类型选择器 + 步骤编辑器 + store 接线 | `campaign-wizard-store.ts`, `StepBasicInfo.tsx`, `StepAiWriter.tsx` |
+| #9 | 移除 Worker/直发 totalSent++；stats API 从 EmailLog 聚合后同步 Campaign 模型字段 | `email-worker.ts`, `email-queue.ts`, `campaigns/stats/route.ts` |
+
+**遗留：** Campaign PUT/PATCH `where: { id }` 缺 tenantId（已通过 findUnique 预检查缓解）；Campaign 列表页 totalSent 来自模型缓存（GET /api/campaigns 与 stats 查询时从 EmailLog 同步）。
+
+### 9.10 核实后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| `advance-sequences` 无 GET，Vercel Cron 不触发 | 补 GET + `verifyCronSecret`（`lib/cron-auth.ts`） |
+| `/api/email/bounce` 无鉴权 | `verifyBounceWebhook`（`BOUNCE_WEBHOOK_SECRET` / `CRON_SECRET`） |
+| SEQUENCE 被误标 COMPLETED | `campaign-completion.ts` 跳过 `type === 'SEQUENCE'` |
+| #48 权限覆盖不全 | 扩展 companies、email-accounts/[id]、inbox、prospecting 导入、CSV 导入、queue retry |
+| bounce 账户匹配 | `markAsBounced` 优先 `emailAccountId` |
+
+### 9.11 核实 #7 / #9（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| #7 SEQUENCE 向导 UI 已实现但 Step 3 仍强制 AI 内容 | `StepAiWriter.tsx`：SEQUENCE 用步骤 1 作为 campaign subject/content，无需 `generatedEmail` 即可 Launch |
+| #9 仅移除 Worker totalSent++，open/click/reply/bounce 仍 increment | 移除 `email-tracking.ts`、`imap-multi.ts`、`bounce-handler.ts`、`track/event` 的 Campaign increment |
+| 列表页 totalSent 不访问 stats API 时可能 stale | 新增 `campaign-stats-sync.ts`；`GET /api/campaigns` 列表时同步；stats API 复用同一聚合函数 |
+
+**#7 / #9 状态：** 已完成并核实。
+
+### 9.12 Batch A — 快速补洞（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #5 | throttlePerHour：Launch 按 perHour 切片分批，每批延迟 1h 入队 | `campaigns/[id]/launch/route.ts` |
+| #52 | 产品管理：侧边栏入口 + hasPermission 鉴权 + Campaign 向导关联产品（productId） | `dashboard-layout.tsx`, `products/route.ts`, `products/[id]/route.ts`, `campaign-wizard-store.ts`, `StepBasicInfo.tsx`, `StepAiWriter.tsx`, `schema.prisma` |
+| — | Campaign/Contact/Template PATCH/DELETE where 加 tenantId 隔离 | `campaigns/[id]/route.ts`, `contacts/[id]/route.ts`, `templates/[id]/route.ts` |
+| #4 | /api/stats recentCampaigns 从 EmailLog 聚合（修复 emailStats 缺 tenant 过滤） | `stats/route.ts` |
+
+### 9.13 Batch B+C — 营销能力 + 数据修复（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| #8 | A/B 测试完整流程：向导变体 B + Launch 50/50 分流 + 48h winner cron | `StepBasicInfo.tsx`, `StepAiWriter.tsx`, `campaign-wizard-store.ts`, `launch/route.ts`, `api/cron/ab-test-winner/route.ts` |
+| #24 | OOO 自动跟进：IMAP 检测 OUT_OF_OFFICE → 创建 3 天后跟进 Task | `imap-multi.ts` |
+| — | AI 回复称呼修复：从 Contact 记录取 firstName，避免混淆 | `api/inbox/ai-reply/route.ts` |
+
+### 9.14 核实 Batch A/B/C 后修复（2026-05-30）
+
+| 问题 | 修复 |
+|------|------|
+| A/B winner 按 contactIds 顺序分组，与 Launch 随机 shuffle 不一致 | 新增 `Campaign.abTestAssignments`；Launch 持久化分组；winner cron 按 assignments 统计 |
+| `ab-test-winner` 仅 POST、无 Cron 鉴权，Vercel 不触发 | 补 GET + `verifyCronSecret` |
+| AB_TEST 发完后被 `maybeMarkCampaignCompleted` 误标 COMPLETED | `campaign-completion.ts` 跳过 `AB_TEST` |
+| Step 3 Launch 按钮 AB_TEST 不可用 | `StepAiWriter` 增加 `abReady` 条件 |
+| OOO Task `tenantId` 为 undefined；`steps` 错误 JSON.stringify | 从 Campaign 取 tenantId；steps 用 Json 数组；去重 |
+| OOO 只建 Task 不发信 | 新增 `/api/cron/process-follow-ups` + `vercel.json` |
+| `/api/stats` emailStats 未按 tenant 过滤 | groupBy 加 `campaign.tenantId` 条件 |
+
+**需执行：** `npm run db:push`（新增 `abTestAssignments` 字段）
+
 ---
 
-*本报告最后更新：2026-05-30。Phase 1–3 与前端接线（§9.7）已完成；后续从 §四 未勾选项继续。*
+*本报告最后更新：2026-05-30。Batch A/B/C 已核实并修补；后续从 Batch D 继续。*

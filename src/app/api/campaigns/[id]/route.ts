@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -29,6 +29,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    // #48: 编辑活动需要 campaigns:manage 权限
+    if (!hasPermission(auth.role, 'campaigns:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -45,7 +49,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const { name, subject, content, type, scheduleType, scheduledAt } = body
 
     const campaign = await prisma.campaign.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         name,
         subject,
@@ -66,6 +70,10 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    // #48: 更新活动需要 campaigns:manage 权限
+    if (!hasPermission(auth.role, 'campaigns:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
+    }
 
     const { id } = await ctx.params
     const existing = await prisma.campaign.findUnique({
@@ -96,9 +104,11 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.throttlePerDay !== undefined) updateData.throttlePerDay = body.throttlePerDay
     if (body.abTestEnabled !== undefined) updateData.abTestEnabled = body.abTestEnabled
     if (body.type !== undefined) updateData.type = body.type
+    // #52: 产品关联
+    if (body.productId !== undefined) updateData.productId = body.productId || null
 
     const campaign = await prisma.campaign.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: updateData,
     })
 
@@ -112,6 +122,10 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    // #48: 删除活动需要 campaigns:manage 权限
+    if (!hasPermission(auth.role, 'campaigns:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -125,7 +139,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     }
 
     await prisma.emailLog.deleteMany({ where: { campaignId: id } })
-    await prisma.campaign.delete({ where: { id } })
+    await prisma.campaign.delete({ where: { id, tenantId: auth.tenantId } })
     return NextResponse.json({ success: true, message: '活动已删除' })
   } catch (error) {
     return handleApiError(error)

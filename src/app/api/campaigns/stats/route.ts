@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { withCache } from '@/lib/redis'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
+import {
+  aggregateCampaignStatsFromLogs,
+  syncCampaignStatsFromLogs,
+} from '@/lib/campaign-stats-sync'
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,6 +44,13 @@ export async function GET(req: NextRequest) {
           },
         })
 
+        // #9: 同步每个 Campaign 的聚合统计到模型字段
+        for (const campaign of campaigns) {
+          if (campaign.emailLogs.length > 0) {
+            await syncCampaignStatsFromLogs(campaign.id, campaign.emailLogs)
+          }
+        }
+
         // Calculate overall stats
         let totalSent = 0
         let totalOpened = 0
@@ -57,8 +68,7 @@ export async function GET(req: NextRequest) {
 
         campaigns.forEach((campaign) => {
           campaign.emailLogs.forEach((log) => {
-            if (log.status === 'SENT' || log.status === 'OPENED' ||
-                log.status === 'CLICKED' || log.status === 'REPLIED') {
+            if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'].includes(log.status)) {
               totalSent++
 
               const sentDate = log.sentAt?.toISOString().split('T')[0]
@@ -124,23 +134,12 @@ export async function GET(req: NextRequest) {
         let comparison: any[] = []
         if (!campaignId) {
           const campaignStats = campaigns.map((campaign) => {
-            const sent = campaign.emailLogs.filter(
-              (l) => l.status === 'SENT' || l.status === 'OPENED' ||
-                      l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const opened = campaign.emailLogs.filter(
-              (l) => l.status === 'OPENED' || l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const clicked = campaign.emailLogs.filter(
-              (l) => l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const replied = campaign.emailLogs.filter((l) => l.status === 'REPLIED').length
-
+            const agg = aggregateCampaignStatsFromLogs(campaign.emailLogs)
             return {
               name: campaign.name,
-              openRate: sent > 0 ? (opened / sent) * 100 : 0,
-              clickRate: sent > 0 ? (clicked / sent) * 100 : 0,
-              replyRate: sent > 0 ? (replied / sent) * 100 : 0,
+              openRate: agg.totalSent > 0 ? (agg.totalOpened / agg.totalSent) * 100 : 0,
+              clickRate: agg.totalSent > 0 ? (agg.totalClicked / agg.totalSent) * 100 : 0,
+              replyRate: agg.totalSent > 0 ? (agg.totalReplied / agg.totalSent) * 100 : 0,
             }
           })
 

@@ -29,6 +29,7 @@ import {
   Server,
   Shield,
   Pencil,
+  AlertTriangle,
 } from 'lucide-react'
 
 const emptyFormData = {
@@ -96,6 +97,8 @@ interface EmailAccount {
   dailySent: number
   dailyLimit: number
   healthScore: number
+  imapLastError: string | null
+  imapLastErrorAt: string | null
   createdAt: string
 }
 
@@ -532,6 +535,23 @@ export default function SettingsPage() {
                                 健康度: {account.healthScore}%
                               </span>
                             </div>
+                            {/* #19: IMAP 错误提示 */}
+                            {account.imapLastError && (
+                              <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium text-amber-700">IMAP 连接异常</p>
+                                  <p className="text-xs text-amber-600 truncate" title={account.imapLastError}>
+                                    {account.imapLastError}
+                                  </p>
+                                  {account.imapLastErrorAt && (
+                                    <p className="text-xs text-amber-500 mt-0.5">
+                                      {new Date(account.imapLastErrorAt).toLocaleString('zh-CN')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 

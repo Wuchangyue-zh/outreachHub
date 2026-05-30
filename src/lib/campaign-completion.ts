@@ -28,6 +28,7 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
     select: {
       id: true,
       status: true,
+      type: true,
       scheduleType: true,
       contactIds: true,
     },
@@ -36,6 +37,8 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
   if (!campaign) return false
   if (campaign.status !== 'RUNNING') return false
   if (campaign.scheduleType === 'RECURRING') return false
+  if (campaign.type === 'SEQUENCE') return false
+  if (campaign.type === 'AB_TEST') return false
   if (!campaign.contactIds?.length) return false
 
   const logs = await prisma.emailLog.findMany({

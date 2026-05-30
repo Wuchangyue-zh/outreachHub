@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -30,6 +30,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    // #48: 编辑联系人需要 contacts:manage 权限
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -46,7 +50,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const { firstName, lastName, title, department, emails, country, city, tags, notes, status } = body
 
     const contact = await prisma.contact.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         firstName,
         lastName,
@@ -83,6 +87,10 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    // #48: 删除联系人需要 contacts:manage 权限
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -96,7 +104,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     }
 
     await prisma.contactEmail.deleteMany({ where: { contactId: id } })
-    await prisma.contact.delete({ where: { id } })
+    await prisma.contact.delete({ where: { id, tenantId: auth.tenantId } })
     return NextResponse.json({ success: true, message: '客户已删除' })
   } catch (error) {
     return handleApiError(error)

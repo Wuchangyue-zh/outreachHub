@@ -11,6 +11,7 @@ export interface IMAPAccountConfig {
   imapPort: number
   imapUser: string
   imapPassword: string
+  healthScore: number
 }
 
 export interface FetchedEmail {
@@ -63,6 +64,7 @@ async function loadIMAPAccounts(userId?: string): Promise<IMAPAccountConfig[]> {
       imapPort: true,
       imapUser: true,
       imapPassword: true,
+      healthScore: true,
     },
   })
 
@@ -76,6 +78,7 @@ async function loadIMAPAccounts(userId?: string): Promise<IMAPAccountConfig[]> {
       imapPort: a.imapPort!,
       imapUser: a.imapUser!,
       imapPassword: safeDecrypt(a.imapPassword!),
+      healthScore: (a as any).healthScore ?? 100,
     }))
 }
 
@@ -234,6 +237,43 @@ async function processReply(email: FetchedEmail): Promise<boolean> {
       break
   }
 
+  // #24: OOO 自动跟进 — 创建 3 天后跟进任务
+  if (classification.category === 'OUT_OF_OFFICE' && originalLog.campaignId) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: originalLog.campaignId },
+      select: { tenantId: true, name: true },
+    })
+
+    const existingFollowUp = await prisma.task.findFirst({
+      where: {
+        type: 'FOLLOW_UP',
+        status: 'PENDING',
+        contactIds: { has: originalLog.contactId },
+      },
+    })
+
+    if (!existingFollowUp && campaign) {
+      const followUpAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+      await prisma.task.create({
+        data: {
+          tenantId: campaign.tenantId,
+          name: `OOO 跟进: ${email.from || originalLog.toEmail}`,
+          type: 'FOLLOW_UP',
+          status: 'PENDING',
+          contactIds: [originalLog.contactId],
+          steps: [{
+            type: 'follow-up',
+            scheduledAt: followUpAt.toISOString(),
+            reason: 'OUT_OF_OFFICE',
+            originalCampaignId: originalLog.campaignId,
+            originalLogId: originalLog.id,
+            replyBody: email.text?.slice(0, 500) || '',
+          }],
+        },
+      }).catch((err) => console.error('[IMAP] Failed to create OOO follow-up task:', err))
+    }
+  }
+
   // 更新联系人统计
   const updateData: any = {
     emailsReplied: { increment: 1 },
@@ -247,6 +287,8 @@ async function processReply(email: FetchedEmail): Promise<boolean> {
     where: { id: originalLog.contactId },
     data: updateData,
   })
+
+  // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
   return true
 }
@@ -312,6 +354,16 @@ export async function checkRepliesFromAllAccounts(userId?: string): Promise<{
           replyCount,
         })
 
+        // #19: IMAP 成功时恢复健康度（最高100）并清除错误
+        await prisma.emailAccount.update({
+          where: { id: account.id },
+          data: {
+            healthScore: { set: Math.min(100, account.healthScore + 1) },
+            imapLastError: null,
+            imapLastErrorAt: null,
+          },
+        }).catch((err) => console.error(`[IMAP] Failed to update health for ${account.email}:`, err))
+
         console.log(`[IMAP] ${account.email}: found ${replyCount} replies`)
       } catch (error: any) {
         result.failedAccounts++
@@ -320,6 +372,16 @@ export async function checkRepliesFromAllAccounts(userId?: string): Promise<{
           success: false,
           error: error.message,
         })
+
+        // #19: IMAP 失败时降低账户健康度
+        await prisma.emailAccount.update({
+          where: { id: account.id },
+          data: {
+            healthScore: { decrement: 5 },
+            imapLastError: error.message?.slice(0, 500),
+            imapLastErrorAt: new Date(),
+          },
+        }).catch((err) => console.error(`[IMAP] Failed to update health for ${account.email}:`, err))
 
         console.error(`[IMAP] ${account.email} failed:`, error.message)
       }
@@ -367,6 +429,7 @@ export async function checkRepliesForAccount(emailAccountId: string): Promise<{
     imapPort: account.imapPort,
     imapUser: account.imapUser,
     imapPassword: safeDecrypt(account.imapPassword),
+    healthScore: (account as any).healthScore ?? 100,
   }
 
   try {

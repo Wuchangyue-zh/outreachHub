@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseCSV, importContacts } from '@/lib/csv-import'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 export async function POST(req: NextRequest) {
@@ -9,6 +9,9 @@ export async function POST(req: NextRequest) {
     const authResult = await verifyAuthToken(req)
     if (!authResult.success || !authResult.userId) {
       return errorResponse(ErrorCodes.UNAUTHORIZED, authResult.error || 'Unauthorized', 401)
+    }
+    if (!hasPermission(authResult.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
     }
 
     // Parse request body

@@ -36,6 +36,9 @@ export function StepAiWriter() {
     prevStep,
     campaignName, targetTags, pastedEmails, selectedContactIds,
     audienceTab, senderAccountId,
+    productId,
+    campaignType, sequence,
+    variantBSubject, variantBContent,
     scheduleType, scheduledAt, recurrenceRule, timezone,
     windowStart, windowEnd,
   } = useCampaignWizardStore()
@@ -94,8 +97,22 @@ export function StepAiWriter() {
     return ids
   }
 
+  const isSequence = campaignType === 'SEQUENCE'
+  const isAbTest = campaignType === 'AB_TEST'
+  const sequenceReady =
+    isSequence &&
+    sequence.length > 0 &&
+    sequence.every((s) => s.subject.trim() && s.content.trim())
+  const abReady =
+    isAbTest &&
+    !!generatedEmail.trim() &&
+    !!variantBSubject.trim() &&
+    !!variantBContent.trim()
+  const singleReady = campaignType === 'SINGLE' && !!generatedEmail.trim()
+  const canLaunch = !!senderAccountId && (sequenceReady || singleReady || abReady)
+
   const handleLaunch = async () => {
-    if (!generatedEmail.trim() || !senderAccountId) return
+    if (!canLaunch) return
     setLaunching(true)
     setLaunchError('')
 
@@ -106,25 +123,60 @@ export function StepAiWriter() {
         return
       }
 
-      // 从生成内容提取主题（首行非空）或使用任务名
-      const lines = generatedEmail.trim().split('\n').filter(Boolean)
-      const subjectLine = lines.find((l) => !l.startsWith('{{') && l.length < 120) || `Re: ${campaignName}`
-      const htmlContent = generatedEmail.replace(/\n/g, '<br/>')
+      let subjectLine: string
+      let emailContent: string
+      let htmlContent: string
+
+      if (isSequence) {
+        const firstStep = sequence[0]
+        subjectLine = firstStep.subject.trim()
+        emailContent = firstStep.content
+        htmlContent = firstStep.htmlContent || firstStep.content.replace(/\n/g, '<br/>')
+      } else {
+        const lines = generatedEmail.trim().split('\n').filter(Boolean)
+        subjectLine =
+          lines.find((l) => !l.startsWith('{{') && l.length < 120) || `Re: ${campaignName}`
+        emailContent = generatedEmail
+        htmlContent = generatedEmail.replace(/\n/g, '<br/>')
+      }
+
       const sendingWindows = { start: windowStart, end: windowEnd }
 
       const createPayload: Record<string, unknown> = {
         name: campaignName,
         subject: subjectLine,
-        content: generatedEmail,
+        content: emailContent,
         htmlContent,
         emailAccountId: senderAccountId,
         contactIds,
-        type: 'SINGLE',
+        type: campaignType,
         status: 'DRAFT',
         scheduleType,
         timezone,
         sendingWindows,
       }
+      // #52: 传递产品关联
+      if (productId) createPayload.productId = productId
+
+      // #7: SEQUENCE 类型传递步骤配置
+      if (campaignType === 'SEQUENCE' && sequence.length > 0) {
+        createPayload.sequence = sequence.map((step, idx) => ({
+          subject: step.subject,
+          content: step.content,
+          htmlContent: step.content.replace(/\n/g, '<br/>'),
+          delayHours: idx === 0 ? 0 : step.delayHours,
+        }))
+      }
+
+      // #8: A/B 测试变体 B 配置
+      if (campaignType === 'AB_TEST' && variantBSubject && variantBContent) {
+        createPayload.abTestEnabled = true
+        createPayload.sequence = [
+          { subject: subjectLine, content: emailContent, htmlContent, variant: 'A' },
+          { subject: variantBSubject, content: variantBContent, htmlContent: variantBContent.replace(/\n/g, '<br/>'), variant: 'B' },
+        ]
+      }
+
       if (scheduleType === 'RECURRING') {
         createPayload.recurrenceRule = recurrenceRule
       }
@@ -223,11 +275,32 @@ export function StepAiWriter() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">AI 开发信撰写</h2>
+        <h2 className="text-lg font-bold text-gray-900">
+          {isSequence ? '确认并启动序列' : isAbTest ? '确认 A/B 测试并启动' : 'AI 开发信撰写'}
+        </h2>
         <p className="mt-1 text-sm text-gray-500">
-          描述你的产品优势，AI 帮你生成专业的英文开发信
+          {isSequence
+            ? `已在第一步配置 ${sequence.length} 封邮件序列，可直接启动；也可选用 AI 润色第一封内容`
+            : isAbTest
+              ? '变体 A 使用下方 AI 生成内容，变体 B 已在第一步配置；48 小时后按打开率自动选 winner'
+              : '描述你的产品优势，AI 帮你生成专业的英文开发信'}
         </p>
       </div>
+
+      {isSequence && sequenceReady && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
+          <p className="text-sm font-medium text-gray-800">序列预览</p>
+          {sequence.map((step, idx) => (
+            <div key={idx} className="text-sm text-gray-600">
+              <span className="font-medium text-gray-800">第 {idx + 1} 封：</span>
+              {step.subject || '（无主题）'}
+              {idx > 0 && (
+                <span className="ml-2 text-xs text-gray-400">（+{step.delayHours}h）</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Product prompt */}
       <div className="space-y-2">
@@ -368,7 +441,7 @@ export function StepAiWriter() {
           <Button
             type="button"
             onClick={handleLaunch}
-            disabled={launching || !generatedEmail.trim() || !senderAccountId}
+            disabled={launching || !canLaunch}
             className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             size="lg"
           >
@@ -380,7 +453,7 @@ export function StepAiWriter() {
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Launch Campaign
+                {isSequence ? 'Launch Sequence' : 'Launch Campaign'}
               </>
             )}
           </Button>

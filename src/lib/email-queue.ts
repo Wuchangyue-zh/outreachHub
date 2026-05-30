@@ -221,14 +221,8 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       })
     }
 
-    // Update campaign stats
+    // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (data.campaignId) {
-      await prisma.campaign.update({
-        where: { id: data.campaignId },
-        data: {
-          totalSent: { increment: 1 },
-        },
-      })
       await maybeMarkCampaignCompleted(data.campaignId)
     }
 

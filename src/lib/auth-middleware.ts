@@ -5,7 +5,33 @@ export interface AuthResult {
   success: boolean
   userId?: string
   tenantId?: string
+  role?: string
   error?: string
+}
+
+// #48: 角色权限定义
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  OWNER: ['*'], // 所有权限
+  ADMIN: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'settings:manage', 'inbox:manage', 'reports:view'],
+  MANAGER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view'],
+  MEMBER: ['campaigns:view', 'contacts:view', 'templates:view', 'inbox:manage'],
+  VIEWER: ['campaigns:view', 'contacts:view', 'templates:view', 'reports:view'],
+}
+
+/**
+ * 检查用户是否有指定权限
+ */
+export function hasPermission(role: string | undefined, permission: string): boolean {
+  if (!role) return false
+  const permissions = ROLE_PERMISSIONS[role] || []
+  return permissions.includes('*') || permissions.includes(permission)
+}
+
+/**
+ * 检查用户是否为管理员（OWNER 或 ADMIN）
+ */
+export function isAdmin(role: string | undefined): boolean {
+  return role === 'OWNER' || role === 'ADMIN'
 }
 
 /**
@@ -57,6 +83,7 @@ export async function verifyAuthToken(req: NextRequest): Promise<AuthResult> {
       success: true,
       userId: payload.userId,
       tenantId: payload.tenantId,
+      role: payload.role,
     }
   } catch (error) {
     console.error('Auth verification error:', error)

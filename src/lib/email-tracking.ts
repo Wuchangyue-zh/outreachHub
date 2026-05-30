@@ -85,6 +85,8 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
       },
     })
 
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
+
     console.log(`Email open recorded: ${emailLogId}`)
   } catch (error) {
     console.error('Error recording email open:', error)
@@ -107,6 +109,7 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
     await prisma.emailLog.update({
       where: { id: emailLogId },
       data: {
+        status: emailLog.status !== 'REPLIED' ? 'CLICKED' : emailLog.status,
         clickedAt: emailLog.clickedAt || new Date(),
         clickedCount: { increment: 1 },
       },
@@ -119,6 +122,8 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
         lastEmailOpenedAt: new Date(),
       },
     })
+
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
     console.log(`Email click recorded: ${emailLogId} -> ${url}`)
   } catch (error) {

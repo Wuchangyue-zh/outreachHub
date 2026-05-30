@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import * as rocketreach from '@/lib/rocketreach'
 import { generateCustomerProfile } from '@/lib/openai'
@@ -13,6 +13,11 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { type, params } = body
+
+    const mutateTypes = ['create-prospecting-task', 'import-companies', 'import-contacts']
+    if (mutateTypes.includes(type) && !hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
 
     if (type === 'search-companies') {
       const companies = await rocketreach.searchCompanies(params)

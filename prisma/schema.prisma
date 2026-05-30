@@ -75,6 +75,8 @@ model EmailAccount {
   dailyLimit   Int      @default(50)
   lastResetAt  DateTime @default(now())
   healthScore  Float    @default(100) // 邮箱健康度评分
+  imapLastError   String?  @db.Text  // 最近一次 IMAP 错误信息
+  imapLastErrorAt DateTime? // 最近一次 IMAP 错误时间
   campaigns    Campaign[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -238,6 +240,7 @@ model Product {
   features    String[]
   tags        String[]
   isActive    Boolean  @default(true)
+  campaigns   Campaign[]       // #52: 关联的营销活动
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -290,6 +293,10 @@ model Campaign {
   emailAccountId  String?
   emailAccount    EmailAccount?   @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
 
+  // #52: 产品关联
+  productId       String?
+  product         Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+
   // 多封邮件(用于序列活动)
   sequence        Json?           // 多封邮件的配置数组
 
@@ -314,6 +321,7 @@ model Campaign {
   abTestEnabled   Boolean         @default(false)
   abTestVariant   String?
   abTestWinner    String?
+  abTestAssignments Json?         // { [contactId]: "A" | "B" }
 
   // 统计
   totalSent       Int             @default(0)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { encrypt, decrypt } from '@/lib/encryption'
 
@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    // #48: 邮箱设置需要 settings:manage 权限
+    if (!hasPermission(auth.role, 'settings:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要设置管理权限', 403)
+    }
 
     const body = await req.json()
     const { email, displayName, smtpHost, smtpPort, smtpUser, smtpPassword, imapHost, imapPort, imapUser, imapPassword } = body

@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useCampaignWizardStore } from '@/store/campaign-wizard-store'
-import { ArrowRight, Mail, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowRight, Mail, Loader2, AlertCircle, Plus, Trash2, Clock, Package } from 'lucide-react'
 import Link from 'next/link'
 
 interface EmailAccountOption {
@@ -22,6 +23,11 @@ export function StepBasicInfo() {
     campaignName, setCampaignName,
     targetTags, setTargetTags,
     senderAccountId, setSenderAccountId,
+    productId, setProductId,
+    campaignType, setCampaignType,
+    variantBSubject, setVariantBSubject,
+    variantBContent, setVariantBContent,
+    sequence, addSequenceStep, removeSequenceStep, updateSequenceStep,
     scheduleType, setScheduleType,
     scheduledAt, setScheduledAt,
     recurrenceRule, setRecurrenceRule,
@@ -31,28 +37,54 @@ export function StepBasicInfo() {
     nextStep,
   } = useCampaignWizardStore()
 
+  interface ProductOption {
+    id: string
+    name: string
+    category: string | null
+    price: number | null
+    currency: string
+  }
+
   const [accounts, setAccounts] = useState<EmailAccountOption[]>([])
+  const [products, setProducts] = useState<ProductOption[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/email-accounts')
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success) {
-          const active = (json.data as EmailAccountOption[]).filter((a) => a.isActive)
+    Promise.all([
+      fetch('/api/email-accounts').then((r) => r.json()),
+      fetch('/api/products?limit=100').then((r) => r.json()),
+    ])
+      .then(([accountsJson, productsJson]) => {
+        if (accountsJson.success) {
+          const active = (accountsJson.data as EmailAccountOption[]).filter((a) => a.isActive)
           setAccounts(active)
           if (active.length === 1 && !senderAccountId) {
             setSenderAccountId(active[0].id)
           }
+        }
+        if (productsJson.success) {
+          setProducts(productsJson.data.products || [])
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [senderAccountId, setSenderAccountId])
 
+  // #7: SEQUENCE 至少需要一个有效步骤
+  const sequenceValid =
+    campaignType !== 'SEQUENCE' ||
+    (sequence.length > 0 && sequence.every((s) => s.subject.trim() && s.content.trim()))
+
+  // #8: AB_TEST 需要变体 B 内容
+  const abValid =
+    campaignType !== 'AB_TEST' ||
+    (variantBSubject.trim() && variantBContent.trim())
+
   const canProceed =
     campaignName.trim() &&
     senderAccountId &&
+    sequenceValid &&
+    abValid &&
     (scheduleType !== 'SCHEDULED' || !!scheduledAt) &&
     (scheduleType !== 'RECURRING' || windowStart < windowEnd)
 
@@ -83,6 +115,173 @@ export function StepBasicInfo() {
         />
         <p className="text-xs text-gray-400">用于后续筛选和统计，可留空</p>
       </div>
+
+      {/* #52: 产品关联（可选） */}
+      {products.length > 0 && (
+        <div className="space-y-2">
+          <Label>关联产品（可选）</Label>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => setProductId('')}
+              className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all duration-300 ${
+                !productId
+                  ? 'border-gray-300 bg-gray-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
+                <Package className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm text-gray-500">不关联产品</p>
+              </div>
+            </button>
+            {products.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setProductId(p.id)}
+                className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all duration-300 ${
+                  productId === p.id
+                    ? 'border-blue-500 bg-blue-50 shadow-sm shadow-blue-100'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    productId === p.id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  <Package className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{p.name}</p>
+                  {p.category && (
+                    <p className="truncate text-xs text-gray-500">{p.category}</p>
+                  )}
+                  {p.price != null && (
+                    <p className="text-xs text-gray-400">{p.price} {p.currency}</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">选择产品后 AI 写信将自动填充产品信息</p>
+        </div>
+      )}
+
+      {/* #7: 活动类型选择 */}
+      <div className="space-y-3">
+        <Label>活动类型</Label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              { id: 'SINGLE', label: '单次发送', desc: '一封邮件，一次性发给所有联系人' },
+              { id: 'SEQUENCE', label: '多步序列', desc: '多封邮件按时间间隔逐步发送，提升回复率' },
+              { id: 'AB_TEST', label: 'A/B 测试', desc: '两版本邮件各发 50%，48h 后自动选胜出版本' },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setCampaignType(opt.id)}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                campaignType === opt.id
+                  ? 'border-blue-500 bg-blue-50 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <p className="text-sm font-semibold text-gray-900">{opt.label}</p>
+              <p className="mt-0.5 text-xs text-gray-500">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* #7: 序列步骤编辑器 */}
+      {campaignType === 'SEQUENCE' && (
+        <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+          <div className="flex items-center justify-between">
+            <Label>序列步骤</Label>
+            <Button type="button" variant="outline" size="sm" onClick={addSequenceStep} className="gap-1">
+              <Plus className="h-3 w-3" />
+              添加步骤
+            </Button>
+          </div>
+          {sequence.length === 0 && (
+            <p className="text-sm text-gray-500">点击「添加步骤」开始配置多封邮件序列</p>
+          )}
+          {sequence.map((step, idx) => (
+            <div key={idx} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">
+                  第 {idx + 1} 封邮件
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeSequenceStep(idx)}
+                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+              {idx > 0 && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-gray-400" />
+                  <Label className="text-xs text-gray-500">上封邮件发出后等待</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={step.delayHours}
+                    onChange={(e) => updateSequenceStep(idx, { delayHours: parseInt(e.target.value) || 1 })}
+                    className="h-7 w-20 text-xs"
+                  />
+                  <span className="text-xs text-gray-500">小时</span>
+                </div>
+              )}
+              <Input
+                placeholder="邮件主题"
+                value={step.subject}
+                onChange={(e) => updateSequenceStep(idx, { subject: e.target.value })}
+                className="text-sm"
+              />
+              <Textarea
+                placeholder="邮件内容（支持 {{FirstName}} 等变量）"
+                value={step.content}
+                onChange={(e) => updateSequenceStep(idx, { content: e.target.value })}
+                rows={4}
+                className="text-sm font-mono"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* #8: A/B 测试变体 B 编辑器 */}
+      {campaignType === 'AB_TEST' && (
+        <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/30 p-4">
+          <Label>变体 B（变体 A 在第 3 步 AI 写信中编辑）</Label>
+          <Input
+            placeholder="变体 B 邮件主题"
+            value={variantBSubject}
+            onChange={(e) => setVariantBSubject(e.target.value)}
+            className="text-sm"
+          />
+          <Textarea
+            placeholder="变体 B 邮件内容（支持 {{FirstName}} 等变量）"
+            value={variantBContent}
+            onChange={(e) => setVariantBContent(e.target.value)}
+            rows={6}
+            className="text-sm font-mono"
+          />
+          <p className="text-xs text-gray-500">发送时联系人随机分为 A、B 两组，48 小时后根据打开率自动选出胜出版本。</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Label>发信邮箱账户 *</Label>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { encrypt } from '@/lib/encryption'
 
@@ -38,6 +38,9 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!hasPermission(auth.role, 'settings:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要邮箱设置管理权限', 403)
+    }
 
     const { id } = await ctx.params
     const existing = await prisma.emailAccount.findUnique({
@@ -80,6 +83,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!hasPermission(auth.role, 'settings:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要邮箱设置管理权限', 403)
+    }
 
     const { id } = await ctx.params
     const existing = await prisma.emailAccount.findUnique({
@@ -110,6 +116,9 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+    if (!hasPermission(auth.role, 'settings:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要邮箱设置管理权限', 403)
+    }
 
     const { id } = await ctx.params
     const existing = await prisma.emailAccount.findUnique({

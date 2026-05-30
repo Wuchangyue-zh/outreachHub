@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { refreshRunningCampaignStatuses } from '@/lib/campaign-completion'
+import { syncCampaignStatsByIds } from '@/lib/campaign-stats-sync'
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,6 +45,17 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // #9: 列表页从 EmailLog 同步统计缓存，避免 Campaign 模型字段漂移
+    await syncCampaignStatsByIds(campaigns.map((c) => c.id))
+    if (campaigns.length > 0) {
+      campaigns = await prisma.campaign.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      })
+    }
+
     return NextResponse.json({
       success: true,
       data: campaigns,
@@ -59,6 +71,10 @@ export async function POST(req: NextRequest) {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+    // #48: 创建 Campaign 需要 campaigns:manage 权限
+    if (!hasPermission(auth.role, 'campaigns:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
+    }
 
     const body = await req.json()
     const campaign = await prisma.campaign.create({

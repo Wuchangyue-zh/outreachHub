@@ -14,31 +14,56 @@ export async function GET(req: NextRequest) {
       async () => {
         const tenantFilter = auth.tenantId ? { tenantId: auth.tenantId } : {}
 
-        const [totalContacts, totalCompanies, totalCampaigns, emailStats, recentCampaigns] = await Promise.all([
+        // #4: recentCampaigns 从 EmailLog 聚合，避免 stale totalSent
+        const [totalContacts, totalCompanies, totalCampaigns, emailStats, recentCampaignsRaw] = await Promise.all([
           prisma.contact.count({ where: tenantFilter }),
           prisma.company.count({ where: tenantFilter }),
           prisma.campaign.count({ where: tenantFilter }),
           prisma.emailLog.groupBy({
             by: ['status'],
+            where: auth.tenantId ? { campaign: { tenantId: auth.tenantId } } : undefined,
             _count: true,
           }),
           prisma.campaign.findMany({
             where: tenantFilter,
             orderBy: { createdAt: 'desc' },
             take: 5,
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              totalSent: true,
-              totalOpened: true,
-              totalReplied: true,
-              createdAt: true,
-            },
+            select: { id: true, name: true, status: true, createdAt: true },
           }),
         ])
 
-        const stats: Record<string, any> = {
+        // 从 EmailLog 聚合每个 recentCampaign 的统计
+        const campaignIds = recentCampaignsRaw.map((c) => c.id)
+        const logAgg = campaignIds.length > 0
+          ? await prisma.emailLog.groupBy({
+              by: ['campaignId', 'status'],
+              where: { campaignId: { in: campaignIds } },
+              _count: true,
+            })
+          : []
+
+        const statsMap = new Map<string, { totalSent: number; totalOpened: number; totalReplied: number }>()
+        for (const row of logAgg) {
+          if (!row.campaignId) continue
+          const entry = statsMap.get(row.campaignId) || { totalSent: 0, totalOpened: 0, totalReplied: 0 }
+          if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'].includes(row.status)) {
+            entry.totalSent += row._count
+          }
+          if (['OPENED', 'CLICKED', 'REPLIED'].includes(row.status)) {
+            entry.totalOpened += row._count
+          }
+          if (row.status === 'REPLIED') {
+            entry.totalReplied += row._count
+          }
+          statsMap.set(row.campaignId, entry)
+        }
+
+        const recentCampaigns = recentCampaignsRaw.map((c) => {
+          const s = statsMap.get(c.id) || { totalSent: 0, totalOpened: 0, totalReplied: 0 }
+          return { ...c, ...s }
+        })
+
+        const result: Record<string, any> = {
           totalContacts,
           totalCompanies,
           totalCampaigns,
@@ -50,18 +75,18 @@ export async function GET(req: NextRequest) {
 
         // Aggregate email stats
         for (const s of emailStats) {
-          stats[`emails_${s.status}`] = s._count
+          result[`emails_${s.status}`] = s._count
         }
 
         // Calculate rates
-        const totalSent = stats.emails_SENT || 0
-        const totalOpened = stats.emails_OPENED || 0
-        const totalReplied = stats.emails_REPLIED || 0
+        const totalSent = result.emails_SENT || 0
+        const totalOpened = result.emails_OPENED || 0
+        const totalReplied = result.emails_REPLIED || 0
 
-        stats.openRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0
-        stats.replyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0
+        result.openRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0
+        result.replyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0
 
-        return stats
+        return result
       },
       { ttl: 60 } // Cache for 60 seconds
     )

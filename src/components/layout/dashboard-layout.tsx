@@ -19,6 +19,7 @@ import {
   Menu,
   BarChart3,
   Inbox as InboxIcon,
+  Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -29,6 +30,7 @@ const navigation = [
   { name: '智能拓客', href: '/prospecting', icon: Search },
   { name: '客户管理', href: '/contacts', icon: Users },
   { name: '公司库', href: '/companies', icon: Building2 },
+  { name: '产品管理', href: '/dashboard/products', icon: Package },
   { name: '邮件营销', href: '/campaigns', icon: Send },
   { name: '邮件模板', href: '/templates', icon: FileText },
   { name: '统一收件箱', href: '/dashboard/inbox', icon: InboxIcon },

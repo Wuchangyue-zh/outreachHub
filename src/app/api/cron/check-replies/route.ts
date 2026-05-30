@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRepliesFromAllAccounts } from '@/lib/imap-multi'
+import { verifyCronSecret } from '@/lib/cron-auth'
 
 /**
  * GET/POST /api/cron/check-replies
@@ -24,19 +25,8 @@ export async function POST(req: NextRequest) {
 
 async function handleCronRequest(req: NextRequest) {
   try {
-    // 可选：验证 Cron 密钥
-    const cronSecret = process.env.CRON_SECRET
-    if (cronSecret) {
-      const authHeader = req.headers.get('authorization')
-      const urlSecret = req.nextUrl.searchParams.get('secret')
-
-      if (authHeader !== `Bearer ${cronSecret}` && urlSecret !== cronSecret) {
-        return NextResponse.json(
-          { success: false, error: 'Unauthorized' },
-          { status: 401 }
-        )
-      }
-    }
+    const unauthorized = verifyCronSecret(req)
+    if (unauthorized) return unauthorized
 
     console.log('[Cron] Starting check-replies job...')
 

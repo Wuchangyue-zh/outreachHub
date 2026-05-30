@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { generateInboxReply } from '@/lib/openai'
 
@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
     if (!auth.userId) return errorResponse(ErrorCodes.UNAUTHORIZED, 'Unauthorized', 401)
+    if (!hasPermission(auth.role, 'inbox:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要收件箱管理权限', 403)
+    }
 
     const body = await req.json()
     const {
@@ -77,12 +80,25 @@ export async function POST(req: NextRequest) {
       emailAccountId,
     } = body
 
-    if (!contactName || !contactEmail) {
+    if (!contactEmail) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '缺少联系人信息', 400)
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '缺少对话历史', 400)
+    }
+
+    // #24: 从 Contact 记录取正确称呼，避免与客户/发件人姓名混淆
+    let resolvedContactName = contactName
+    const contactRecord = await prisma.contact.findFirst({
+      where: {
+        tenantId: auth.tenantId || undefined,
+        emails: { some: { address: contactEmail } },
+      },
+      select: { firstName: true, fullName: true },
+    })
+    if (contactRecord) {
+      resolvedContactName = contactRecord.firstName || contactRecord.fullName || contactName
     }
 
     const replyMode = mode === 'expand' ? 'expand' : 'draft'
@@ -94,7 +110,7 @@ export async function POST(req: NextRequest) {
     const sender = await resolveSender(auth.userId, emailAccountId)
 
     const draft = await generateInboxReply({
-      contactName,
+      contactName: resolvedContactName,
       contactEmail,
       company: company || '',
       country,

@@ -7,6 +7,7 @@ import { addEmailTracking } from './email-tracking'
 import { applyEmailVariables, buildContactVariables } from './email-variables'
 import type { EmailJobData } from './email-queue'
 import { maybeMarkCampaignCompleted } from './campaign-completion'
+import { isPermanentBounce, markAsBounced } from './bounce-handler'
 
 async function processEmailJob(job: Job<EmailJobData>) {
   const {
@@ -157,15 +158,17 @@ async function processEmailJob(job: Job<EmailJobData>) {
       })
     }
 
-    // Update campaign statistics if campaignId exists
+    // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (campaignId) {
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: {
-          totalSent: { increment: 1 },
-        },
-      })
       await maybeMarkCampaignCompleted(campaignId)
+    }
+
+    // #14: 发送成功时小幅恢复账户健康度（上限由 select-email-account 控制）
+    if (emailAccountId) {
+      await prisma.emailAccount.update({
+        where: { id: emailAccountId },
+        data: { healthScore: { increment: 0.5 } },
+      }).catch((err) => console.error(`[Worker] Failed to recover healthScore for ${emailAccountId}:`, err))
     }
 
     await job.updateProgress(100)
@@ -180,17 +183,30 @@ async function processEmailJob(job: Job<EmailJobData>) {
   } catch (error: any) {
     console.error(`[Email Worker] Job ${job.id} failed:`, error)
 
-    // Update email log with failure
-    await prisma.emailLog.update({
-      where: { id: emailLog.id },
-      data: {
-        status: 'FAILED',
-        error: error.message,
-      },
-    })
+    // #14: 检测是否为永久性退信（5xx SMTP 错误）
+    const isBounce = isPermanentBounce(error.message || '')
 
-    // P1-6 修复：SMTP 发送失败不计入 totalBounced（那是真实退信统计）
-    // 失败记录已保存在 EmailLog 中，可通过查询 EmailLog 统计失败数
+    if (isBounce) {
+      // 退信：标记 BOUNCED + 降级健康度 + 更新统计
+      await markAsBounced(emailLog.id, error.message, emailAccountId)
+    } else {
+      // 普通发送失败
+      await prisma.emailLog.update({
+        where: { id: emailLog.id },
+        data: {
+          status: 'FAILED',
+          error: error.message,
+        },
+      })
+
+      // #14: 发送失败时降低账户健康度
+      if (emailAccountId) {
+        await prisma.emailAccount.update({
+          where: { id: emailAccountId },
+          data: { healthScore: { decrement: 2 } },
+        }).catch((err) => console.error(`[Worker] Failed to degrade healthScore for ${emailAccountId}:`, err))
+      }
+    }
 
     if (campaignId) {
       await maybeMarkCampaignCompleted(campaignId)

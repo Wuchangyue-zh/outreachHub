@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { generateEmail, generateEmailSubject, generateReplyDraft } from '@/lib/openai'
+import {
+  generateEmail, generateEmailSubject, generateReplyDraft,
+  polishEmail, translateEmail
+} from '@/lib/openai'
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,6 +47,24 @@ export async function POST(req: NextRequest) {
         lastMessage: data.lastMessage,
       })
       return NextResponse.json({ success: true, data: draft })
+    }
+
+    // #50: AI 润色/改写邮件
+    if (type === 'polish-email') {
+      if (!data.content) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供邮件内容', 400)
+      }
+      const polished = await polishEmail(data.content, data.tone || 'professional')
+      return NextResponse.json({ success: true, data: { content: polished } })
+    }
+
+    // #50: AI 翻译邮件
+    if (type === 'translate-email') {
+      if (!data.content || !data.targetLanguage) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供邮件内容和目标语言', 400)
+      }
+      const translated = await translateEmail(data.content, data.targetLanguage)
+      return NextResponse.json({ success: true, data: { content: translated } })
     }
 
     return errorResponse(ErrorCodes.VALIDATION_ERROR, '无效的生成类型', 400)

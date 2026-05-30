@@ -6,6 +6,8 @@ export type WizardStep = 1 | 2 | 3
 
 export type ToneType = 'professional' | 'warm' | 'concise' | 'urgent'
 
+export type CampaignType = 'SINGLE' | 'SEQUENCE' | 'AB_TEST'
+
 export interface SenderAccount {
   id: string
   email: string
@@ -23,6 +25,14 @@ export interface ContactRecord {
 export type ScheduleType = 'IMMEDIATE' | 'SCHEDULED' | 'RECURRING'
 export type RecurrenceRule = 'daily' | 'weekly' | 'monthly'
 
+// #7: 序列步骤定义
+export interface SequenceStep {
+  subject: string
+  content: string
+  htmlContent?: string
+  delayHours: number  // 距上一步的延迟小时数（第一步为 0）
+}
+
 export interface WizardState {
   // Step tracking
   currentStep: WizardStep
@@ -37,6 +47,26 @@ export interface WizardState {
   setTargetTags: (v: string) => void
   senderAccountId: string
   setSenderAccountId: (v: string) => void
+
+  // #52: 产品关联
+  productId: string
+  setProductId: (v: string) => void
+
+  // #7: 活动类型
+  campaignType: CampaignType
+  setCampaignType: (v: CampaignType) => void
+
+  // #8: A/B 测试变体
+  variantBSubject: string
+  setVariantBSubject: (v: string) => void
+  variantBContent: string
+  setVariantBContent: (v: string) => void
+
+  // #7: 序列步骤
+  sequence: SequenceStep[]
+  addSequenceStep: () => void
+  removeSequenceStep: (idx: number) => void
+  updateSequenceStep: (idx: number, patch: Partial<SequenceStep>) => void
 
   // 发送调度
   scheduleType: ScheduleType
@@ -93,6 +123,36 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
   senderAccountId: '',
   setSenderAccountId: (v) => set({ senderAccountId: v }),
 
+  // #52: 产品关联
+  productId: '',
+  setProductId: (v) => set({ productId: v }),
+
+  // #7: 活动类型
+  campaignType: 'SINGLE',
+  setCampaignType: (v) => set({ campaignType: v }),
+
+  // #8: A/B 测试变体
+  variantBSubject: '',
+  setVariantBSubject: (v) => set({ variantBSubject: v }),
+  variantBContent: '',
+  setVariantBContent: (v) => set({ variantBContent: v }),
+
+  // #7: 序列步骤
+  sequence: [],
+  addSequenceStep: () =>
+    set((s) => ({
+      sequence: [
+        ...s.sequence,
+        { subject: '', content: '', delayHours: s.sequence.length === 0 ? 0 : 24 },
+      ],
+    })),
+  removeSequenceStep: (idx) =>
+    set((s) => ({ sequence: s.sequence.filter((_, i) => i !== idx) })),
+  updateSequenceStep: (idx, patch) =>
+    set((s) => ({
+      sequence: s.sequence.map((step, i) => (i === idx ? { ...step, ...patch } : step)),
+    })),
+
   scheduleType: 'IMMEDIATE',
   setScheduleType: (v) => set({ scheduleType: v }),
   scheduledAt: '',
@@ -138,6 +198,11 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
       campaignName: '',
       targetTags: '',
       senderAccountId: '',
+      productId: '',
+      campaignType: 'SINGLE',
+      variantBSubject: '',
+      variantBContent: '',
+      sequence: [],
       scheduleType: 'IMMEDIATE',
       scheduledAt: '',
       recurrenceRule: 'weekly',

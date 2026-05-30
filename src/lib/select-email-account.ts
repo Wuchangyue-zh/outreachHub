@@ -168,6 +168,15 @@ export async function selectEmailAccount(
   for (const account of accounts) {
     const normalized = await resetDailySentIfNeeded(account)
 
+    // #14: 健康度上限 cap（防止超过100）
+    if (normalized.healthScore > 100) {
+      await prisma.emailAccount.update({
+        where: { id: normalized.id },
+        data: { healthScore: 100 },
+      }).catch(() => {})
+      normalized.healthScore = 100
+    }
+
     // 检查健康度阈值
     if (normalized.healthScore < mergedConfig.minHealthScore) {
       continue

@@ -66,18 +66,7 @@ export async function POST(req: NextRequest) {
       timestamp: Date.now(),
     })
 
-    // Update campaign stats if applicable
-    if (emailLog.campaignId) {
-      const campaignUpdate: any = {}
-      if (eventType === 'opened') campaignUpdate.totalOpened = { increment: 1 }
-      if (eventType === 'clicked') campaignUpdate.totalClicked = { increment: 1 }
-      if (eventType === 'replied') campaignUpdate.totalReplied = { increment: 1 }
-
-      await prisma.campaign.update({
-        where: { id: emailLog.campaignId },
-        data: campaignUpdate,
-      })
-    }
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

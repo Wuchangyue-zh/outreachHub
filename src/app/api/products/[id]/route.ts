@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuthToken } from '@/lib/auth-middleware'
+import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -46,6 +46,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+    // #52: 编辑产品需要 contacts:manage 权限
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要产品管理权限', 403)
+    }
 
     const { id } = await ctx.params
     const body = await req.json()
@@ -65,7 +69,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const { name, description, category, price, currency, imageUrl, websiteUrl, features, tags, isActive } = body
 
     const product = await prisma.product.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         name: name !== undefined ? name : existingProduct.name,
         description: description !== undefined ? description : existingProduct.description,
@@ -98,6 +102,10 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+    // #52: 删除产品需要 contacts:manage 权限
+    if (!hasPermission(auth.role, 'contacts:manage')) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要产品管理权限', 403)
+    }
 
     const { id } = await ctx.params
 
@@ -115,7 +123,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
 
     // 软删除：设置为不活跃
     await prisma.product.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: { isActive: false },
     })
 
