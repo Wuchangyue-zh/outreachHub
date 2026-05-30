@@ -125,34 +125,174 @@ export async function generateReplyDraft(input: {
   contactName: string
   company: string
   lastMessage: string
+  sender?: { name: string; email: string; company?: string }
 }) {
+  return generateInboxReply({
+    contactName: input.contactName,
+    contactEmail: '',
+    company: input.company,
+    messages: [{ from: 'them', body: input.lastMessage, timestamp: '' }],
+    mode: 'draft',
+    sender: input.sender || { name: 'Sales Team', email: '', company: input.company },
+  })
+}
+
+export async function generateInboxReply(input: {
+  contactName: string
+  contactEmail: string
+  company: string
+  country?: string
+  intent?: string
+  messages: Array<{ from: 'us' | 'them'; body: string; timestamp: string }>
+  existingDraft?: string
+  mode: 'draft' | 'expand'
+  sender: {
+    name: string
+    email: string
+    company?: string
+  }
+}) {
+  const conversation = input.messages
+    .map((m) => {
+      const role = m.from === 'us' ? 'Sales Rep (us)' : `${input.contactName} (customer)`
+      const time = m.timestamp ? ` [${m.timestamp}]` : ''
+      return `${role}${time}:\n${stripHtmlForPrompt(m.body)}`
+    })
+    .join('\n\n---\n\n')
+
+  const intentHint =
+    input.intent === 'interested'
+      ? 'The customer appears interested. Move toward scheduling a call or next step.'
+      : input.intent === 'opt-out'
+        ? 'The customer wants to opt out. Be polite and confirm removal from outreach.'
+        : input.intent === 'ooo'
+          ? 'The customer is out of office. Suggest following up later.'
+          : 'Respond appropriately based on the conversation tone.'
+
+  const signatureBlock = buildSignatureBlock(input.sender, isChineseConversation(input.messages))
+  const signatureInstruction = `Sign off with this exact signature (do not use placeholders):\n${signatureBlock}`
+
+  if (input.mode === 'expand') {
+    const completion = await createChatCompletion(
+      [
+        {
+          role: 'system',
+          content:
+            'You are a professional B2B sales representative. Expand and polish the draft reply using the full conversation context. Keep the same intent and language as the draft. Return only the improved email body text.',
+        },
+        {
+          role: 'user',
+          content: `Contact: ${input.contactName} (${input.contactEmail}) at ${input.company}${input.country ? `, ${input.country}` : ''}
+
+Conversation history:
+${conversation}
+
+Draft to expand:
+${input.existingDraft || ''}
+
+Requirements:
+1. Expand the draft into a complete, professional reply (under 250 words)
+2. Address the customer's latest message directly
+3. ${intentHint}
+4. Include a clear next step
+5. Match the language of the customer's latest message (Chinese or English)
+6. ${signatureInstruction}
+7. Do not include subject line — body only`,
+        },
+      ],
+      { temperature: 0.7, max_tokens: 800 }
+    )
+    return applySenderSignature(
+      completion.choices[0]?.message?.content?.trim() || input.existingDraft || '',
+      input.sender
+    )
+  }
+
   const completion = await createChatCompletion(
     [
       {
         role: 'system',
         content:
-          'You are a professional B2B sales representative. Write concise, helpful email replies that address the customer inquiry directly. Use a professional but warm tone.',
+          'You are a professional B2B sales representative. Write concise, helpful email replies based on the full conversation history. Use a professional but warm tone. Return only the email body text.',
       },
       {
         role: 'user',
-        content: `Write a reply email to ${input.contactName} at ${input.company}.
+        content: `Write a reply email to ${input.contactName} (${input.contactEmail}) at ${input.company}${input.country ? `, ${input.country}` : ''}.
 
-Their latest message:
-${input.lastMessage}
+You are replying as: ${input.sender.name} <${input.sender.email}>${input.sender.company ? ` from ${input.sender.company}` : ''}.
+
+Full conversation history:
+${conversation}
 
 Requirements:
-1. Address their specific questions or requests
-2. Keep it under 200 words
-3. Include a clear next step
-4. Sign off professionally
-
-Return only the email body text.`,
+1. Read the entire thread and respond to the customer's latest message
+2. Address the customer by name — never confuse the customer with the sender
+3. Keep it under 200 words
+4. ${intentHint}
+5. Include a clear next step (e.g. schedule a call, send more info)
+6. Match the language of the customer's latest message (Chinese or English)
+7. ${signatureInstruction}
+8. Do not include subject line — body only`,
       },
     ],
     { temperature: 0.7, max_tokens: 800 }
   )
 
-  return completion.choices[0]?.message?.content?.trim() || ''
+  return applySenderSignature(
+    completion.choices[0]?.message?.content?.trim() || '',
+    input.sender
+  )
+}
+
+function buildSignatureBlock(
+  sender: { name: string; email: string; company?: string },
+  chinese = false
+): string {
+  const lines = chinese ? ['此致敬礼', sender.name] : ['Best regards,', sender.name]
+  if (sender.company) lines.push(sender.company)
+  lines.push(sender.email)
+  return lines.join('\n')
+}
+
+function isChineseConversation(
+  messages: Array<{ from: 'us' | 'them'; body: string }>
+): boolean {
+  const lastCustomer = [...messages].reverse().find((m) => m.from === 'them')
+  if (!lastCustomer) return false
+  return /[\u4e00-\u9fff]/.test(stripHtmlForPrompt(lastCustomer.body))
+}
+
+function applySenderSignature(
+  text: string,
+  sender: { name: string; email: string; company?: string }
+): string {
+  let result = text
+  const placeholders = [
+    '[你的姓名]',
+    '[您的姓名]',
+    '[Your Name]',
+    '[Your Full Name]',
+    '[NAME]',
+    '[Name]',
+  ]
+  for (const placeholder of placeholders) {
+    result = result.split(placeholder).join(sender.name)
+  }
+  return result
+}
+
+function stripHtmlForPrompt(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+    .slice(0, 2000)
 }
 
 export async function generateEmailSubject(input: {

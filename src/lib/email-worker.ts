@@ -83,6 +83,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
     subject: finalSubject,
     status: 'PENDING',
     sentAt: new Date(),
+    content: finalText || finalHtml || '',
     htmlContent: finalHtml,
   }
 

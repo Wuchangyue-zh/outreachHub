@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -24,13 +25,15 @@ import {
   ThumbsUp,
   ThumbsDown,
   AlertCircle,
-  Bot,
   ChevronLeft,
   MoreVertical,
+  Sparkles,
+  Wand2,
 } from 'lucide-react'
 
 interface InboxThread {
   id: string
+  contactId: string
   contactName: string
   contactEmail: string
   company: string
@@ -55,13 +58,34 @@ interface InboxThread {
 export default function InboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [selectedThread, setSelectedThread] = useState<InboxThread | null>(null)
   const [replyContent, setReplyContent] = useState('')
   const [sending, setSending] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterIntent, setFilterIntent] = useState<string>('all')
   const [accounts, setAccounts] = useState<Array<{ id: string; email: string }>>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+
+  // 从 IMAP 同步回信，再加载收件箱线程
+  const syncAndLoadThreads = async () => {
+    setSyncing(true)
+    try {
+      const syncRes = await fetch('/api/imap/check-replies', { method: 'POST' })
+      const syncData = await syncRes.json()
+      if (!syncRes.ok) {
+        toast.error(syncData.error || '同步回信失败，请检查邮箱 IMAP 配置')
+      } else if (syncData.replyCount > 0) {
+        toast.success(`已同步 ${syncData.replyCount} 封新回复`)
+      }
+    } catch {
+      toast.error('同步回信失败')
+    } finally {
+      setSyncing(false)
+    }
+    await loadThreads()
+  }
 
   // 加载收件箱线程
   const loadThreads = async () => {
@@ -102,9 +126,13 @@ export default function InboxPage() {
   }
 
   useEffect(() => {
-    loadThreads()
+    syncAndLoadThreads()
     loadAccounts()
   }, [])
+
+  useEffect(() => {
+    setReplyContent('')
+  }, [selectedThread?.id])
 
   // 过滤线程
   const filteredThreads = threads.filter((thread) => {
@@ -119,6 +147,55 @@ export default function InboxPage() {
 
     return matchesSearch && matchesIntent
   })
+
+  // AI 撰写 / 扩写回复
+  const handleAiReply = async (mode: 'draft' | 'expand') => {
+    if (!selectedThread) return
+
+    if (mode === 'expand' && !replyContent.trim()) {
+      toast.error('请先输入草稿内容再进行 AI 扩写')
+      return
+    }
+
+    if (!selectedAccountId) {
+      toast.error('请先选择发件账户，以便 AI 带入您的签名信息')
+      return
+    }
+
+    setAiGenerating(true)
+    try {
+      const res = await fetch('/api/inbox/ai-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactName: selectedThread.contactName,
+          contactEmail: selectedThread.contactEmail,
+          company: selectedThread.company,
+          country: selectedThread.country,
+          intent: selectedThread.intent,
+          emailAccountId: selectedAccountId,
+          messages: selectedThread.messages.map((m) => ({
+            from: m.from,
+            body: m.body,
+            timestamp: m.timestamp,
+          })),
+          existingDraft: replyContent,
+          mode,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setReplyContent(data.data.draft)
+        toast.success(mode === 'expand' ? 'AI 扩写完成' : 'AI 回复已生成')
+      } else {
+        toast.error(data.error || 'AI 生成失败')
+      }
+    } catch {
+      toast.error('AI 生成失败，请稍后重试')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
 
   // 发送回复
   const handleSendReply = async () => {
@@ -142,6 +219,7 @@ export default function InboxPage() {
           subject: `Re: ${selectedThread.messages[0]?.subject || '回复'}`,
           content: replyContent,
           emailAccountId: selectedAccountId,
+          contactId: selectedThread.contactId,
           emailLogIds: selectedThread.emailLogIds,
         }),
       })
@@ -222,8 +300,8 @@ export default function InboxPage() {
                     <Inbox className="h-5 w-5" />
                     收件箱
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={loadThreads}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  <Button variant="ghost" size="sm" onClick={syncAndLoadThreads} disabled={syncing || loading}>
+                    <RefreshCw className={`h-4 w-4 ${syncing || loading ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
 
@@ -443,28 +521,53 @@ export default function InboxPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="输入回复内容..."
+                    <div className="flex gap-2 items-end">
+                      <Textarea
+                        placeholder="输入回复内容，或使用 AI 根据往来记录自动生成..."
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendReply()
-                          }
-                        }}
+                        rows={3}
+                        className="min-h-[80px] resize-y"
+                        disabled={aiGenerating}
                       />
-                      <Button
-                        onClick={handleSendReply}
-                        disabled={sending || !replyContent.trim() || !selectedAccountId}
-                      >
-                        {sending ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAiReply('draft')}
+                          disabled={aiGenerating || sending}
+                          title="根据往来记录 AI 撰写回复"
+                          className="whitespace-nowrap"
+                        >
+                          {aiGenerating ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                          <span className="ml-1 hidden lg:inline">AI 回复</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAiReply('expand')}
+                          disabled={aiGenerating || sending || !replyContent.trim()}
+                          title="扩写润色当前草稿"
+                          className="whitespace-nowrap"
+                        >
+                          <Wand2 className="h-4 w-4" />
+                          <span className="ml-1 hidden lg:inline">AI 扩写</span>
+                        </Button>
+                        <Button
+                          onClick={handleSendReply}
+                          disabled={sending || aiGenerating || !replyContent.trim() || !selectedAccountId}
+                        >
+                          {sending ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

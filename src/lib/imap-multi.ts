@@ -1,5 +1,5 @@
 import Imap from 'imap'
-import { simpleParser, ParsedMail } from 'mailparser'
+import { simpleParser } from 'mailparser'
 import { prisma } from '@/lib/prisma'
 import { classifyReply, type ClassificationResult } from './reply-classifier'
 import { safeDecrypt } from './encryption'
@@ -16,12 +16,29 @@ export interface IMAPAccountConfig {
 export interface FetchedEmail {
   messageId: string
   inReplyTo: string | null
+  references: string[]
   subject: string
   from: string
   to: string
   date: Date
   text: string
   html: string
+}
+
+function normalizeMessageId(messageId: string | null | undefined): string | null {
+  if (!messageId) return null
+  const trimmed = messageId.trim()
+  if (!trimmed) return null
+  return trimmed.startsWith('<') ? trimmed : `<${trimmed}>`
+}
+
+function collectReplyTargetIds(email: FetchedEmail): string[] {
+  const ids = new Set<string>()
+  for (const raw of [email.inReplyTo, ...email.references]) {
+    const normalized = normalizeMessageId(raw)
+    if (normalized) ids.add(normalized)
+  }
+  return [...ids]
 }
 
 /**
@@ -68,7 +85,7 @@ async function loadIMAPAccounts(userId?: string): Promise<IMAPAccountConfig[]> {
 async function fetchEmailsFromAccount(
   config: IMAPAccountConfig,
   since?: Date,
-  limit: number = 50
+  limit: number = 100
 ): Promise<FetchedEmail[]> {
   return new Promise((resolve, reject) => {
     const imap = new Imap({
@@ -88,10 +105,7 @@ async function fetchEmailsFromAccount(
           return
         }
 
-        const searchCriteria: any[] = ['UNSEEN']
-        if (since) {
-          searchCriteria.push(['SINCE', since])
-        }
+        const searchCriteria: any[] = since ? [['SINCE', since]] : ['ALL']
 
         imap.search(searchCriteria, (err, results) => {
           if (err) {
@@ -106,50 +120,53 @@ async function fetchEmailsFromAccount(
             return
           }
 
-          // 限制结果数量
           const messageIds = results.slice(-limit)
-          const fetchedEmails: FetchedEmail[] = []
+          const parsePromises: Array<Promise<FetchedEmail | null>> = []
 
           const fetch = imap.fetch(messageIds, { bodies: '' })
 
           fetch.on('message', (msg) => {
-            msg.on('body', (stream: any) => {
-              simpleParser(stream, async (err: any, parsed: ParsedMail) => {
-                if (err) {
-                  console.error(`[${config.email}] Error parsing email:`, err)
-                  return
-                }
-
-                fetchedEmails.push({
-                  messageId: parsed.messageId || '',
-                  inReplyTo: parsed.inReplyTo || null,
-                  subject: parsed.subject || '',
-                  from: parsed.from?.text || '',
-                  to: Array.isArray(parsed.to)
-                    ? parsed.to.map(t => t.text || '').join(', ')
-                    : (parsed.to?.text || ''),
-                  date: parsed.date || new Date(),
-                  text: parsed.text || '',
-                  html: parsed.html || '',
-                })
-
-                if (fetchedEmails.length === messageIds.length) {
-                  imap.end()
-                  resolve(fetchedEmails)
-                }
-              })
+            msg.on('body', (stream: NodeJS.ReadableStream) => {
+              parsePromises.push(
+                simpleParser(stream)
+                  .then((parsed) => ({
+                    messageId: parsed.messageId || '',
+                    inReplyTo: parsed.inReplyTo || null,
+                    references: Array.isArray(parsed.references)
+                      ? parsed.references
+                      : parsed.references
+                        ? [parsed.references]
+                        : [],
+                    subject: parsed.subject || '',
+                    from: parsed.from?.text || '',
+                    to: Array.isArray(parsed.to)
+                      ? parsed.to.map((t) => t.text || '').join(', ')
+                      : (parsed.to?.text || ''),
+                    date: parsed.date || new Date(),
+                    text: parsed.text || '',
+                    html: parsed.html || '',
+                  }))
+                  .catch((parseErr) => {
+                    console.error(`[${config.email}] Error parsing email:`, parseErr)
+                    return null
+                  })
+              )
             })
           })
 
-          fetch.once('error', (err) => {
+          fetch.once('error', (fetchErr) => {
             imap.end()
-            reject(err)
+            reject(fetchErr)
           })
 
-          fetch.once('end', () => {
-            imap.end()
-            if (fetchedEmails.length < messageIds.length) {
-              resolve(fetchedEmails)
+          fetch.once('end', async () => {
+            try {
+              const parsed = await Promise.all(parsePromises)
+              imap.end()
+              resolve(parsed.filter((email): email is FetchedEmail => email !== null))
+            } catch (fetchEndErr) {
+              imap.end()
+              reject(fetchEndErr)
             }
           })
         })
@@ -168,16 +185,19 @@ async function fetchEmailsFromAccount(
  * 处理回复邮件：更新 EmailLog 和 Contact 状态
  */
 async function processReply(email: FetchedEmail): Promise<boolean> {
-  if (!email.inReplyTo) {
+  const replyTargetIds = collectReplyTargetIds(email)
+  if (replyTargetIds.length === 0) {
     return false
   }
 
-  // 查找原始邮件日志
+  // 查找原始邮件日志（In-Reply-To / References）
   const originalLog = await prisma.emailLog.findFirst({
-    where: { messageId: email.inReplyTo },
+    where: {
+      OR: replyTargetIds.map((messageId) => ({ messageId })),
+    },
   })
 
-  if (!originalLog) {
+  if (!originalLog || originalLog.repliedAt) {
     return false
   }
 

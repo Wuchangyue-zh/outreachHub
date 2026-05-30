@@ -338,8 +338,11 @@ export default function SettingsPage() {
                         id="imapHost"
                         value={formData.imapHost}
                         onChange={(e) => setFormData({ ...formData, imapHost: e.target.value })}
-                        placeholder="imap.gmail.com"
+                        placeholder={formData.smtpHost.replace(/^smtp\./i, 'mail.') || 'mail.example.com'}
                       />
+                      <p className="text-xs text-gray-500">
+                        若 SMTP 为 smtp.example.com，IMAP 通常为 mail.example.com（不一定存在 imap 子域名）
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="imapPort">IMAP 端口</Label>
