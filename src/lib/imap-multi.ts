@@ -78,8 +78,6 @@ async function fetchEmailsFromAccount(
       port: config.imapPort,
       tls: true,
       tlsOptions: { rejectUnauthorized: false },
-      connectionTimeout: 30000,
-      authTimeout: 30000,
     })
 
     imap.once('ready', () => {
