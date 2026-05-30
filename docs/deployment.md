@@ -1,5 +1,7 @@
 # OutreachHub 生产部署指南
 
+> 架构模块索引与禁止回退规则见 [`architecture.md`](architecture.md) 和 [`CLAUDE.md`](../CLAUDE.md)。
+
 ## 架构拓扑
 
 ```

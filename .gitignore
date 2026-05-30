@@ -50,3 +50,6 @@ logs/
 # Temporary
 tmp/
 temp/
+
+# Claude worktrees (duplicate package.json breaks Jest in CI)
+.claude/

@@ -1,3 +1,11 @@
+/**
+ * IMAP 收信队列（BullMQ queue: imap-jobs）
+ *
+ * - 生产者：/api/cron/check-replies → dispatchImapCheck()
+ * - 消费者：npm run worker:imap
+ * - 业务：src/lib/imap-multi.ts
+ * - 架构规则：见 CLAUDE.md
+ */
 import { Queue, Worker } from 'bullmq'
 import { getRedisConnection } from './redis'
 import { executeCheckReplies } from './imap-worker-handler'

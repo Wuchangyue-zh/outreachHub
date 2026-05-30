@@ -1,3 +1,11 @@
+/**
+ * 邮件发送队列（BullMQ queue: email-queue）
+ *
+ * - 生产者：Campaign launch、Cron、Inbox 等
+ * - 消费者：npm run worker:email → src/lib/email-worker.ts
+ * - 无 Redis 时降级 API 内同步发信（仅开发）
+ * - 架构规则：见 CLAUDE.md
+ */
 import { Queue } from 'bullmq'
 import { getRedisConnection } from './redis'
 import { sendPlatformMail } from './email'

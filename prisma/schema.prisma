@@ -1,5 +1,10 @@
 // OutreachHub - SaaS平台数据库架构
 // 面向国内出海外贸企业的智能拓客与邮件营销平台
+//
+// Agent 须知：
+// - Campaign 联系人：优先 CampaignContact 关联表，contactIds[] 为遗留兼容字段
+// - 读写联系人：src/lib/campaign-contacts.ts（getCampaignContactIds / replaceCampaignContacts）
+// - 完整架构规则：CLAUDE.md / docs/architecture.md
 
 generator client {
   provider = "prisma-client-js"

@@ -1,3 +1,8 @@
+/**
+ * 统一文件存储：Vercel Blob（生产）/ public/uploads（本地开发）。
+ * 禁止在新代码中直接 fs.writeFile 到 public/uploads。
+ * 架构规则：见 CLAUDE.md
+ */
 import { promises as fs } from 'fs'
 import path from 'path'
 import { getStorageBackend } from './env'

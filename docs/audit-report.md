@@ -1,7 +1,7 @@
 # OutreachHub 项目现状与开发缺口报告
 
 > **生成日期**：2026-05-29  
-> **最后更新**：2026-05-30（前端接线：Campaign 调度向导 / Prospecting 导入 / CampaignStats / 联系人时间线 / docker worker env）  
+> **最后更新**：2026-05-30（**架构演进 Phase 1–3**：三 Worker 队列、CampaignContact、Redis 限流/事件/统计、Blob 存储 — 规则见 [`CLAUDE.md`](../CLAUDE.md) / [`docs/architecture.md`](architecture.md)）  
 > **分支**：`feat/landing-page`  
 > **审计范围**：Prisma Schema、API Routes、Frontend Pages、Lib 模块、Store、本地开发环境  
 > **用途**：交给 Claude / 开发 Agent 按优先级逐项实现
@@ -28,6 +28,8 @@
 | Next.js Dev | ✅ 本机 | `pnpm dev` / `npm run dev`，端口 **3030** |
 | 演示账户 | ✅ seed | `admin@outreachhub.com` / `admin123`（需先 `npm run db:push` + `npm run db:seed`） |
 | Email Worker | ⚠️ 需手动 | 另开终端 `npm run worker:email`（依赖 Redis；Campaign 发信必须跑） |
+| Cron Worker | ⚠️ 可选 | `npm run worker:cron` — Cron HTTP 仅入队，业务在 `src/lib/cron-jobs/` |
+| IMAP Worker | ⚠️ 可选 | `npm run worker:imap` — 收信走 `imap-jobs` 队列 |
 
 **`.env` 关键项：**
 
@@ -56,8 +58,10 @@ OPENAI_MODEL="doubao-seed-2-0-pro-260215"
 - 项目锁定 **Prisma 5.22**
 - Redis 未配置时邮件队列降级 SMTP 直发
 - **用户营销邮件已走 EmailAccount SMTP**（见 Phase 1 完成情况）；平台系统邮件仍用 `.env`
-- **Email Worker 需单独终端运行**；失败任务不会自动重试，需手动 `/api/email-queue/retry` 或队列监控页
-- **本地开发 Cron 不自动执行**；IMAP 收信需手动刷新收件箱或 `POST /api/cron/check-replies`
+- **Email Worker 需单独终端运行**；另可选 `worker:cron` / `worker:imap`（见 `docker-compose.yml`）
+- **Cron HTTP 仅入队**：业务逻辑在 `src/lib/cron-jobs/`，禁止在 route 写大段逻辑
+- **Campaign 联系人**：读写用 `src/lib/campaign-contacts.ts`，勿直接依赖裸 `contactIds[]`
+- **本地开发 Cron 不自动执行**；手动 `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3030/api/cron/...`
 
 ---
 
@@ -98,16 +102,18 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 |------|------|
 | 前端 | Next.js 15, React 18, TailwindCSS, Radix UI, Recharts, Zustand |
 | 后端 | Next.js API Routes (App Router) |
-| 数据库 | PostgreSQL (Prisma ORM v5) |
-| 缓存/队列 | Redis + BullMQ（可选，有降级） |
-| 邮件发送 | Nodemailer (SMTP) — **待拆分为平台/用户两路** |
-| 邮件接收 | IMAP + mailparser（单全局 `.env` 账户） |
+| 部署 | Vercel Web + 独立 Worker（email/cron/imap）+ Upstash Redis + Neon PG pooler |
+| 数据库 | PostgreSQL (Prisma ORM v5.22) |
+| 缓存/队列 | Redis + BullMQ（三队列：`email-queue` / `cron-jobs` / `imap-jobs`） |
+| 邮件发送 | Nodemailer — 平台 SMTP + 用户 EmailAccount 双通道 |
+| 邮件接收 | IMAP + mailparser（`imap-multi.ts`，独立 imap-worker） |
 | AI | 火山方舟（OpenAI 兼容 API，`openai.ts`） |
 | 邮箱验证 | MillionVerifier API |
 | 第三方数据 | RocketReach API |
-| 认证 | JWT + bcryptjs（Cookie `auth-token`） |
-| 文件上传 | 本机磁盘 `public/uploads/` |
-| 测试 | Jest（2 个）+ Playwright E2E（5 个 spec） |
+| 认证 | JWT + bcryptjs（Cookie `auth-token`；生产无 fallback secret） |
+| 文件上传 | `src/lib/storage.ts` — Vercel Blob（生产）/ `public/uploads`（本地） |
+| 限流/实时/统计 | Redis 分布式限流 + Pub/Sub 事件 + 统计预聚合 |
+| 测试/CI | Jest + Playwright E2E + GitHub Actions (`.github/workflows/ci.yml`) |
 
 ---
 
@@ -117,7 +123,7 @@ OutreachHub 是面向国内出海外贸企业的智能拓客与邮件营销 SaaS
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| Prisma Schema | ✅ | **13 个模型**，15+ 枚举 |
+| Prisma Schema | ✅ | **14 个模型**（含 `CampaignContact`），15+ 枚举 |
 | User / Tenant | ✅ | 多租户、角色、套餐 |
 | EmailAccount | ✅ | 模型 + CRUD + 发信/IMAP；**imapLastError 字段 + 健康度联动** |
 | Company / Contact / ContactEmail | ✅ | 完整 CRUD |

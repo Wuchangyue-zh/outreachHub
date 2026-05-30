@@ -1,3 +1,11 @@
+/**
+ * Cron 任务队列（BullMQ queue: cron-jobs）
+ *
+ * - HTTP 入口：/api/cron/* → dispatchCronJob() 仅入队
+ * - 业务逻辑：src/lib/cron-jobs/*.ts（禁止写在 route 里）
+ * - 消费者：npm run worker:cron → src/lib/cron-worker.ts
+ * - 架构规则：见 CLAUDE.md
+ */
 export type CronJobType =
   | 'launch-scheduled'
   | 'check-replies'

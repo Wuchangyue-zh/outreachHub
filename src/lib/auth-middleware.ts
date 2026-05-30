@@ -96,8 +96,9 @@ export async function verifyAuthToken(req: NextRequest): Promise<AuthResult> {
 }
 
 /**
- * 辅助函数：构建需要 tenantId 的 Prisma where 子句
- * 如果用户没有租户，则返回永远不匹配的条件（安全默认值）
+ * 构建租户隔离 Prisma where 子句。
+ * 无 tenantId 时返回永不匹配条件，防止全表泄露。
+ * 所有租户 scoped API 必须使用，见 CLAUDE.md。
  */
 export function tenantWhere(
   tenantId: string | undefined,

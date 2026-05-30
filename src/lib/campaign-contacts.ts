@@ -1,9 +1,11 @@
-import { prisma } from './prisma'
-
 /**
- * 获取 Campaign 的联系人 ID 列表。
- * 优先从 CampaignContact 关联表读取，回退到 contactIds 数组（向后兼容）。
+ * Campaign 联系人读写唯一入口。
+ *
+ * - 优先 CampaignContact 关联表
+ * - Campaign.contactIds[] 为遗留兼容，新代码禁止直接依赖
+ * - 架构规则：见 CLAUDE.md / docs/architecture.md
  */
+import { prisma } from './prisma'
 export async function getCampaignContactIds(campaignId: string): Promise<string[]> {
   const rows = await prisma.campaignContact.findMany({
     where: { campaignId },

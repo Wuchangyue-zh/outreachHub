@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+/**
+ * Cron HTTP 统一入口：鉴权 + 入队（或本地降级同步执行）。
+ * 业务逻辑禁止写在本文件，应放在 src/lib/cron-jobs/。
+ */
 import { verifyCronSecret } from './cron-auth'
 import { dispatchCronJob, type CronJobType } from './cron-queue'
 import { dispatchImapCheck } from './imap-queue'
