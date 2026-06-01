@@ -86,7 +86,10 @@ export default function ProspectingPage() {
       const res = await fetch('/api/prospecting?page=1&limit=50')
       const data = await res.json()
       if (data.success) setTasks(data.data || [])
-    } catch { /* silent */ } finally {
+      else setMessage(data.error?.message || '加载任务列表失败，请稍后重试')
+    } catch {
+      setMessage('加载任务列表失败，请稍后重试')
+    } finally {
       setTasksLoading(false)
     }
   }

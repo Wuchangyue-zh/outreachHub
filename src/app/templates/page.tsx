@@ -79,9 +79,11 @@ export default function TemplatesPage() {
       const data = await res.json()
       if (data.success) {
         setTemplates(data.data)
+      } else {
+        addToast({ type: 'error', title: '加载失败', description: data.error?.message || '无法加载模板列表' })
       }
-    } catch (e) {
-      console.error(e)
+    } catch {
+      addToast({ type: 'error', title: '加载失败', description: '无法加载模板列表，请稍后重试' })
     } finally {
       setLoading(false)
     }

@@ -5,6 +5,9 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { refreshRunningCampaignStatuses } from '@/lib/campaign-completion'
 import { syncCampaignStatsByIds } from '@/lib/campaign-stats-sync'
 import { linkAttachmentsToCampaign } from '@/lib/campaign-attachments'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +31,10 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        include: { product: { select: { id: true, name: true } } },
+        include: {
+          product: { select: { id: true, name: true } },
+          _count: { select: { campaignContacts: true } },
+        },
       }),
       prisma.campaign.count({ where }),
     ])
@@ -44,7 +50,10 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        include: { product: { select: { id: true, name: true } } },
+        include: {
+          product: { select: { id: true, name: true } },
+          _count: { select: { campaignContacts: true } },
+        },
       })
     }
 
@@ -56,7 +65,10 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        include: { product: { select: { id: true, name: true } } },
+        include: {
+          product: { select: { id: true, name: true } },
+          _count: { select: { campaignContacts: true } },
+        },
       })
     }
 
@@ -71,6 +83,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
+
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)

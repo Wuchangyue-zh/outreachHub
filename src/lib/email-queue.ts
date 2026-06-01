@@ -230,6 +230,9 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       })
     } else {
       // 使用平台 SMTP 发送（降级）
+      if (data.campaignId) {
+        console.warn(`[email-queue] Campaign ${data.campaignId} email to ${data.to} falling back to platform SMTP (no emailAccountId)`)
+      }
       result = await sendPlatformMail({
         to: data.to,
         subject: data.subject,

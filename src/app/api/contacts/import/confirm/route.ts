@@ -4,8 +4,13 @@ import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 import { checkContactLimit } from '@/lib/plan-limits'
 import { checkTrialStatus } from '@/lib/trial-guard'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
   try {
     // Verify authentication
     const authResult = await verifyAuthToken(req)

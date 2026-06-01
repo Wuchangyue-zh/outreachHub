@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const updated = await prisma.webhookEndpoint.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId! },
       data: updateData,
       select: {
         id: true,
@@ -94,7 +94,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return errorResponse(ErrorCodes.NOT_FOUND, 'Webhook 端点不存在', 404)
     }
 
-    await prisma.webhookEndpoint.delete({ where: { id } })
+    await prisma.webhookEndpoint.delete({ where: { id, tenantId: auth.tenantId! } })
 
     return NextResponse.json({ success: true, data: { deleted: true } })
   } catch (error) {

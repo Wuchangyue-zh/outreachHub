@@ -28,6 +28,7 @@ interface Campaign {
   totalReplied: number
   totalBounced: number
   contactIds: string[]
+  _count?: { campaignContacts: number }
   createdAt: string
   sentAt: string | null
   completedAt: string | null
@@ -363,7 +364,12 @@ export default function CampaignsPage() {
                   >
                     {/* Name + created */}
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-gray-900">{campaign.name}</p>
+                      <Link
+                        href={`/campaigns/${campaign.id}`}
+                        className="font-semibold text-gray-900 hover:text-violet-600 hover:underline"
+                      >
+                        {campaign.name}
+                      </Link>
                       {campaign.product && (
                         <p className="mt-0.5 text-xs text-blue-600">📦 {campaign.product.name}</p>
                       )}
@@ -387,7 +393,7 @@ export default function CampaignsPage() {
 
                     {/* Audience */}
                     <td className="px-5 py-4 text-right tabular-nums text-gray-700">
-                      {campaign.contactIds.length.toLocaleString()}
+                      {(campaign._count?.campaignContacts ?? campaign.contactIds?.length ?? 0).toLocaleString()}
                     </td>
 
                     {/* Sent */}

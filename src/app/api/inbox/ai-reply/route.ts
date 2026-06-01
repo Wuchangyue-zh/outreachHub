@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { generateInboxReply } from '@/lib/openai'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 async function resolveSender(userId: string, emailAccountId?: string) {
   if (emailAccountId) {
@@ -59,6 +62,9 @@ async function resolveSender(userId: string, emailAccountId?: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
+
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)

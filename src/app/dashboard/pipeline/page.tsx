@@ -109,12 +109,14 @@ interface Deal {
   expectedClose: string | null
   probability: number
   contactId: string | null
-  contactName: string | null
+  contactName?: string | null
   companyId: string | null
-  companyName: string | null
+  companyName?: string | null
   notes: string | null
   createdAt: string
   updatedAt: string
+  contact?: { id: string; fullName: string } | null
+  company?: { id: string; name: string } | null
 }
 
 interface StageStats {
@@ -227,16 +229,16 @@ function DealCard({ deal, onEdit, onDragStart }: DealCardProps) {
 
       {/* Meta info */}
       <div className="mt-2 space-y-1">
-        {deal.contactName && (
+        {(deal.contactName || deal.contact?.fullName) && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <User className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{deal.contactName}</span>
+            <span className="truncate">{deal.contactName || deal.contact?.fullName}</span>
           </div>
         )}
-        {deal.companyName && (
+        {(deal.companyName || deal.company?.name) && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <Building2 className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{deal.companyName}</span>
+            <span className="truncate">{deal.companyName || deal.company?.name}</span>
           </div>
         )}
       </div>
@@ -635,8 +637,8 @@ export default function PipelinePage() {
       companyId: deal.companyId || '',
       notes: deal.notes || '',
     })
-    setEditContactLabel(deal.contactName || '')
-    setEditCompanyLabel(deal.companyName || '')
+    setEditContactLabel(deal.contactName || deal.contact?.fullName || '')
+    setEditCompanyLabel(deal.companyName || deal.company?.name || '')
     setDialogOpen(true)
   }
 

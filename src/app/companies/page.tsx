@@ -78,9 +78,11 @@ export default function CompaniesPage() {
       if (data.success) {
         setCompanies(data.data)
         setTotal(data.pagination.total)
+      } else {
+        addToast({ type: 'error', title: '加载失败', description: data.error?.message || '无法加载公司列表' })
       }
-    } catch (e) {
-      console.error(e)
+    } catch {
+      addToast({ type: 'error', title: '加载失败', description: '无法加载公司列表，请稍后重试' })
     } finally {
       setLoading(false)
     }

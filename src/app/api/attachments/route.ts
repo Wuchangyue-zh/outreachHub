@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest) {
     })
 
     // 删除 DB 记录
-    await prisma.attachment.delete({ where: { id } })
+    await prisma.attachment.delete({ where: { id, tenantId } })
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {

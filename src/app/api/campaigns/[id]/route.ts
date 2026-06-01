@@ -15,6 +15,20 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params
     const campaign = await prisma.campaign.findUnique({
       where: { id, tenantId: auth.tenantId },
+      include: {
+        emailLogs: {
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        },
+        campaignContacts: {
+          take: 500,
+          include: {
+            contact: {
+              select: { id: true, fullName: true, emails: { where: { isPrimary: true }, take: 1 } },
+            },
+          },
+        },
+      },
     })
 
     if (!campaign) {
@@ -97,7 +111,6 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.fromName !== undefined) updateData.fromName = body.fromName
     if (body.fromEmail !== undefined) updateData.fromEmail = body.fromEmail
     if (body.replyTo !== undefined) updateData.replyTo = body.replyTo
-    if (body.contactIds !== undefined) updateData.contactIds = body.contactIds
     if (body.scheduleType !== undefined) updateData.scheduleType = body.scheduleType
     if (body.scheduledAt !== undefined) updateData.scheduledAt = new Date(body.scheduledAt)
     if (body.timezone !== undefined) updateData.timezone = body.timezone

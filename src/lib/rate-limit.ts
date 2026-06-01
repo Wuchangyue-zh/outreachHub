@@ -119,6 +119,24 @@ export async function checkApiKeyRateLimit(
   return null
 }
 
+/**
+ * Higher-order wrapper that adds rate limiting to a route handler.
+ * Usage: export const POST = withRateLimit(handler, { limit: 10 })
+ */
+export function withRateLimit(
+  handler: (req: NextRequest, ctx?: any) => Promise<NextResponse>,
+  options: { limit?: number; interval?: number } = {}
+) {
+  const limiter = rateLimit({ interval: options.interval || 60000, uniqueTokenPerInterval: 100 })
+  const limit = options.limit || 10
+
+  return async (req: NextRequest, ctx?: any) => {
+    const rateLimitResult = await limiter.check(req, limit)
+    if (rateLimitResult) return rateLimitResult
+    return handler(req, ctx)
+  }
+}
+
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()

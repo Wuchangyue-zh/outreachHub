@@ -104,8 +104,10 @@ export default function ContactsPage() {
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([])
   const [timelineSummary, setTimelineSummary] = useState<TimelineSummary | null>(null)
   const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState(false)
   const [deals, setDeals] = useState<Deal[]>([])
   const [dealsLoading, setDealsLoading] = useState(false)
+  const [deals360Error, setDeals360Error] = useState(false)
   const [contactTasks, setContactTasks] = useState<ContactTask[]>([])
   const [tasksLoading, setTasksLoading] = useState(false)
   const [customsProfile, setCustomsProfile] = useState<{
@@ -217,6 +219,8 @@ export default function ContactsPage() {
     setDeals([])
     setContactTasks([])
     setCustomsProfile(null)
+    setTimelineError(false)
+    setDeals360Error(false)
     setTimelineLoading(true)
     setDealsLoading(true)
     setTasksLoading(true)
@@ -228,9 +232,16 @@ export default function ContactsPage() {
       ])
       const [data360, dataTimeline] = await Promise.all([res360.json(), resTimeline.json()])
 
+      let loadFailed = false
+
       if (dataTimeline.success) {
         setTimelineEvents(dataTimeline.data.timeline || [])
         setTimelineSummary(dataTimeline.data.summary || null)
+      } else {
+        setTimelineEvents([])
+        setTimelineSummary(null)
+        setTimelineError(true)
+        loadFailed = true
       }
 
       if (data360.success) {
@@ -250,9 +261,25 @@ export default function ContactsPage() {
               : prev
           )
         }
+      } else {
+        setDeals([])
+        setContactTasks([])
+        setDeals360Error(true)
+        loadFailed = true
+      }
+
+      if (loadFailed) {
+        addToast({ type: 'error', title: '加载失败', description: '无法加载联系人详情，请稍后重试' })
       }
     } catch (e) {
-      console.error('Failed to load contact detail:', e)
+      setTimelineEvents([])
+      setTimelineSummary(null)
+      setDeals([])
+      setContactTasks([])
+      setCustomsProfile(null)
+      setTimelineError(true)
+      setDeals360Error(true)
+      addToast({ type: 'error', title: '加载失败', description: '无法加载联系人详情，请稍后重试' })
     } finally {
       setTimelineLoading(false)
       setDealsLoading(false)
@@ -1104,6 +1131,8 @@ export default function ContactsPage() {
                       <div className="flex items-center justify-center py-6 text-sm text-gray-500">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
                       </div>
+                    ) : timelineError ? (
+                      <p className="text-sm text-red-500 py-4 text-center">加载失败，请稍后重试</p>
                     ) : timelineEvents.length === 0 ? (
                       <p className="text-sm text-gray-400 py-4 text-center">暂无邮件互动记录</p>
                     ) : (
@@ -1159,6 +1188,11 @@ export default function ContactsPage() {
                       <div className="flex items-center justify-center py-6 text-sm text-gray-500">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
                       </div>
+                    ) : deals360Error ? (
+                      <div className="py-6 text-center">
+                        <Briefcase className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-red-500">加载失败，请稍后重试</p>
+                      </div>
                     ) : deals.length === 0 ? (
                       <div className="py-6 text-center">
                         <Briefcase className="mx-auto h-10 w-10 text-gray-300 mb-2" />
@@ -1201,6 +1235,11 @@ export default function ContactsPage() {
                     {tasksLoading ? (
                       <div className="flex items-center justify-center py-6 text-sm text-gray-500">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+                      </div>
+                    ) : deals360Error ? (
+                      <div className="py-6 text-center">
+                        <ListTodo className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-red-500">加载失败，请稍后重试</p>
                       </div>
                     ) : contactTasks.length === 0 ? (
                       <div className="py-6 text-center">

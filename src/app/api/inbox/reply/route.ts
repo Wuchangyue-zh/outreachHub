@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { sendAccountMail } from '@/lib/email-account-mail'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 async function resolveContactId(
   tenantId: string,
@@ -30,6 +33,9 @@ async function resolveContactId(
 
 // POST /api/inbox/reply — send a reply email
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
+
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
@@ -88,7 +94,10 @@ export async function POST(req: NextRequest) {
 
     if (emailLogIds && emailLogIds.length > 0) {
       await prisma.emailLog.updateMany({
-        where: { id: { in: emailLogIds } },
+        where: {
+          id: { in: emailLogIds },
+          contact: { tenantId: auth.tenantId },
+        },
         data: { tracked: true },
       })
     }

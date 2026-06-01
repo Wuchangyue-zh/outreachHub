@@ -100,10 +100,10 @@
 
 ```
 Phase A (P0): 多租户隔离修复 → 15 项 ✅ 完成
-Phase B (P1): 邮件双通道 → 2 项
-Phase C (P2+P3): JWT secret + Campaign 遗留 → 4 项
-Phase D (P4): 限流覆盖 → 按优先级分批
-Phase E: 前端补全 → 见 docs/frontend-gaps.md
+Phase B (P1): 邮件双通道 → 2 项 ✅
+Phase C (P2+P3): JWT secret + Campaign 遗留 → 4 项 ✅
+Phase D (P4): 限流覆盖 → 按优先级分批 ✅
+Phase E: 前端补全 → 见 docs/frontend-gaps.md（D1/D7 ✅，下一步 D3/D5）
 ```
 
 每 Phase 完成后：`npx tsc --noEmit` → `npm test` → `npm run build`

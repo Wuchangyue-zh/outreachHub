@@ -8,8 +8,13 @@ import { RocketReachProvider } from '@/lib/data-providers/rocketreach'
 import { ApolloProvider } from '@/lib/data-providers/apollo'
 import { dedupContacts } from '@/lib/contact-dedup'
 import type { SearchPeopleInput } from '@/lib/data-providers/types'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)

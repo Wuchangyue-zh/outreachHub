@@ -11,6 +11,9 @@ import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
 import { getStorageBackend } from '@/lib/env'
 import { checkTrialStatus } from '@/lib/trial-guard'
 import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -50,6 +53,9 @@ function getLaunchWarnings(): string[] {
  * Supports SINGLE (immediate blast) and SEQUENCE (step-by-step with delays).
  */
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
+
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)

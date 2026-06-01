@@ -62,7 +62,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.apiKey.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId! },
       data,
       select: {
         id: true,
@@ -118,7 +118,7 @@ export async function DELETE(
 
   try {
     await prisma.apiKey.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId! },
       data: { isActive: false },
     })
 

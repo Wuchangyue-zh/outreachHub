@@ -93,8 +93,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    const fullContact = await prisma.contact.findUnique({
-      where: { id },
+    const fullContact = await prisma.contact.findFirst({
+      where: { id, tenantId: auth.tenantId },
       include: { emails: true, company: { select: { id: true, name: true } } },
     })
 

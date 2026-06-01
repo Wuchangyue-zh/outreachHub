@@ -56,11 +56,17 @@ export function validateEnv(): void {
   }
 }
 
+let devSecretWarned = false
+
 export function getJwtSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET
   if (secret) return secret
   if (isProduction) {
     throw new Error('NEXTAUTH_SECRET is required in production')
+  }
+  if (!devSecretWarned) {
+    console.warn('[Env] NEXTAUTH_SECRET not set — using dev fallback. Set NEXTAUTH_SECRET in .env for consistent JWT across restarts.')
+    devSecretWarned = true
   }
   return 'dev-only-secret-not-for-production'
 }

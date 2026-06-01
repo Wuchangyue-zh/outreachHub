@@ -3,8 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { getStripe, getPriceId } from '@/lib/stripe'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 5)
+  if (rateLimitResult) return rateLimitResult
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)

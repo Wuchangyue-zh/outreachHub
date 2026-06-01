@@ -5,12 +5,18 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { checkUserLimit } from '@/lib/plan-limits'
 import { sendPlatformMail } from '@/lib/email'
 import crypto from 'crypto'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 /**
  * POST /api/tenant/invite
  * 邀请新成员加入团队
  */
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 5)
+  if (rateLimitResult) return rateLimitResult
+
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)

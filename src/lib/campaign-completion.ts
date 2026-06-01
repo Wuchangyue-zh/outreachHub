@@ -34,7 +34,6 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
       status: true,
       type: true,
       scheduleType: true,
-      contactIds: true,
     },
   })
 

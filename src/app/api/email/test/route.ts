@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
 import { addEmailTracking } from '@/lib/email-tracking'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 import { sendAccountMail } from '@/lib/email-account-mail'
+import { sendPlatformMail } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   try {
@@ -83,23 +83,8 @@ export async function POST(req: NextRequest) {
 
       senderEmail = account.email
     } else {
-      // 使用平台 SMTP 发送（降级）
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.jafron.com',
-        port: parseInt(process.env.SMTP_PORT || '465'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER || 'wuchangyue@jafron.com',
-          pass: process.env.SMTP_PASSWORD || '',
-        },
-        connectionTimeout: 10000,
-        tls: {
-          rejectUnauthorized: false,
-        },
-      })
-
-      const mailResult = await transporter.sendMail({
-        from: `"OutreachHub" <${senderEmail}>`,
+      // 使用平台 SMTP 发送（通过 sendPlatformMail 统一入口）
+      const mailResult = await sendPlatformMail({
         to,
         subject: subject || 'OutreachHub 测试邮件',
         text: content || '这是一封测试邮件，验证SMTP配置是否正常。',

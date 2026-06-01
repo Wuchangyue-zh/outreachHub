@@ -1427,6 +1427,127 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 **验证：** `npm run build` ✅ · `npm test` 78 条全通过 · TypeScript 零错误
 
+**核实修复（2026-05-30）：**
+- `inbox/reply`：`emailLog.updateMany` 补 `contact: { tenantId }`（Phase A 遗漏 #22）
+- `attachments` DELETE：`delete` 补 `tenantId`（遗漏 #23）
+- `v1/contacts/[id]` PUT：返回数据 `findUnique({ id })` → `findFirst({ id, tenantId })`
+
+**Phase A 遗留（Phase A2，低优先级）：** `email-accounts/[id]` update/delete 仍仅 `where: { id }`（已有 findFirst 租户校验）。`webhooks/[id]`、`api-keys/[id]` 已在 Phase B 加 `tenantId` 纵深防御 ✅
+
 ---
 
-*本报告最后更新：2026-06-01。Batch D–U + Post-GA + Launch Prep + Security Fix 全部完成。*
+### §9.43 Architecture Cleanup — Phase B
+
+**P1 — 邮件双通道修复：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| sendPlatformMail 替换 nodemailer | `api/email/test/route.ts` | 删除 `import nodemailer`，platform fallback 改用 `sendPlatformMail()` |
+| Campaign 降级警告 | `lib/email-queue.ts` | `sendEmailDirectly()` 降级路径：有 campaignId 时 `console.warn` |
+
+**P3 — Campaign 联系人遗留清理：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| 去掉 legacy contactIds 写入 | `api/campaigns/[id]/route.ts` | PATCH 删除 `updateData.contactIds = body.contactIds`，只保留 `replaceCampaignContacts()` |
+| 列表用 _count | `api/campaigns/route.ts` + `campaigns/page.tsx` | findMany include `_count: { campaignContacts }`，前端改为 `_count?.campaignContacts` |
+
+**P2 — JWT dev 环境警告：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| 启动警告 | `lib/env.ts` | `getJwtSecret()` 使用 dev fallback 时 `console.warn`（保留 fallback 不 break 本地） |
+
+**Phase A2 — 纵深防御：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| webhooks update/delete | `api/webhooks/[id]/route.ts` | `where: { id, tenantId }` |
+| api-keys update/delete | `api/api-keys/[id]/route.ts` | `where: { id, tenantId }` |
+
+**新增测试：** `src/__tests__/tenant-isolation.test.ts` — 9 条测试覆盖关系过滤和 tenantId 防御
+
+**验证：** `npm run build` ✅ · `npm test` 87 条全通过 · TypeScript 零错误
+
+**核实修复（2026-05-30）：** 移除 `campaign-completion.ts` 中未使用的 `contactIds: true` select（P3 #19 遗留）。
+
+---
+
+### §9.44 Rate Limit — Phase C
+
+**withRateLimit 包装器：** `src/lib/rate-limit.ts` 新增 `withRateLimit(handler, options)` 高阶函数，简化路由限流接入。
+
+**已覆盖写操作路由（10 条）：**
+
+| 路由 | 限流 | 说明 |
+|------|------|------|
+| `POST /api/campaigns` | 10/min | 创建 Campaign |
+| `POST /api/campaigns/[id]/launch` | 10/min | 启动 Campaign |
+| `POST /api/contacts/import/confirm` | 10/min | 确认导入 |
+| `POST /api/inbox/reply` | 10/min | 发送回复 |
+| `POST /api/inbox/ai-reply` | 10/min | AI 生成回复 |
+| `POST /api/billing/checkout` | 5/min | Stripe 结账 |
+| `POST /api/tenant/invite` | 5/min | 邀请成员 |
+| `POST /api/ai/generate` | 10/min | AI 内容生成 |
+| `POST /api/prospecting` | 10/min | 客户挖掘 |
+| `POST /api/deals` | 10/min | 创建商机（已有） |
+
+**验证：** `npm run build` ✅ · `npm test` 87 条全通过 · TypeScript 零错误
+
+**核实说明（2026-05-30）：** 10 条路由均通过 `limiter.check()` 接入（与 `withRateLimit` 包装器等价）；`withRateLimit` 已导出但尚未被路由引用，可后续 refactor。
+
+---
+
+### §9.45 Frontend — Phase D
+
+**D1 — Campaign 列表 _count：** ✅ Phase B 已完成
+
+**D7 — Campaign 详情页：** `src/app/campaigns/[id]/page.tsx`（新建）
+- 统计卡片：已发送/打开/点击/回复/退信/受众
+- 三个 Tab：概览（基本信息+效果指标+邮件内容）、发送日志、受众列表
+- 支持暂停/恢复操作
+- API 增强：`GET /api/campaigns/[id]` 返回 `emailLogs` + `campaignContacts`
+- 列表页活动名称链接至 `/campaigns/[id]`
+
+**验证：** `npm run build` ✅ · `npm test` 87 条全通过 · TypeScript 零错误
+
+**核实修复（2026-05-30）：** 列表页补活动名 Link；移除详情页无效的「编辑」按钮（向导尚未支持 `?edit=` 加载）。
+
+---
+
+---
+
+### §9.46 Frontend Error Handling — Phase E 第一批
+
+**E1 — D3：联系人详情 Drawer 错误提示：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| openDetailDrawer catch 加 toast | `contacts/page.tsx` | `addToast({ type: 'error', title: '加载失败' })` |
+| API 失败时清空状态 | `contacts/page.tsx` | timeline/deals/tasks 在对应 API 失败时清空，避免残留旧数据 |
+| 空状态文案 | `contacts/page.tsx` | 「暂无邮件互动记录」「暂无商机记录」「暂无关联任务」已有 |
+
+**E2 — D5：通用 fetch 错误 toast：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| fetchCompanies catch 加 toast | `companies/page.tsx` | `addToast({ type: 'error', title: '加载失败' })` |
+| fetchTemplates catch 加 toast | `templates/page.tsx` | `addToast({ type: 'error', title: '加载失败' })` |
+| fetchTasks catch 加 message | `prospecting/page.tsx` | `setMessage('加载任务列表失败')`（与页面内联模式一致） |
+| settings/page.tsx | 已使用 sonner `toast.error`，无需修改 |
+
+**E3 — D2：Pipeline 编辑 label 修复：**
+
+| 修复 | 文件 | 说明 |
+|------|------|------|
+| Deal 接口增加嵌套字段 | `pipeline/page.tsx` | `contact?: { id; fullName }` / `company?: { id; name }` |
+| openEditDialog initialLabel fallback | `pipeline/page.tsx` | `deal.contactName \|\| deal.contact?.fullName \|\| ''` |
+| Kanban 卡片嵌套 fallback | `pipeline/page.tsx` | `deal.contactName \|\| deal.contact?.fullName` |
+
+**验证：** `npm run build` ✅ · `npm test` 87 条全通过 · TypeScript 零错误
+
+**核实修复（2026-05-30）：** D3 补 `timelineError` / `deals360Error` 状态，API 返回 `success: false` 时 toast + 空态显示「加载失败」；catch 显式清空数据。D5 补 companies/templates 的 `!data.success` toast；prospecting `fetchTasks` 失败路径补 `setMessage`。
+
+---
+
+*本报告最后更新：2026-06-01。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling 全部完成。*
