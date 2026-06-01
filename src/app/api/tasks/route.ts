@@ -34,7 +34,11 @@ export async function GET(req: NextRequest) {
     ])
 
     // 为 FOLLOW_UP 任务加载关联联系人信息
-    const allContactIds = [...new Set(tasks.flatMap((t) => t.contactIds))]
+    const allContactIds = [
+      ...new Set(
+        tasks.flatMap((t) => [t.contactId, ...(t.contactIds || [])].filter(Boolean) as string[])
+      ),
+    ]
     const contacts = allContactIds.length > 0
       ? await prisma.contact.findMany({
           where: { id: { in: allContactIds }, tenantId: auth.tenantId },
@@ -51,13 +55,19 @@ export async function GET(req: NextRequest) {
     const enrichedTasks = tasks.map((task) => {
       const steps = (task.steps as any[]) || []
       const followUpInfo = task.type === 'FOLLOW_UP' && steps.length > 0 ? steps[0] : null
-      const contact = task.contactIds.length > 0 ? contactMap.get(task.contactIds[0]) : null
+      const primaryContactId = task.contactId || task.contactIds[0]
+      const contact = primaryContactId ? contactMap.get(primaryContactId) : null
+      const scheduledAt =
+        task.dueDate?.toISOString() ||
+        task.reminderAt?.toISOString() ||
+        followUpInfo?.scheduledAt ||
+        null
 
       return {
         ...task,
         contactName: contact?.fullName || contact?.firstName || null,
         contactEmail: contact?.emails[0]?.address || null,
-        followUpScheduledAt: followUpInfo?.scheduledAt || null,
+        followUpScheduledAt: scheduledAt,
         followUpReason: followUpInfo?.reason || null,
         originalCampaignId: followUpInfo?.originalCampaignId || null,
       }

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
 
     const body = await req.json()
-    const { productPrompt, tone, productId } = body
+    const { productPrompt, tone, productId, language } = body
 
     if (!productPrompt?.trim() && !productId) {
       const productCount = await prisma.product.count({
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请输入产品描述', 400)
     }
 
-    const email = await generateCampaignEmail(enrichedPrompt, tone || 'professional')
+    const email = await generateCampaignEmail(enrichedPrompt, tone || 'professional', language)
 
     if (!email) {
       return errorResponse(ErrorCodes.INTERNAL_ERROR, 'AI 未返回有效内容', 500)

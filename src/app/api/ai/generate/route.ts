@@ -6,6 +6,7 @@ import {
   generateEmail, generateEmailSubject, generateReplyDraft,
   polishEmail, translateEmail
 } from '@/lib/openai'
+import { getLanguageName } from '@/lib/i18n/languages'
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
       if (!data.content || !data.targetLanguage) {
         return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供邮件内容和目标语言', 400)
       }
-      const translated = await translateEmail(data.content, data.targetLanguage)
+      const translated = await translateEmail(data.content, getLanguageName(data.targetLanguage))
       return NextResponse.json({ success: true, data: { content: translated } })
     }
 

@@ -24,12 +24,22 @@ interface CompanyResult {
 interface PersonResult {
   _id: string
   name: string
+  firstName?: string
+  lastName?: string
   current_title?: string
   current_employer?: string
   country?: string
   country_code?: string
   emails?: Array<{ address: string; type: string }>
   teaser?: { emails: string[] }
+  source?: string
+  sources?: string[]
+}
+
+interface DataSourceStatus {
+  name: string
+  env: string
+  configured: boolean
 }
 
 export default function ProspectingPage() {
@@ -55,6 +65,20 @@ export default function ProspectingPage() {
     companySizes: '',
     domain: '',
   })
+  const [peopleSources, setPeopleSources] = useState({ rocketreach: true, apollo: true })
+  const [dataSources, setDataSources] = useState<DataSourceStatus[]>([])
+
+  useEffect(() => {
+    fetch('/api/settings/data-sources')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) setDataSources(d.data.providers || [])
+      })
+      .catch(() => {})
+  }, [])
+
+  const isSourceConfigured = (env: string) =>
+    dataSources.find((s) => s.env === env)?.configured ?? false
 
   const fetchTasks = async () => {
     setTasksLoading(true)
@@ -111,27 +135,63 @@ export default function ProspectingPage() {
           setMessage(data.message || '搜索失败')
         }
       } else {
+        const sources = (['rocketreach', 'apollo'] as const).filter((s) => peopleSources[s])
+        if (sources.length === 0) {
+          setMessage('请至少选择一个数据源')
+          setSearching(false)
+          return
+        }
         const res = await fetch('/api/prospecting', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            type: 'search-people',
+            type: 'search-people-multi',
             params: {
+              sources,
+              keywords: formData.keywords ? [formData.keywords] : undefined,
               title: formData.positions.split(',')[0]?.trim() || undefined,
               location: formData.locations.split(',')[0]?.trim() || undefined,
               company: formData.keywords || undefined,
-              domain: formData.domain || undefined,
               limit: 25,
             },
           }),
         })
         const data = await res.json()
         if (data.success) {
-          setPeople(data.data || [])
+          const mapped: PersonResult[] = (data.data || []).map((c: {
+            sourceId?: string
+            fullName: string
+            firstName?: string
+            lastName?: string
+            title?: string
+            company?: string
+            country?: string
+            emails: string[]
+            source: string
+            sources?: string[]
+          }) => ({
+            _id: c.sourceId || c.emails[0] || `${c.fullName}-${c.source}`,
+            name: c.fullName,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            current_title: c.title,
+            current_employer: c.company,
+            country: c.country,
+            emails: c.emails.map((e) => ({ address: e, type: 'work' })),
+            teaser: { emails: c.emails },
+            source: c.source,
+            sources: c.sources || [c.source],
+          }))
+          setPeople(mapped)
           setSelectedPersonIds(new Set())
-          setMessage(data.data?.length ? `找到 ${data.data.length} 位联系人` : '未找到结果，请调整搜索条件或配置 ROCKETREACH_API_KEY')
+          const meta = data.meta
+          setMessage(
+            mapped.length
+              ? `找到 ${mapped.length} 位联系人（${meta?.sources?.join(' + ') || '多源'}，去重前 ${meta?.totalRaw ?? mapped.length}）`
+              : '未找到结果，请调整搜索条件或配置数据源 API Key'
+          )
         } else {
-          setMessage(data.message || '搜索失败')
+          setMessage(apiErrorMessage(data, '搜索失败'))
         }
       }
     } catch {
@@ -196,15 +256,17 @@ export default function ProspectingPage() {
           contacts: selected.map((p) => {
             const email = p.emails?.[0]?.address || p.teaser?.emails?.[0] || ''
             const parts = (p.name || '').trim().split(/\s+/)
+            const source = p.sources?.[0] || p.source || 'prospecting'
             return {
               fullName: p.name,
-              firstName: parts[0] || '',
-              lastName: parts.slice(1).join(' ') || '',
+              firstName: p.firstName || parts[0] || '',
+              lastName: p.lastName || parts.slice(1).join(' ') || '',
               title: p.current_title || null,
               country: p.country || null,
               countryCode: p.country_code || null,
               email: email || undefined,
-              tags: ['rocketreach'],
+              source,
+              tags: p.sources || [source],
             }
           }),
         }),
@@ -505,6 +567,38 @@ export default function ProspectingPage() {
                   />
                 </div>
               )}
+              {tab === 'search' && searchMode === 'people' && (
+                <div>
+                  <Label>数据源（多选并行搜索）</Label>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {([
+                      { key: 'rocketreach' as const, label: 'RocketReach', env: 'ROCKETREACH_API_KEY' },
+                      { key: 'apollo' as const, label: 'Apollo.io', env: 'APOLLO_API_KEY' },
+                    ]).map(({ key, label, env }) => {
+                      const configured = dataSources.length === 0 || isSourceConfigured(env)
+                      return (
+                        <label
+                          key={key}
+                          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                            configured ? 'border-gray-200' : 'border-gray-100 bg-gray-50 text-gray-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={peopleSources[key]}
+                            disabled={!configured}
+                            onChange={(e) =>
+                              setPeopleSources((prev) => ({ ...prev, [key]: e.target.checked }))
+                            }
+                          />
+                          {label}
+                          {!configured && <span className="text-xs">(未配置)</span>}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
                 <Label>目标地区</Label>
                 <Input
@@ -633,6 +727,7 @@ export default function ProspectingPage() {
                           <th className="p-2">姓名</th>
                           <th className="p-2">职位</th>
                           <th className="p-2">邮箱</th>
+                          <th className="p-2">来源</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -649,6 +744,9 @@ export default function ProspectingPage() {
                             <td className="p-2 text-gray-600">{p.current_title || '—'}</td>
                             <td className="p-2 text-gray-600">
                               {p.emails?.[0]?.address || p.teaser?.emails?.[0] || '—'}
+                            </td>
+                            <td className="p-2 text-xs text-gray-500">
+                              {(p.sources || (p.source ? [p.source] : [])).join(', ') || '—'}
                             </td>
                           </tr>
                         ))}

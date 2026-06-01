@@ -3,6 +3,7 @@ import { parseCSV, importContacts } from '@/lib/csv-import'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 import { checkContactLimit } from '@/lib/plan-limits'
+import { checkTrialStatus } from '@/lib/trial-guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,12 @@ export async function POST(req: NextRequest) {
     }
     if (!authResult.tenantId) {
       return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+    }
+
+    const trial = await checkTrialStatus(authResult.tenantId)
+    if (!trial.allowed) {
+      return errorResponse(ErrorCodes.FORBIDDEN,
+        '试用期已结束，请升级套餐以继续使用。访问 /pricing 查看套餐方案。', 403)
     }
 
     // Parse request body

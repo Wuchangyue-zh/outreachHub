@@ -337,7 +337,7 @@ export interface CaseStudy {
 
 export const caseStudiesData = {
   title: '他们用 OutreachHub 实现了获客突破',
-  subtitle: '来自 3 个行业的真实增长故事',
+  subtitle: '来自 3 个行业的真实增长故事（演示案例）',
   cases: [
     {
       id: 'electronics',
@@ -530,7 +530,7 @@ export const faqData = {
     },
     {
       question: '如何保障我的数据安全？',
-      answer: '我们采用企业级安全架构：① 所有数据传输使用 TLS 1.3 加密；② 数据存储使用 AES-256 加密；③ 多租户数据严格隔离；④ 支持 RBAC 角色权限管理和双因素认证；⑤ 定期进行第三方安全审计。我们已通过 SOC 2 Type II 和 ISO 27001 认证。',
+      answer: '我们采用企业级安全架构：① 所有数据传输使用 TLS 1.3 加密；② 数据存储使用 AES-256 加密；③ 多租户数据严格隔离；④ 支持 RBAC 角色权限管理和双因素认证；⑤ 定期进行第三方安全审计。我们正在进行 SOC 2 Type II 和 ISO 27001 认证。',
     },
     {
       question: '是否支持团队协作？',
@@ -570,7 +570,7 @@ export const securityData = {
       icon: 'shield',
       title: '合规认证',
       description: '符合国际主流安全标准',
-      details: ['SOC 2 Type II 认证', 'ISO 27001 认证', 'GDPR 合规', 'CCPA 合规'],
+      details: ['SOC 2 Type II 认证（进行中）', 'ISO 27001 认证（进行中）', 'GDPR 合规', 'CCPA 合规'],
     },
     {
       icon: 'user-check',
@@ -652,8 +652,8 @@ export const ctaData = {
     note: '注册即表示同意我们的《服务条款》和《隐私政策》',
   },
   trustBadges: [
-    'SOC 2 认证',
-    'ISO 27001',
+    'SOC 2 认证（进行中）',
+    'ISO 27001（进行中）',
     'GDPR 合规',
     '99.9% SLA',
   ],
@@ -688,11 +688,11 @@ export const footerData = {
     {
       title: '资源中心',
       links: [
-        { label: '外贸知识库', href: '#knowledge' },
-        { label: '开发信模板', href: '#knowledge' },
-        { label: '海关数据教程', href: '#knowledge' },
-        { label: 'API 文档', href: '#' },
-        { label: '帮助中心', href: '#' },
+        { label: '外贸知识库', href: '/knowledge/cold-email-optimization-guide-2026' },
+        { label: '开发信模板', href: '/knowledge/cold-email-optimization-guide-2026' },
+        { label: '海关数据教程', href: '/knowledge/customs-data-prospecting-guide' },
+        { label: 'API 文档', href: '/developers' },
+        { label: '帮助中心', href: '/help' },
       ],
     },
     {
@@ -702,8 +702,8 @@ export const footerData = {
         { label: '加入我们', href: '#' },
         { label: '合作伙伴', href: '#' },
         { label: '联系我们', href: '#' },
-        { label: '服务条款', href: '#' },
-        { label: '隐私政策', href: '#' },
+        { label: '服务条款', href: '/terms' },
+        { label: '隐私政策', href: '/privacy' },
       ],
     },
   ],

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { replaceCampaignContacts } from '@/lib/campaign-contacts'
+import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -145,6 +146,18 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
 
     await prisma.emailLog.deleteMany({ where: { campaignId: id } })
     await prisma.campaign.delete({ where: { id, tenantId: auth.tenantId } })
+
+    if (auth.userId) {
+      await writeAuditLog({
+        userId: auth.userId,
+        tenantId: auth.tenantId || undefined,
+        action: 'delete_campaign',
+        resource: 'campaign',
+        resourceId: id,
+        ...getAuditRequestMeta(req),
+      })
+    }
+
     return NextResponse.json({ success: true, message: '活动已删除' })
   } catch (error) {
     return handleApiError(error)

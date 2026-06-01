@@ -151,3 +151,13 @@ npm run worker:imap                     # 终端 4 — 可选
 - [ ] 上传是否走 `storage.ts`？
 - [ ] 限流 `await limiter.check()` 了吗？
 - [ ] 生产 env 是否不依赖 fallback secret？
+
+---
+
+## 首页功能落地（Batch M 起）
+
+Batch D–L 完成的是**工程 MVP**；首页（`src/lib/landing-data.ts`）承诺的完整产品能力见：
+
+**[`docs/landing-implementation-plan.md`](docs/landing-implementation-plan.md)**
+
+执行顺序：**M → N → O → P → Q → R → S/T → U**。每批结束更新 `docs/audit-report.md` §9。

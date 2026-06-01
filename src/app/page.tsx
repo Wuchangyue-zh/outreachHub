@@ -11,6 +11,7 @@ import { Stats } from '@/components/landing/Stats'
 import { Pricing } from '@/components/landing/Pricing'
 import { FAQ } from '@/components/landing/FAQ'
 import { Security } from '@/components/landing/Security'
+import { Knowledge } from '@/components/landing/Knowledge'
 import { CTA } from '@/components/landing/CTA'
 import { Footer } from '@/components/landing/Footer'
 
@@ -67,6 +68,7 @@ export default function LandingPage() {
       <Pricing />
       <FAQ />
       <Security />
+      <Knowledge />
       <CTA />
       <Footer />
     </div>

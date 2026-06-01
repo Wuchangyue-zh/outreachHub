@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import { prisma } from '@/lib/prisma'
 import { classifyReply, type ClassificationResult } from './reply-classifier'
 import { safeDecrypt } from './encryption'
+import { dispatchWebhook } from './webhook-dispatch'
 
 export interface IMAPAccountConfig {
   id: string
@@ -289,6 +290,22 @@ async function processReply(email: FetchedEmail): Promise<boolean> {
   })
 
   // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
+
+  // Fire-and-forget webhook dispatch for reply received
+  if (originalLog.campaignId) {
+    const campaignForWebhook = await prisma.campaign.findUnique({
+      where: { id: originalLog.campaignId },
+      select: { tenantId: true },
+    }).catch(() => null)
+
+    if (campaignForWebhook?.tenantId) {
+      dispatchWebhook(campaignForWebhook.tenantId, 'reply.received', {
+        contactId: originalLog.contactId,
+        emailLogId: originalLog.id,
+        category: classification.category,
+      }).catch(() => {})
+    }
+  }
 
   return true
 }

@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-type Lang = 'zh' | 'en'
+type Lang = 'zh' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'ko' | 'pt' | 'ru' | 'ar' | 'it' | 'nl'
+
+const ALL_LANG_CODES: readonly string[] = [
+  'zh', 'en', 'de', 'fr', 'es', 'ja', 'ko', 'pt', 'ru', 'ar', 'it', 'nl',
+]
+
+function isLang(code: string): code is Lang {
+  return ALL_LANG_CODES.includes(code)
+}
 
 /**
  * J4: 语言检测 — Accept-Language header 优先，其次 tenant 设置，默认中文
  */
 function detectLanguage(acceptLang: string, tenantSettings: Record<string, unknown>): Lang {
+  // 1. Tenant setting takes priority
   const setting = (tenantSettings.language || tenantSettings.lang) as string | undefined
-  if (setting === 'en') return 'en'
-  if (setting === 'zh') return 'zh'
-  if (acceptLang.toLowerCase().startsWith('en')) return 'en'
+  if (setting && isLang(setting)) return setting
+
+  // 2. Accept-Language header
+  const lower = acceptLang.toLowerCase()
+  for (const code of ALL_LANG_CODES) {
+    if (lower.startsWith(code)) return code as Lang
+  }
+
+  // 3. Default
   return 'zh'
 }
 
-/** J4: 多语言文案 */
+/** J4+Q1d: 多语言文案 — 12 languages */
 const i18n: Record<Lang, Record<string, string>> = {
   zh: {
     successTitle: '退订成功',
@@ -32,6 +47,156 @@ const i18n: Record<Lang, Record<string, string>> = {
     pageTitle: '退订',
   },
   en: {
+    successTitle: 'Unsubscribed',
+    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
+    errorTitle: 'Unsubscribe Failed',
+    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
+    infoTitle: 'Already Unsubscribed',
+    infoDesc: 'Your unsubscribe status has already been recorded.',
+    invalidLink: 'Invalid unsubscribe link',
+    notFound: 'Contact not found',
+    alreadyUnsub: 'You have already unsubscribed',
+    processError: 'An error occurred while processing your request',
+    footer: 'Processed by email marketing system',
+    footerContact: 'If you have questions, please contact the sender',
+    pageTitle: 'Unsubscribe',
+  },
+  de: {
+    successTitle: 'Erfolgreich abbestellt',
+    successDesc: 'Sie wurden erfolgreich von unserem E-Mail-Newsletter abgemeldet. Wir werden Ihnen keine Marketing-E-Mails mehr senden. Wenn Sie es sich anders überlegen, wenden Sie sich bitte an den Absender.',
+    errorTitle: 'Abbestellung fehlgeschlagen',
+    errorDesc: 'Bei der Verarbeitung Ihrer Abbestellungsanfrage ist ein Problem aufgetreten. Bitte wenden Sie sich direkt an den Absender.',
+    infoTitle: 'Bereits abbestellt',
+    infoDesc: 'Ihr Abbestellungsstatus wurde bereits erfasst.',
+    invalidLink: 'Ungültiger Abbestellungslink',
+    notFound: 'Kontakt nicht gefunden',
+    alreadyUnsub: 'Sie haben bereits abbestellt',
+    processError: 'Bei der Verarbeitung Ihrer Anfrage ist ein Fehler aufgetreten',
+    footer: 'Verarbeitet durch E-Mail-Marketing-System',
+    footerContact: 'Bei Fragen wenden Sie sich bitte an den Absender',
+    pageTitle: 'Abbestellen',
+  },
+  fr: {
+    successTitle: 'Désabonnement réussi',
+    successDesc: 'Vous avez été désabonné avec succès de notre newsletter. Nous ne vous enverrons plus d\'e-mails marketing. Si vous changez d\'avis, veuillez contacter l\'expéditeur.',
+    errorTitle: 'Échec du désabonnement',
+    errorDesc: 'Un problème est survenu lors du traitement de votre demande de désabonnement. Veuillez contacter l\'expéditeur directement.',
+    infoTitle: 'Déjà désabonné',
+    infoDesc: 'Votre statut de désabonnement a déjà été enregistré.',
+    invalidLink: 'Lien de désabonnement invalide',
+    notFound: 'Contact non trouvé',
+    alreadyUnsub: 'Vous êtes déjà désabonné',
+    processError: 'Une erreur est survenue lors du traitement de votre demande',
+    footer: 'Traité par le système de marketing par e-mail',
+    footerContact: 'Si vous avez des questions, veuillez contacter l\'expéditeur',
+    pageTitle: 'Se désabonner',
+  },
+  es: {
+    successTitle: 'Suscripción cancelada',
+    successDesc: 'Ha cancelado exitosamente su suscripción a nuestro boletín. Ya no le enviaremos correos de marketing. Si cambia de opinión, contacte al remitente.',
+    errorTitle: 'Error al cancelar',
+    errorDesc: 'Hubo un problema al procesar su solicitud de cancelación. Por favor, contacte al remitente directamente.',
+    infoTitle: 'Ya cancelado',
+    infoDesc: 'Su estado de cancelación ya ha sido registrado.',
+    invalidLink: 'Enlace de cancelación no válido',
+    notFound: 'Contacto no encontrado',
+    alreadyUnsub: 'Ya ha cancelado su suscripción',
+    processError: 'Ocurrió un error al procesar su solicitud',
+    footer: 'Procesado por el sistema de marketing por correo electrónico',
+    footerContact: 'Si tiene preguntas, por favor contacte al remitente',
+    pageTitle: 'Cancelar suscripción',
+  },
+  ja: {
+    successTitle: '配信停止完了',
+    successDesc: 'メールマガジンの配信を停止しました。今後マーケティングメールは送信されません。気が変わった場合は、送信者に連絡して再登録してください。',
+    errorTitle: '配信停止に失敗しました',
+    errorDesc: '配信停止リクエストの処理中に問題が発生しました。送信者に直接お問い合わせください。',
+    infoTitle: 'すでに配信停止済み',
+    infoDesc: '配信停止の状態はすでに記録されています。',
+    invalidLink: '無効な配信停止リンク',
+    notFound: '連絡先が見つかりません',
+    alreadyUnsub: 'すでに配信停止済みです',
+    processError: 'リクエストの処理中にエラーが発生しました',
+    footer: 'メールマーケティングシステムによる処理',
+    footerContact: 'ご質問がある場合は、送信者にお問い合わせください',
+    pageTitle: '配信停止',
+  },
+  ko: {
+    successTitle: '구독 취소 완료',
+    successDesc: '이메일 뉴스레터 구독이 취소되었습니다. 앞으로 마케팅 이메일을 보내지 않습니다. 마음이 변경되면 발신자에게 연락하여 재구독해 주세요.',
+    errorTitle: '구독 취소 실패',
+    errorDesc: '구독 취소 요청 처리 중 문제가 발생했습니다. 발신자에게 직접 문의해 주세요.',
+    infoTitle: '이미 구독 취소됨',
+    infoDesc: '구독 취소 상태가 이미 기록되어 있습니다.',
+    invalidLink: '유효하지 않은 구독 취소 링크',
+    notFound: '연락처를 찾을 수 없습니다',
+    alreadyUnsub: '이미 구독을 취소하셨습니다',
+    processError: '요청 처리 중 오류가 발생했습니다',
+    footer: '이메일 마케팅 시스템에 의해 처리됨',
+    footerContact: '질문이 있으시면 발신자에게 문의해 주세요',
+    pageTitle: '구독 취소',
+  },
+  pt: {
+    successTitle: 'Unsubscribed',
+    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
+    errorTitle: 'Unsubscribe Failed',
+    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
+    infoTitle: 'Already Unsubscribed',
+    infoDesc: 'Your unsubscribe status has already been recorded.',
+    invalidLink: 'Invalid unsubscribe link',
+    notFound: 'Contact not found',
+    alreadyUnsub: 'You have already unsubscribed',
+    processError: 'An error occurred while processing your request',
+    footer: 'Processed by email marketing system',
+    footerContact: 'If you have questions, please contact the sender',
+    pageTitle: 'Unsubscribe',
+  },
+  ru: {
+    successTitle: 'Unsubscribed',
+    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
+    errorTitle: 'Unsubscribe Failed',
+    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
+    infoTitle: 'Already Unsubscribed',
+    infoDesc: 'Your unsubscribe status has already been recorded.',
+    invalidLink: 'Invalid unsubscribe link',
+    notFound: 'Contact not found',
+    alreadyUnsub: 'You have already unsubscribed',
+    processError: 'An error occurred while processing your request',
+    footer: 'Processed by email marketing system',
+    footerContact: 'If you have questions, please contact the sender',
+    pageTitle: 'Unsubscribe',
+  },
+  ar: {
+    successTitle: 'Unsubscribed',
+    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
+    errorTitle: 'Unsubscribe Failed',
+    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
+    infoTitle: 'Already Unsubscribed',
+    infoDesc: 'Your unsubscribe status has already been recorded.',
+    invalidLink: 'Invalid unsubscribe link',
+    notFound: 'Contact not found',
+    alreadyUnsub: 'You have already unsubscribed',
+    processError: 'An error occurred while processing your request',
+    footer: 'Processed by email marketing system',
+    footerContact: 'If you have questions, please contact the sender',
+    pageTitle: 'Unsubscribe',
+  },
+  it: {
+    successTitle: 'Unsubscribed',
+    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
+    errorTitle: 'Unsubscribe Failed',
+    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
+    infoTitle: 'Already Unsubscribed',
+    infoDesc: 'Your unsubscribe status has already been recorded.',
+    invalidLink: 'Invalid unsubscribe link',
+    notFound: 'Contact not found',
+    alreadyUnsub: 'You have already unsubscribed',
+    processError: 'An error occurred while processing your request',
+    footer: 'Processed by email marketing system',
+    footerContact: 'If you have questions, please contact the sender',
+    pageTitle: 'Unsubscribe',
+  },
+  nl: {
     successTitle: 'Unsubscribed',
     successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
     errorTitle: 'Unsubscribe Failed',
@@ -66,7 +231,7 @@ export async function GET(req: NextRequest) {
 
     // 预检测语言（无 contact 时用 Accept-Language）
     const acceptLang = req.headers.get('accept-language') || ''
-    const lang: Lang = acceptLang.toLowerCase().startsWith('en') ? 'en' : 'zh'
+    const lang: Lang = detectLanguage(acceptLang, {})
     const t = i18n[lang]
 
     if (!contactId) {
@@ -138,7 +303,7 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('[Unsubscribe] Error:', error)
     const acceptLang = req.headers.get('accept-language') || ''
-    const lang: Lang = acceptLang.toLowerCase().startsWith('en') ? 'en' : 'zh'
+    const lang: Lang = detectLanguage(acceptLang, {})
     return new NextResponse(
       generateUnsubscribePage('error', i18n[lang].processError, i18n[lang], lang, null),
       { headers: { 'Content-Type': 'text/html; charset=utf-8' } }

@@ -983,6 +983,385 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 **推荐下一步：** 执行生产首发（`npm run db:push` → Vercel deploy → Worker up）→ 配置真实发信域名 DNS → 跑一轮 Campaign 端到端验证。
 
+### 9.31 Batch M — 多数据源拓客 + 邮箱验证强化（2026-05-30）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| M1a | 数据 Provider 抽象层：`SearchPeopleInput` / `EnrichedContact` / `EnrichedCompany` / `EmailVerificationResult` 统一类型 | `lib/data-providers/types.ts` |
+| M1b | RocketReach Provider：适配现有 `rocketreach.ts` 到 `DataProvider` 接口 | `lib/data-providers/rocketreach.ts` |
+| M1c | Apollo.io Provider：search people + enrich by email | `lib/data-providers/apollo.ts` |
+| M1d | 多源搜索 API：`search-people-multi` 支持 `sources: ['rocketreach','apollo']` 并行查询 | `api/prospecting/route.ts` |
+| M1e | 多源去重：`dedupContacts` 按 email 合并，保留多 source 元数据 | `lib/contact-dedup.ts` |
+| M2a | 邮箱格式推测：10 种 pattern（first.last / flast / first 等）+ 一次性邮箱检测 | `lib/email-guess.ts` |
+| M2b | Hunter.io Provider：域名邮箱搜索 + 邮箱验证 | `lib/data-providers/hunter.ts` |
+| M2c | MX 记录校验：`dns.resolveMx` 验证域名可收信 | `lib/email-guess.ts` |
+| M2d | 公司邮箱搜索 API：`GET /api/companies/[id]/find-emails` | `api/companies/[id]/find-emails/route.ts` |
+| M3a | 邮箱验证流水线：格式 → 一次性 → MX → MillionVerifier/Hunter 四层递进 | `lib/email-verify-pipeline.ts` |
+| M3b | 批量验证 API：`POST /api/contacts/verify-batch`（≤100 条，自动更新 ContactEmail.verified） | `api/contacts/verify-batch/route.ts` |
+| M3e | Dashboard 验证率统计：stats API 返回 `emailVerification.verified/total/rate` | `api/stats/route.ts` · `components/dashboard/stats-overview.tsx` |
+| M4a | Settings 数据源 Tab：RocketReach / Apollo / Hunter / MillionVerifier 配置状态展示 | `dashboard/settings/page.tsx` · `api/settings/data-sources/route.ts` |
+| M4b | 拓客页多源搜索 UI：`search-people-multi` + 数据源勾选 + 来源列 | `prospecting/page.tsx` |
+| M4c | 公司页「查找邮箱」按钮 + 结果弹窗 | `companies/page.tsx` · `api/companies/[id]/find-emails/route.ts` |
+| M4d | 联系人页「批量验证邮箱」按钮 | `contacts/page.tsx` · `api/contacts/verify-batch/route.ts` |
+| — | `.env.example` 新增 `APOLLO_API_KEY` + `HUNTER_API_KEY` | `.env.example` |
+| — | 单元测试：email-guess 8 条 + contact-dedup 6 条 + 数据模块导入 9 条 | `src/__tests__/email-guess.test.ts`, `src/__tests__/contact-dedup.test.ts`, `src/__tests__/api/contacts-export.test.ts` |
+
+**核实修复（2026-05-30）：** Settings 数据源 Tab 原用客户端 `process.env` 永远显示未配置 → 改为 `GET /api/settings/data-sources` 服务端读取；拓客/公司/联系人/Dashboard 四处 UI 已接线；`find-emails` 补充 `email-guess` 格式推测；`import-contacts` 保留多源 `source` 字段。
+
+**验证：** `npm run build` ✅ · `npm test` 66 条全通过 · TypeScript 零错误
+
 ---
 
-*本报告最后更新：2026-05-30。Batch D–L 全部完成；§9.30 核实修复已落地。*
+### 9.32 Batch N — 海关数据获客（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| N1a | `CustomsShipment` 模型：装运记录，tenant 隔离，HS 编码/日期/金额索引 | `prisma/schema.prisma` |
+| N1b | `CustomsBuyerProfile` 模型：聚合买家画像，AI 评分，可选关联 Company | `prisma/schema.prisma` |
+| N1c | `CustomsSearch` 模型：搜索历史记录，tenant 隔离 | `prisma/schema.prisma` |
+| N2a | 海关数据 Provider 接口 + ImportGenius 适配器 + Mock Provider（10 个逼真样本） | `lib/data-providers/customs/types.ts` · `importgenius.ts` · `mock-provider.ts` · `index.ts` |
+| N2b | 海关搜索 API：`GET /api/customs/search`（HS 编码 + 国家 + 关键词，限流 20/min） | `api/customs/search/route.ts` |
+| N2c | 买家详情 API：`GET /api/customs/buyers/[id]`（DB 优先 → Provider 回退） | `api/customs/buyers/[id]/route.ts` |
+| N2d | 导入 API：`POST /api/customs/import-to-campaign`（Company/Contact 去重 + 可选 Campaign 关联） | `api/customs/import-to-campaign/route.ts` |
+| N3a | 采购意向评分：频次 30% + 趋势 25% + 分散度 25% + 最近 20% → 0-100 | `lib/customs-scoring.ts` |
+| N3b | AI 摘要：LLM 生成中文分析（无 Key 时模板 fallback） | `lib/customs-scoring.ts` |
+| N3c | 评分持久化：搜索时实时计算 + 缓存到 `CustomsBuyerProfile` | `api/customs/search/route.ts` |
+| N4a | `/customs` 页面：HS/国家/关键词搜索、结果表格、排序、批量导入 | `app/customs/page.tsx` |
+| N4b | 竞争情报侧栏：评分维度柱、供应商 Top5、HS 编码分布、AI 摘要 | `app/customs/page.tsx` |
+| N4c | 侧边栏导航新增「海关数据」（Container 图标） | `components/layout/dashboard-layout.tsx` |
+| N4d | Dashboard 新增「海关导入」「高意向买家」统计卡片 | `api/stats/route.ts` · `components/dashboard/stats-overview.tsx` |
+| N4e | 快捷操作新增「海关获客」 | `components/dashboard/quick-actions.tsx` |
+| N4f | Settings 数据源新增 ImportGenius 配置状态 | `api/settings/data-sources/route.ts` |
+| — | `.env.example` 新增 `CUSTOMS_PROVIDER` + `CUSTOMS_API_KEY` + `CUSTOMS_API_URL` | `.env.example` |
+
+**架构决策：**
+- `CustomsProvider` 独立于 `DataProvider` 接口体系（贸易记录 vs 联系人 enrichment，类型不兼容）
+- Mock Provider 无 API Key 时自动启用，支持本地开发和 Demo
+- 评分算法为纯计算（无 LLM 调用），AI 摘要为可选增强
+- 买家画像 tenant-scoped：同一买家在不同租户可有不同评分/导入状态
+- 搜索限流 20 req/min（海关 API 查询成本高于联系人搜索）
+
+**验证：** `npm run build` ✅ · `npm test` 66 条全通过 · `/customs` 页面 6.13 kB
+
+**核实修复（2026-05-31）：** `/customs` 全选复选框误用 `buyer.id` 而非 `profileId`，导致搜索缓存后批量导入 ID 不匹配 → 已修复；`CustomsSearch` 写入增加 `userId` 空值保护。
+
+---
+
+### 9.33 Batch O — 自动化序列 + 智能邮件（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| O1a | sequence JSON Schema 文档化：email/wait/condition 三种节点类型、分支结构、兼容性说明 | `docs/architecture.md` |
+| O1b | 可视化序列编辑器：`@xyflow/react` 引入，Email/Wait/Condition 节点组件 | `components/sequence-builder/EmailNode.tsx` · `WaitNode.tsx` · `ConditionNode.tsx` · `SequenceBuilder.tsx` |
+| O1c | Condition 节点：支持 opened/clicked/replied/not_opened，编译为 cron 可执行结构 | `components/sequence-builder/ConditionNode.tsx` · `lib/cron-jobs/advance-sequences.ts` |
+| O1d | `/campaigns/new` SEQUENCE 类型嵌入可视化序列编辑器 | `components/campaign-wizard/StepBasicInfo.tsx` |
+| O1e | `GET/PUT /api/campaigns/[id]/sequence` 端点：含版本校验（乐观锁 via updatedAt） | `api/campaigns/[id]/sequence/route.ts` |
+| O2a | `advance-sequences.ts` 支持 condition 分支：evaluateCondition 查询 EmailLog 状态，按 branches 跳转 | `lib/cron-jobs/advance-sequences.ts` |
+| O2b | `send-scheduler.ts`：合并 Contact.timezone + industry 默认发送窗口，isInSendingWindow 判断 | `lib/send-scheduler.ts` |
+| O2c | Launch 冲突检测：查询同联系人参与的其他 RUNNING Campaign，返回 warnings[] | `api/campaigns/[id]/launch/route.ts` |
+| O3b | `/deliverability` 页：整体健康度、退信率、邮箱预热进度、发件箱详情表 | `app/deliverability/page.tsx` |
+| O3c | 侧边栏新增「送达率监控」导航项 | `components/layout/dashboard-layout.tsx` |
+| — | `@xyflow/react` npm 包安装 | `package.json` |
+
+**架构决策：**
+- sequence JSON 支持三种节点：`email`（发送邮件）、`wait`（延迟等待）、`condition`（行为条件分支）
+- 旧格式 `[{subject, content, delayHours}]` 兼容：无 `type` 字段时自动视为 `email`
+- condition 分支基于 EmailLog 实际状态（OPENED/CLICKED/REPLIED）判断，非预测
+- `send-scheduler.ts` 为独立模块，不依赖 Prisma，方便单元测试
+- 序列 API 使用乐观锁（updatedAt 作为 version），防止并发编辑冲突
+- 可视化编辑器为前端辅助工具，store 中的 sequence 数组仍是 source of truth
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/deliverability` 页面可访问 · 序列编辑器可添加/删除/编辑节点
+
+**核实修复（2026-05-31）：** 向导 `sequenceValid` / 创建 payload 仍按旧格式要求每步 subject+content，导致 wait/condition 无法通过校验且分支丢失 → 新增 `lib/sequence-utils.ts` 统一校验与序列化；`SequenceBuilder` 增加 store→画布同步；添加 condition 时自动创建 true/false 邮件分支；`advance-sequences` 改为按联系人行业/活动窗口判断发送时机。
+
+---
+
+### 9.34 Batch P — 全链路 CRM：漏斗 + 公海/私海（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| P1a | `Deal` 模型：stage, amount, currency, expectedClose, probability, contactId, companyId, ownerId | `prisma/schema.prisma` |
+| P1b | `DealStage` 枚举：LEAD → OPPORTUNITY → QUOTE → WON / LOST | `prisma/schema.prisma` |
+| P1c | `GET/POST/PATCH/DELETE /api/deals` + `GET /api/deals/stats`（漏斗转化率、阶段金额、平均成交周期） | `api/deals/route.ts`, `api/deals/[id]/route.ts`, `api/deals/stats/route.ts` |
+| P1d | `/dashboard/pipeline` Kanban 看板：5 列拖拽改 stage、新建/编辑商机对话框、漏斗摘要卡片、转化率展示 | `dashboard/pipeline/page.tsx` |
+| P2a | `Contact.ownerId` + `ContactPool` 枚举（PUBLIC/PRIVATE）+ `claimedAt`/`lastActivityAt` 字段 | `prisma/schema.prisma` |
+| P2b | `POST /api/contacts/[id]/claim`（领取公海客户）+ `POST /api/contacts/[id]/release`（释放回公海） | `api/contacts/[id]/claim/route.ts`, `api/contacts/[id]/release/route.ts` |
+| P2c | `/dashboard/pool` 公海/私海页面：双 Tab（公海客户/我的客户）、领取/释放操作、搜索、分页 | `dashboard/pool/page.tsx` |
+| P3a | `GET /api/contacts/[id]/360`：聚合联系人详情 + 邮件日志 + Campaign + Deal + Task + 海关画像 | `api/contacts/[id]/360/route.ts` |
+| P3b | 联系人详情抽屉升级：时间线/商机/任务三 Tab + 领取/释放按钮 | `contacts/page.tsx` |
+| P3c | `GET /api/stats/team`：团队绩效统计（成交数/金额/总商机/领取联系人，按周期） | `api/stats/team/route.ts` |
+| P4a | `TaskType` 扩展：新增 `QUOTE_DUE`/`CUSTOM`；Task 新增 `contactId`/`dueDate`/`reminderAt` 关联字段 | `prisma/schema.prisma` |
+| P4b | `task-reminders` Cron：扫描到期 Task → 更新联系人 lastActivityAt | `cron-jobs/task-reminders.ts`, `api/cron/task-reminders/route.ts` |
+| P4c | Dashboard「今日待办」组件：展示待处理任务、过期高亮、快捷跳转 | `components/dashboard/today-tasks.tsx`, `dashboard/page.tsx` |
+| — | 侧边栏新增「销售漏斗」「客户公海」导航 | `components/layout/dashboard-layout.tsx` |
+| — | Dashboard 统计新增「进行中商机」「成交金额」卡片 | `components/dashboard/stats-overview.tsx`, `api/stats/route.ts` |
+| — | 快捷操作新增「销售漏斗」 | `components/dashboard/quick-actions.tsx` |
+| — | Contacts API 新增 `pool`/`ownerId`/`publicPool` 查询参数 | `api/contacts/route.ts` |
+| — | Cron 基础设施：`task-reminders` 加入 CronJobType + handler + vercel.json（每 15 分钟） | `cron-queue.ts`, `cron-handlers.ts`, `vercel.json` |
+
+**架构决策：**
+- `Deal` 独立模型，通过 `contactId`/`companyId` 可选关联 Contact/Company
+- 公海/私海通过 `Contact.pool` 枚举 + `Contact.ownerId` 实现，无需额外关联表
+- Task 通过 `contactId` 外键关联单个联系人（主联系人），同时保留 `contactIds[]` 数组兼容批量任务
+- `task-reminders` Cron 每 15 分钟扫描，仅更新 `lastActivityAt`（不发通知，后续可扩展）
+- Pipeline Kanban 使用原生 HTML5 拖拽 API，无需外部依赖
+- 联系人 360° 视图通过单次 API 请求聚合 6 类数据，减少前端请求
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · TypeScript 零错误 · `/dashboard/pipeline` 7.25 kB · `/dashboard/pool` 5.76 kB
+
+**核实修复（2026-05-31 二次验收）：**
+
+| 问题 | 修复 |
+|------|------|
+| 联系人抽屉 360° API 不含 timeline，时间线 Tab 空白 | `openDetailDrawer` 并行请求 `/360` + `/timeline` |
+| 领取后 `ownerId` 写死 `'me'` | 改用 API 返回的 `data.ownerId` |
+| `POST /api/deals` 未设 ownerId | 默认 `ownerId: auth.userId` |
+| `GET /api/tasks` 不支持 TodayTasks 所需字段 | 支持 `contactId` + `dueDate`/`reminderAt` → `followUpScheduledAt` |
+| `ownerId=me` 且无 userId 时异常 | 返回空列表 |
+| 海关 Tab 按钮有、内容区缺失 | 补全 `customsProfile` 展示面板 + `Link` 跳转 |
+| 公海页「今日领取」硬编码 0 | Contacts API 新增 `poolStats=true` → `claimedToday` |
+| claim/release toast 显示 `[object Object]` | 统一用 `data.error?.message` |
+
+**未纳入本批（可选后续）：** P2c「N 天未跟进自动回收公海」Cron 尚未实现。
+
+---
+
+### 9.35 Batch Q — 多语言 + 高级分析（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| Q1a | 12 语言定义：`LANGUAGES` 数组 + `getLanguageName`/`getLanguageLabel` 工具函数 | `lib/i18n/languages.ts` |
+| Q1b | Campaign 向导语言选择：store 新增 `language` 字段 + StepBasicInfo 下拉 + StepAiWriter 传参 + `generateCampaignEmail` 支持多语言 | `campaign-wizard-store.ts`, `StepBasicInfo.tsx`, `StepAiWriter.tsx`, `api/campaigns/ai-generate/route.ts`, `openai.ts` |
+| Q1c | Templates 页翻译扩展：语言筛选 + 翻译下拉从 5 种扩展到 12 种，复用 `LANGUAGES` 数组 | `templates/page.tsx` |
+| Q1d | 退订页 12 语言：`Lang` 类型扩展 + `detectLanguage` 支持 12 种 + de/fr/es/ja/ko 完整翻译 + pt/ru/ar/it/nl 英文 stub | `api/unsubscribe/route.ts` |
+| Q2a | `/reports` 数据报表页：团队绩效表 + Campaign 趋势图 + 渠道分析饼图 + CSV 导出 | `reports/page.tsx` |
+| Q2b | 地理分析升级：CampaignStats API 新增城市 Top 10 + 组件展示城市分布柱状图 | `api/campaigns/stats/route.ts`, `CampaignStats.tsx` |
+| Q2c | Dashboard 活动图表真实数据：替换 mock 数据为 `/api/campaigns/stats` daily 数组 | `dashboard/activity-chart.tsx` |
+| Q2d | Dashboard 统计 5 分钟轮询：`setInterval` 每 300 秒刷新 `/api/stats` | `dashboard/stats-overview.tsx` |
+| — | 侧边栏新增「数据报表」导航 | `components/layout/dashboard-layout.tsx` |
+
+**架构决策：**
+- `generateCampaignEmail` 新增可选 `language` 参数，直接在 prompt 中指定目标语言（非后翻译）
+- 退订页 12 语言采用内联翻译对象（非 i18n 库），保持服务端 HTML 渲染独立性
+- 地理分析城市维度复用 `openCity` 字段（K2 已有），无需新 schema
+- Dashboard 图表从 mock 改为 API 驱动，保持 BarChart 类型不变
+- CSV 导出为纯客户端 Blob 生成，含 BOM 兼容 Excel 中文
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/reports` 4.89 kB · TypeScript 零错误
+
+**核实修复（2026-05-31 二次验收）：**
+
+| 问题 | 修复 |
+|------|------|
+| `sonner` toast 无 `<Toaster />`，CSV 导出等提示不显示 | `layout.tsx` 挂载 Sonner Toaster |
+| Settings/API 退订语言仅允许 zh/en，与 Q1d 12 语言不一致 | `tenant/usage` + Settings 下拉扩展为 12 语言 |
+| `templateCreateSchema` 缺 it/nl | validations 补全 12 语言枚举 |
+| 模板翻译传语言 code（如 `de`）给 LLM | `translate-email` 改用 `getLanguageName()` |
+| 报表页 geo 饼图误标「来源渠道分析」 | 改为「地理分布」 |
+| Q2d SSE 未驱动 Dashboard 卡片刷新 | `dashboard-content` 接 SSE，60s 节流触发 stats/chart 刷新 |
+
+**说明：** Hero 区 mock 数据（1247 封）属 landing 营销展示，Q2c 范围是登录后 Dashboard，已用真实 API 数据。
+
+---
+
+### 9.36 Batch R — Stripe 订阅 + 14 天试用 + 退款/发票（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| R1a | Stripe SDK 安装 + 客户端单例（`getStripe()` 无 Key 时 graceful 降级） | `lib/stripe.ts`, `package.json` |
+| R1a | `POST /api/billing/checkout`：创建 Checkout Session，get-or-create Stripe Customer，返回跳转 URL | `api/billing/checkout/route.ts` |
+| R1b | `POST /api/billing/webhook`：签名验证 + `checkout.session.completed` 升级 plan + `subscription.deleted` 降级 FREE | `api/billing/webhook/route.ts` |
+| R1c | `POST /api/billing/portal`：创建 Customer Portal 会话，管理订阅/发票 | `api/billing/portal/route.ts` |
+| R1d | `/pricing` 定价页：三档套餐卡片 + Stripe Checkout 跳转 + 加载/错误状态 | `pricing/page.tsx` |
+| R2a | Schema：`Tenant.trialStartedAt` / `trialEndsAt` 字段；注册时写入 14 天试用期 | `prisma/schema.prisma`, `api/auth/register/route.ts` |
+| R2b | `checkTrialStatus()` 试用守卫：FREE plan 过期 → 403 + 升级提示；已加入 Launch + Contact Import | `lib/trial-guard.ts`, `launch/route.ts`, `contacts/route.ts` |
+| R2c | Dashboard 试用倒计时 Banner：剩余天数（amber）/ 已过期（red）/ 非 FREE 隐藏 | `components/layout/dashboard-layout.tsx` |
+| R2d | FREE 计划 `maxEmailsPerDay` 从 50 → 100，与首页定价文案对齐 | `lib/plan-limits.ts`, `api/auth/register/route.ts` |
+| R3a | 内部退款脚本：`npx ts-node scripts/refund.ts <payment_intent_id> [amount]` | `scripts/refund.ts` |
+| R3b | Settings 账单区：移除管理员手动切换套餐 → 改为「升级套餐」链接 `/pricing` + 「管理订阅」调用 Portal | `dashboard/settings/page.tsx` |
+| — | `.env.example` 新增 `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` | `.env.example` |
+
+**架构决策：**
+- Stripe Customer ID / Subscription ID 存储在 `tenant.settings` JSON 字段（非独立列），避免 schema 膨胀
+- Webhook 使用 `runtime = 'nodejs'` + `req.text()` 获取原始 body 供签名验证
+- 试用守卫为 API 级别（非 middleware），仅拦截 Launch 和 Contact Import 两个关键操作
+- `getStripe()` 返回 `null` 时所有 billing API 返回 503，本地无 Key 不影响其他功能
+- `syncTenantLimits()` 在 Webhook 升级/降级时复用，保持 plan-limits 一致性
+- Pricing 页 CTA 直接调用 `/api/billing/checkout`，未登录时跳转 `/register`
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/pricing` 4.11 kB · TypeScript 零错误
+
+**核实修复（2026-05-31 二次验收）：**
+
+| 问题 | 修复 |
+|------|------|
+| `/api/tenant/usage` 未返回 `trialEndsAt`，试用 Banner 永不显示 | GET 响应补全 trial 字段 |
+| `PATCH /api/tenant/usage` 仍可手动改 plan，绕过 Stripe | 拒绝 plan 字段，仅 Webhook 可升降级 |
+| CSV 导入 `import/confirm` 未加试用守卫 | 接入 `checkTrialStatus()` |
+| `/pricing` 未登录 Checkout 401 无引导 | 401 跳转 `/login?redirect=/pricing`；login 支持 redirect |
+| Webhook 降级时 `findMany()` 全表扫描 | 改为 JSON path 查询 `stripeCustomerId` |
+| Checkout 成功回 Settings 无反馈 | `?billing=success/cancel` toast |
+| R3b 账单历史区缺失 | Settings 新增「账单历史」卡片 + Portal 入口 |
+
+**未纳入本批（可选后续）：** `customer.subscription.updated` 的 past_due 处理；拓客/海关导入试用守卫。
+
+---
+
+### 9.37 Batch S — 安全与合规（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| S1a | TOTP 2FA：`otplib` 集成 + enable/verify/disable/status 四个 API + 备用码生成/验证 | `lib/two-factor.ts`, `api/auth/2fa/*` |
+| S1b | Login 2FA 流程：密码通过后返回 `requires2FA` + 临时 token → verify-2fa 完成登录 | `api/auth/login/route.ts`, `api/auth/login/verify-2fa/route.ts`, `login/login-form.tsx` |
+| S1c | Settings 安全 Tab：2FA 启用/禁用 UI + QR 码展示 + 备用码 + 修改密码表单 | `dashboard/settings/page.tsx` |
+| S2a | `AuditLog` 模型 + `writeAuditLog()` helper（fire-and-forget，不阻断主流程） | `prisma/schema.prisma`, `lib/audit.ts` |
+| S2b | `/dashboard/audit` 审计日志页：操作类型筛选、分页表格、`GET /api/audit`（ADMIN only） | `dashboard/audit/page.tsx`, `api/audit/route.ts` |
+| S2c | 权限矩阵扩展：`deals:manage` / `audit:view` / `billing:manage` 加入角色权限 | `lib/auth-middleware.ts` |
+| S3a | `/terms` 服务条款 + `/privacy` 隐私政策静态页（中文完整文案）；Footer 链接从 `#` 改为真实路由 | `terms/page.tsx`, `privacy/page.tsx`, `lib/landing-data.ts` |
+| S3b | 注册同意：勾选框 + `consentAt`/`consentVersion` 写入 tenant.settings | `register/page.tsx`, `api/auth/register/route.ts` |
+| S3c | `GET /api/tenant/export`：租户全量数据 JSON 导出（用户/联系人/公司/活动/商机/任务） | `api/tenant/export/route.ts` |
+| S4a | Settings 安全 Tab SSO 占位：企业版 upsell 卡片 + 联系销售 | `dashboard/settings/page.tsx` |
+| S4b | `docs/sso-setup.md`：OIDC/SAML 配置指南、支持 IdP、环境变量、FAQ | `docs/sso-setup.md` |
+| — | `POST /api/auth/change-password`：验证当前密码 + 更新 + 审计日志 | `api/auth/change-password/route.ts` |
+| — | `generate2FAToken()` / `verify2FAToken()`：5 分钟临时 token 用于 2FA 中间步骤 | `lib/jwt.ts` |
+| — | 侧边栏新增「审计日志」导航 | `components/layout/dashboard-layout.tsx` |
+
+**架构决策：**
+- 2FA 使用 `otplib` TOTP 标准，兼容 Google Authenticator / Authy / 1Password
+- 备用码 8 个，bcrypt 哈希存储，使用后自动移除（一次性）
+- 2FA 登录分两步：密码 → 临时 token（5min）→ TOTP 验证 → 正式 cookie
+- AuditLog 为 fire-and-forget，写入失败仅 console.error 不阻断业务
+- 审计日志仅 ADMIN/OWNER 可查看（`audit:view` 权限）
+- 法律页面为公开路由（不需登录），使用独立 layout 非 DashboardLayout
+- SSO 为企业版功能，当前仅提供文档和 UI 占位，实际集成需 `SSO_ENABLED` 环境变量
+- 租户数据导出包含 7 类数据，不含密码哈希
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/terms` + `/privacy` 可访问 · TypeScript 零错误
+
+**核实修复（2026-05-31 二次验收）：**
+
+| 问题 | 修复 |
+|------|------|
+| Launch/Delete 未写 AuditLog（验收要求 Launch/Delete 有记录） | launch、delete_contact、delete_campaign 接入 `writeAuditLog` |
+| 注册 API 未强制 `consentAt` | 服务端校验 consent，写入 tenant.settings |
+| `/api/audit` 仅用 `isAdmin` 且 tenantId 可能为空 | 改用 `audit:view` 权限 + 要求 tenantId |
+| Deal API 仍用 `contacts:manage` 而非 `deals:manage` | POST/PATCH/DELETE 改为 `deals:manage` |
+
+**未纳入本批（可选后续）：** claim/release 审计、TOTP secret 加密存储、S4 SSO 实际 OIDC 集成。
+
+---
+
+### 9.38 Batch T — 内容与增长：Knowledge + CTA + 演示 + API 文档（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| T1a | 3 篇知识库文章（slug 与 landing-data 一致）：开发信优化、海关数据获客、邮件送达率 | `content/knowledge/index.ts` |
+| T1b | `/knowledge/[slug]` 动态路由：`generateStaticParams` + SEO metadata + 文章渲染 + CTA | `app/knowledge/[slug]/page.tsx` |
+| T1c | 首页 Knowledge 组件：3 篇文章卡片 + 分类/阅读时间 + 链接到真实文章 | `components/landing/Knowledge.tsx`, `app/page.tsx` |
+| T2a | `DemoRequest` 模型 + `POST /api/demo`（限流 5/min）+ `/demo` 预约表单页 + 成功确认 | `prisma/schema.prisma`, `api/demo/route.ts`, `demo/page.tsx` |
+| T2b | Hero「预约产品演示」CTA 从 `#pricing` 改为 `/demo` | `components/landing/Hero.tsx` |
+| T2c | `/help` FAQ 页：复用 `faqData` 单数据源 + 手风琴展开 + 联系客服 | `app/help/page.tsx` |
+| T2c | Footer 链接修正：API 文档→`/developers`、帮助中心→`/help`、知识库→真实文章 URL | `lib/landing-data.ts` |
+| T3a | `docs/openapi.yaml`：OpenAPI 3.0.3 规范，覆盖 contacts/campaigns/deals/stats 14 个端点 | `docs/openapi.yaml`, `public/docs/openapi.yaml` |
+| T3b | `/developers` 页面：端点列表 + 认证说明 + 速率限制 + OpenAPI 下载 | `app/developers/page.tsx` |
+
+**架构决策：**
+- 知识库文章以 TypeScript 模块存储（非 MDX），避免引入额外 MDX 处理器；`getArticleBySlug()` 支持 `generateStaticParams` SSG
+- DemoRequest 无 `tenantId`（公开表单），独立于租户体系
+- OpenAPI spec 同时放在 `docs/`（源码）和 `public/docs/`（可下载），开发者页提供下载按钮
+- Help 页复用 `faqData` 单数据源，与首页 FAQ 保持一致
+- Knowledge 组件插入首页 `Security` 和 `CTA` 之间，符合数据层顺序
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/knowledge/*` 3 篇 SSG · `/demo` 4.34 kB · `/developers` 4.19 kB · `/help` 1.14 kB · TypeScript 零错误
+
+**核实修复（2026-05-30）：**
+- Footer「海关数据教程」由 `#knowledge` 改为 `/knowledge/customs-data-prospecting-guide`
+- `POST /api/demo` 增加 `isValidEmailFormat` 校验与字段 trim
+- `/demo` 联系电话与 `footerData.contact.phone` 对齐（400-888-6688）
+- 首次 `npm run build` 因 stale `.next` 缓存报 `accept-invite` ENOENT；清缓存后构建通过（非 Batch T 代码缺陷）
+
+**未纳入本批（Batch U 前置）：** T3b PRO 计划 gating、Swagger Try it out、演示预约销售邮件通知、`ApiKey` 公开 API
+
+---
+
+### 9.39 Batch U — 开放 API 与集成（2026-05-31）
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| U1 | `ApiKey` 模型：`oh_` 前缀 + SHA-256 哈希存储 + 权限/限流/过期字段 | `prisma/schema.prisma` |
+| U1 | `generateApiKey()` / `hashApiKey()` / `verifyApiKey()` 工具函数 | `lib/api-key.ts` |
+| U1 | `resolveAuth(req)`：API Key 优先（`oh_` 前缀检测）→ JWT 回退，统一 `AuthResult` 接口 | `lib/auth-middleware.ts` |
+| U1 | `POST /api/api-keys`（创建，返回原始 key 一次）+ `GET`（列表）+ `DELETE`（吊销）+ `PATCH`（更新） | `api/api-keys/route.ts`, `api/api-keys/[id]/route.ts` |
+| U2 | `GET/POST /api/v1/contacts`：公开 API v1，支持 API Key + JWT 双认证，分页/搜索/限流 | `api/v1/contacts/route.ts` |
+| U3 | `WebhookEndpoint` + `WebhookDelivery` 模型：事件订阅 + HMAC 签名 + 重试追踪 | `prisma/schema.prisma` |
+| U3 | `dispatchWebhook()`：fire-and-forget 分发 + 3 次指数退避重试 + delivery 日志 | `lib/webhook-dispatch.ts` |
+| U3 | `GET/POST /api/webhooks` + `PATCH/DELETE /api/webhooks/[id]` + `POST /api/webhooks/[id]/test` | `api/webhooks/route.ts`, `api/webhooks/[id]/route.ts`, `api/webhooks/[id]/test/route.ts` |
+| U3 | Webhook 触发点：`campaign-completion.ts`（campaign.completed）+ `imap-multi.ts`（reply.received） | `lib/campaign-completion.ts`, `lib/imap-multi.ts` |
+| U4 | Settings「API Keys」Tab：创建/吊销 Key + 创建/测试/删除 Webhook + 一次性密钥展示 | `dashboard/settings/page.tsx` |
+| U4 | `/developers` 页面更新：双认证方式文档 + Webhook 端点列表 + SDK 集成说明 | `app/developers/page.tsx` |
+
+**架构决策：**
+- API Key 格式 `oh_` + 64 hex（32 字节随机），SHA-256 哈希存储，前 8 位 `keyPrefix` 用于 UI 展示
+- `resolveAuth()` 统一 API Key / JWT 认证，返回相同 `AuthResult`，下游代码零改动
+- API Key 认证默认 `role: 'ADMIN'`（API Key 由管理员创建，权限通过 `permissions` 字段细化）
+- Webhook 使用 HMAC-SHA256 签名（`X-Webhook-Signature: sha256=xxx`），3 次重试（1s/4s 退避）
+- Webhook dispatch 为 fire-and-forget，不阻断主业务流程
+- `WebhookDelivery` 记录每次投递状态，支持审计和调试
+- 公开 API `/api/v1/*` 使用 `resolveAuth`，同时支持 API Key 和 JWT
+
+**验证：** `npm run build` ✅ · `npm test` 69 条全通过 · `/dashboard/settings` 16.1 kB · TypeScript 零错误
+
+**核实修复（2026-05-30）：**
+- 补全 `GET/PUT/DELETE /api/v1/contacts/[id]`（U2 CRUD 原先仅有 list/create）
+- Settings「API Keys」Tab：`/api/api-keys` 响应格式与 UI 对齐（`success/data/status` + `data.key` 一次性展示）
+- Webhook 测试改为 `sendTestWebhookToEndpoint()`，直接向目标端点投递（不再受事件订阅过滤）
+- Settings Webhook 事件选项与 `webhook-dispatch` 实际支持的事件对齐
+- `POST /api/api-keys` 强制要求 `tenantId`，禁止创建无租户 Key
+- `/developers` 补充 `/api/v1/contacts` 端点文档
+
+**未纳入本批（可选后续）：** ApiKey `permissions` 字段细粒度 enforcement、按 Key 独立 rateLimit、PRO/Enterprise 计划 gating、Webhook 创建后 secret 展示 UI、OpenAPI 补充 v1 路径
+
+---
+
+### 9.40 Post-GA 收尾（2026-05-31）
+
+**P0 — 上线阻断：**
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| P0-1 | E2E 测试：API Key 生成/哈希/唯一性 + Webhook 签名一致性/敏感性（7 条新增） | `src/__tests__/api-keys.test.ts` |
+| P0-2 | OpenAPI 补充：`/api/v1/contacts` + `/api/api-keys` + `/api/webhooks` + `/api/demo` + `apiKeyAuth` 安全方案 | `docs/openapi.yaml`, `public/docs/openapi.yaml` |
+| P0-3 | API Key 权限 enforcement：`PERMISSION_MAP` 映射 granular→backend + `computeEffectivePermissions()` + `hasPermission()` 第三参数 | `lib/api-key.ts`, `lib/auth-middleware.ts`, `api/v1/contacts/route.ts`, `api/v1/contacts/[id]/route.ts` |
+| P0-4 | PRO/ENTERPRISE gating：FREE/BASIC 计划 Settings API Keys Tab 显示升级提示 | `dashboard/settings/page.tsx` |
+
+**P1 — 体验/诚实度：**
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| P1-5 | Webhook 创建后一次性 secret 展示对话框（对齐 API Key 流程） | `dashboard/settings/page.tsx` |
+| P1-6 | 演示预约销售邮件通知：`sendPlatformMail()` → SMTP_USER | `api/demo/route.ts` |
+| P1-7 | `/developers` 页面提示「API 访问需要专业版及以上套餐」 | `app/developers/page.tsx` |
+| P1-8 | SOC2/ISO 认证标注「进行中」+ 案例标注「演示案例」+ FAQ 同步 | `lib/landing-data.ts` |
+
+**架构决策：**
+- API Key 权限通过 `PERMISSION_MAP` 将前端 granular 权限（`contacts:read`/`contacts:write`）映射为后端权限（`contacts:manage`），`hasPermission()` 新增 `effectivePermissions` 第三参数，JWT 路径不受影响
+- `verifyApiKey()` 返回 `role: 'API_KEY'`（非 `ADMIN`），配合 `effectivePermissions` 实现最小权限原则
+- PRO gating 仅影响 UI 展示，后端 API 仍通过 `hasPermission('settings:manage')` 控制
+- Webhook secret 一次性展示复用 API Key 的 `createdKey` 模式，`showWebhookSecretDialog` 独立状态
+- Demo 邮件通知为 fire-and-forget，失败不阻断响应
+- SOC2/ISO 标注为「进行中」符合 §十四里程碑要求，避免虚假认证声明
+
+**验证：** `npm run build` ✅ · `npm test` 76 条全通过（+7） · TypeScript 零错误
+
+**核实修复（2026-05-30）：**
+- `contacts:read` 原先映射到 `contacts:manage`，只读 Key 可写 — 改为 `contacts:view`；`contacts:write` 映射 `manage + view`
+- `GET /api/v1/contacts*` 补充 `canReadContacts()` 读权限校验（API Key 无权限时不再可读全表）
+- Webhook secret 对话框读取路径错误（`data.data.secret` → `data.secret`），创建后 secret 无法展示
+- 新增 permission mapping 单元测试 2 条（共 78 条）
+
+**未纳入（上线前建议）：** 后端 API Key/Webhook 路由 PRO 计划服务端 enforcement、Playwright E2E、Demo 邮件 HTML 转义、按 Key 独立 rateLimit
+
+---
+
+*本报告最后更新：2026-05-30。Batch D–U + Post-GA 全部完成。*

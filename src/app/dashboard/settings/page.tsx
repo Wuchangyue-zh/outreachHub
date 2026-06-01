@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { LANGUAGES } from '@/lib/i18n/languages'
 import {
   Mail,
   Plus,
@@ -36,6 +38,18 @@ import {
   Copy,
   Globe,
   Check,
+  CreditCard,
+  ArrowUpRight,
+  Building2,
+  Lock,
+  Smartphone,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Monitor,
+  Key,
+  Webhook,
+  Zap,
 } from 'lucide-react'
 
 const emptyFormData = {
@@ -154,6 +168,50 @@ interface TenantUsage {
   invitations: Array<{ id: string; email: string; role: string; createdAt: string; expiresAt: string }>
 }
 
+interface DataSourceProvider {
+  name: string
+  env: string
+  desc: string
+  docs: string
+  configured: boolean
+}
+
+interface ApiKey {
+  id: string
+  name: string
+  keyPrefix: string
+  permissions: string[]
+  rateLimit: number
+  lastUsedAt: string | null
+  status: 'active' | 'revoked'
+  createdAt: string
+}
+
+interface WebhookEndpoint {
+  id: string
+  url: string
+  events: string[]
+  status: 'active' | 'inactive'
+  lastTriggeredAt: string | null
+  createdAt: string
+}
+
+const AVAILABLE_PERMISSIONS = [
+  { id: 'contacts:read', label: '联系人 - 读取' },
+  { id: 'contacts:write', label: '联系人 - 写入' },
+  { id: 'campaigns:read', label: '活动 - 读取' },
+  { id: 'campaigns:write', label: '活动 - 写入' },
+]
+
+const AVAILABLE_WEBHOOK_EVENTS = [
+  { id: 'contact.created', label: '联系人创建' },
+  { id: 'campaign.started', label: '活动启动' },
+  { id: 'campaign.completed', label: '活动完成' },
+  { id: 'reply.received', label: '收到回复' },
+  { id: 'deal.won', label: '商机成交' },
+  { id: 'deal.lost', label: '商机流失' },
+]
+
 const PLAN_LABELS: Record<string, string> = { FREE: '免费版', BASIC: '基础版', PRO: '专业版', ENTERPRISE: '企业版' }
 const PLAN_COLORS: Record<string, string> = { FREE: 'bg-gray-100 text-gray-700', BASIC: 'bg-blue-100 text-blue-700', PRO: 'bg-purple-100 text-purple-700', ENTERPRISE: 'bg-amber-100 text-amber-700' }
 
@@ -172,8 +230,6 @@ export default function SettingsPage() {
   const [tenantLoading, setTenantLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState('')
-  const [upgradingPlan, setUpgradingPlan] = useState(false)
   // K6: 租户语言
   const [tenantLanguage, setTenantLanguage] = useState('zh')
   const [savingLanguage, setSavingLanguage] = useState(false)
@@ -182,6 +238,48 @@ export default function SettingsPage() {
   const [dnsAccountId, setDnsAccountId] = useState<string | null>(null)
   const [dnsData, setDnsData] = useState<{ domain: string; records: Array<{ type: string; host: string; value: string; description: string; status: string }>; verification?: Array<{ record: string; found: boolean; valid: boolean; message: string }>; tips: string[] } | null>(null)
   const [dnsLoading, setDnsLoading] = useState(false)
+  const [dataSources, setDataSources] = useState<DataSourceProvider[]>([])
+  const [dataSourcesLoading, setDataSourcesLoading] = useState(false)
+
+  // S1c: Security tab state
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
+  const [twoFactorLoading, setTwoFactorLoading] = useState(true)
+  const [twoFactorSetupStep, setTwoFactorSetupStep] = useState<'idle' | 'scan' | 'verify'>('idle')
+  const [twoFactorQrCode, setTwoFactorQrCode] = useState('')
+  const [twoFactorSecret, setTwoFactorSecret] = useState('')
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([])
+  const [twoFactorActionLoading, setTwoFactorActionLoading] = useState(false)
+  const [twoFactorDisableCode, setTwoFactorDisableCode] = useState('')
+  const [showDisable2fa, setShowDisable2fa] = useState(false)
+  const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+
+  // U4: API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [loadingKeys, setLoadingKeys] = useState(true)
+  const [showCreateKeyDialog, setShowCreateKeyDialog] = useState(false)
+  const [newKeyForm, setNewKeyForm] = useState({ name: '', permissions: [] as string[], rateLimit: 100 })
+  const [createdKey, setCreatedKey] = useState<string | null>(null)
+  const [creatingKey, setCreatingKey] = useState(false)
+
+  // U4: Webhooks state
+  const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([])
+  const [loadingWebhooks, setLoadingWebhooks] = useState(true)
+  const [showCreateWebhookDialog, setShowCreateWebhookDialog] = useState(false)
+  const [newWebhookForm, setNewWebhookForm] = useState({ url: '', events: [] as string[] })
+  const [creatingWebhook, setCreatingWebhook] = useState(false)
+  const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null)
+  const [createdWebhookSecret, setCreatedWebhookSecret] = useState<string | null>(null)
+  const [showWebhookSecretDialog, setShowWebhookSecretDialog] = useState(false)
 
   // 加载邮件账户列表
   const loadAccounts = async () => {
@@ -207,7 +305,7 @@ export default function SettingsPage() {
         setTenantData(data.data)
         if (data.data.tenant.language) setTenantLanguage(data.data.tenant.language)
       }
-      if (data.success && data.data?.tenant?.plan) setSelectedPlan(data.data.tenant.plan)
+      // Plan data loaded successfully
     } catch { /* silent */ } finally {
       setTenantLoading(false)
     }
@@ -234,27 +332,22 @@ export default function SettingsPage() {
     } catch { toast.error('邀请失败') } finally { setInviting(false) }
   }
 
-  // I1: 套餐变更（需 settings:manage 权限）
-  const handleUpgradePlan = async () => {
-    if (!selectedPlan || selectedPlan === tenantData?.tenant.plan) return
-    setUpgradingPlan(true)
+  // R2c: Stripe 客户门户
+  const [portalLoading, setPortalLoading] = useState(false)
+  const handleManageSubscription = async () => {
+    setPortalLoading(true)
     try {
-      const res = await fetch('/api/tenant/usage', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selectedPlan }),
-      })
+      const res = await fetch('/api/billing/portal', { method: 'POST' })
       const data = await res.json()
-      if (data.success) {
-        toast.success(`套餐已切换为 ${PLAN_LABELS[selectedPlan] || selectedPlan}`)
-        await loadTenantUsage()
+      if (data.success && data.data?.url) {
+        window.location.href = data.data.url
       } else {
-        toast.error(data.error?.message || '套餐变更失败')
+        toast.error(data.error?.message || '无法打开订阅管理页面')
       }
     } catch {
-      toast.error('套餐变更失败')
+      toast.error('订阅管理服务暂时不可用')
     } finally {
-      setUpgradingPlan(false)
+      setPortalLoading(false)
     }
   }
 
@@ -308,9 +401,342 @@ export default function SettingsPage() {
     navigator.clipboard.writeText(text).then(() => toast.success('已复制到剪贴板'))
   }
 
+  // U4: Fetch API Keys
+  const fetchApiKeys = async () => {
+    setLoadingKeys(true)
+    try {
+      const res = await fetch('/api/api-keys')
+      const data = await res.json()
+      if (data.success) setApiKeys(data.data)
+    } catch {
+      toast.error('加载 API Keys 失败')
+    } finally {
+      setLoadingKeys(false)
+    }
+  }
+
+  // U4: Fetch Webhooks
+  const fetchWebhooks = async () => {
+    setLoadingWebhooks(true)
+    try {
+      const res = await fetch('/api/webhooks')
+      const data = await res.json()
+      if (data.success) {
+        setWebhooks(
+          data.data.map((wh: WebhookEndpoint & { isActive?: boolean }) => ({
+            ...wh,
+            status: wh.status ?? (wh.isActive ? 'active' : 'inactive'),
+          }))
+        )
+      }
+    } catch {
+      toast.error('加载 Webhook 端点失败')
+    } finally {
+      setLoadingWebhooks(false)
+    }
+  }
+
+  // U4: Create API Key
+  const handleCreateKey = async () => {
+    if (!newKeyForm.name.trim()) {
+      toast.error('请输入 Key 名称')
+      return
+    }
+    if (newKeyForm.permissions.length === 0) {
+      toast.error('请至少选择一项权限')
+      return
+    }
+    setCreatingKey(true)
+    try {
+      const res = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newKeyForm),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCreatedKey(data.data.key)
+        setNewKeyForm({ name: '', permissions: [], rateLimit: 100 })
+        fetchApiKeys()
+      } else {
+        toast.error(data.error?.message || '创建失败')
+      }
+    } catch {
+      toast.error('创建 API Key 失败')
+    } finally {
+      setCreatingKey(false)
+    }
+  }
+
+  // U4: Revoke API Key
+  const handleRevokeKey = async (id: string) => {
+    if (!confirm('确定要吊销此 API Key 吗？吊销后将立即失效。')) return
+    try {
+      const res = await fetch(`/api/api-keys/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('API Key 已吊销')
+        fetchApiKeys()
+      } else {
+        toast.error(data.error?.message || '吊销失败')
+      }
+    } catch {
+      toast.error('吊销失败')
+    }
+  }
+
+  // U4: Create Webhook
+  const handleCreateWebhook = async () => {
+    if (!newWebhookForm.url.trim()) {
+      toast.error('请输入 Webhook URL')
+      return
+    }
+    if (newWebhookForm.events.length === 0) {
+      toast.error('请至少选择一个事件')
+      return
+    }
+    setCreatingWebhook(true)
+    try {
+      const res = await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newWebhookForm),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Webhook 端点已创建')
+        setShowCreateWebhookDialog(false)
+        setNewWebhookForm({ url: '', events: [] })
+        if (data.secret) {
+          setCreatedWebhookSecret(data.secret)
+          setShowWebhookSecretDialog(true)
+        }
+        fetchWebhooks()
+      } else {
+        toast.error(data.error?.message || '创建失败')
+      }
+    } catch {
+      toast.error('创建 Webhook 失败')
+    } finally {
+      setCreatingWebhook(false)
+    }
+  }
+
+  // U4: Test Webhook
+  const handleTestWebhook = async (id: string) => {
+    setTestingWebhookId(id)
+    try {
+      const res = await fetch(`/api/webhooks/${id}/test`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('测试请求已发送')
+      } else {
+        toast.error(data.error?.message || '测试失败')
+      }
+    } catch {
+      toast.error('测试请求失败')
+    } finally {
+      setTestingWebhookId(null)
+    }
+  }
+
+  // U4: Delete Webhook
+  const handleDeleteWebhook = async (id: string) => {
+    if (!confirm('确定要删除此 Webhook 端点吗？')) return
+    try {
+      const res = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Webhook 端点已删除')
+        fetchWebhooks()
+      } else {
+        toast.error(data.error?.message || '删除失败')
+      }
+    } catch {
+      toast.error('删除失败')
+    }
+  }
+
+  // U4: Toggle permission checkbox
+  const togglePermission = (perm: string) => {
+    setNewKeyForm((prev) => ({
+      ...prev,
+      permissions: prev.permissions.includes(perm)
+        ? prev.permissions.filter((p) => p !== perm)
+        : [...prev.permissions, perm],
+    }))
+  }
+
+  // U4: Toggle webhook event checkbox
+  const toggleWebhookEvent = (evt: string) => {
+    setNewWebhookForm((prev) => ({
+      ...prev,
+      events: prev.events.includes(evt)
+        ? prev.events.filter((e) => e !== evt)
+        : [...prev.events, evt],
+    }))
+  }
+
+  const loadDataSources = async () => {
+    setDataSourcesLoading(true)
+    try {
+      const res = await fetch('/api/settings/data-sources')
+      const data = await res.json()
+      if (data.success) setDataSources(data.data.providers || [])
+    } catch {
+      toast.error('加载数据源状态失败')
+    } finally {
+      setDataSourcesLoading(false)
+    }
+  }
+
+  // S1c: Load 2FA status
+  const loadTwoFactorStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/2fa/status')
+      const data = await res.json()
+      if (data.success) {
+        setTwoFactorEnabled(data.data.enabled)
+      }
+    } catch { /* silent */ } finally {
+      setTwoFactorLoading(false)
+    }
+  }
+
+  // S1c: 2FA enable - request QR code
+  const handle2faEnableStart = async () => {
+    setSecurityMessage(null)
+    setTwoFactorActionLoading(true)
+    try {
+      const res = await fetch('/api/auth/2fa/enable', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setTwoFactorQrCode(data.data.qrCode)
+        setTwoFactorSecret(data.data.secret)
+        setTwoFactorSetupStep('scan')
+      } else {
+        setSecurityMessage({ type: 'error', text: data.error?.message || '操作失败' })
+      }
+    } catch {
+      setSecurityMessage({ type: 'error', text: '请求失败，请稍后重试' })
+    } finally {
+      setTwoFactorActionLoading(false)
+    }
+  }
+
+  // S1c: 2FA verify - confirm code and enable
+  const handle2faVerify = async () => {
+    if (!twoFactorCode.trim()) return
+    setSecurityMessage(null)
+    setTwoFactorActionLoading(true)
+    try {
+      const res = await fetch('/api/auth/2fa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: twoFactorCode.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTwoFactorBackupCodes(data.data.backupCodes)
+        setTwoFactorEnabled(true)
+        setTwoFactorSetupStep('idle')
+        setTwoFactorCode('')
+        setSecurityMessage({ type: 'success', text: '两步验证已启用' })
+      } else {
+        setSecurityMessage({ type: 'error', text: data.error?.message || '验证码无效' })
+      }
+    } catch {
+      setSecurityMessage({ type: 'error', text: '请求失败，请稍后重试' })
+    } finally {
+      setTwoFactorActionLoading(false)
+    }
+  }
+
+  // S1c: 2FA disable
+  const handle2faDisable = async () => {
+    if (!twoFactorDisableCode.trim()) return
+    setSecurityMessage(null)
+    setTwoFactorActionLoading(true)
+    try {
+      const res = await fetch('/api/auth/2fa/disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: twoFactorDisableCode.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTwoFactorEnabled(false)
+        setShowDisable2fa(false)
+        setTwoFactorDisableCode('')
+        setSecurityMessage({ type: 'success', text: '两步验证已关闭' })
+      } else {
+        setSecurityMessage({ type: 'error', text: data.error?.message || '验证码无效' })
+      }
+    } catch {
+      setSecurityMessage({ type: 'error', text: '请求失败，请稍后重试' })
+    } finally {
+      setTwoFactorActionLoading(false)
+    }
+  }
+
+  // S1c: Change password
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordMessage(null)
+
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: '新密码至少 6 位' })
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: '两次输入的密码不一致' })
+      return
+    }
+
+    setPasswordSaving(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPasswordMessage({ type: 'success', text: '密码已修改' })
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      } else {
+        setPasswordMessage({ type: 'error', text: data.error?.message || '修改失败' })
+      }
+    } catch {
+      setPasswordMessage({ type: 'error', text: '请求失败，请稍后重试' })
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
+  const copyBackupCodes = () => {
+    navigator.clipboard.writeText(twoFactorBackupCodes.join('\n')).then(() => toast.success('备份码已复制到剪贴板'))
+  }
+
   useEffect(() => {
     loadAccounts()
     loadTenantUsage()
+    loadDataSources()
+    loadTwoFactorStatus()
+    fetchApiKeys()
+    fetchWebhooks()
+  }, [])
+
+  useEffect(() => {
+    const billing = new URLSearchParams(window.location.search).get('billing')
+    if (billing === 'success') {
+      toast.success('订阅成功，套餐已升级')
+      loadTenantUsage()
+    } else if (billing === 'cancel') {
+      toast.info('已取消结账')
+    }
   }, [])
 
   const resetForm = () => {
@@ -479,6 +905,18 @@ export default function SettingsPage() {
             <TabsTrigger value="general" className="flex items-center gap-2">
               <SettingsIcon className="h-4 w-4" />
               通用设置
+            </TabsTrigger>
+            <TabsTrigger value="data-sources" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              数据源
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              安全设置
+            </TabsTrigger>
+            <TabsTrigger value="api-keys" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              API Keys
             </TabsTrigger>
           </TabsList>
 
@@ -872,27 +1310,57 @@ export default function SettingsPage() {
                       <UsageMeter label="团队成员" current={tenantData.usage.userCount} max={tenantData.limits.maxUsers} percent={tenantData.usage.userPercent} />
                     </div>
 
-                    <div className="flex flex-wrap items-end gap-2 border-t border-gray-100 pt-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-gray-500">切换套餐（管理员）</Label>
-                        <select
-                          value={selectedPlan || tenantData.tenant.plan}
-                          onChange={(e) => setSelectedPlan(e.target.value)}
-                          className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
-                        >
-                          {Object.entries(PLAN_LABELS).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
+                      {tenantData.tenant.plan !== 'ENTERPRISE' && (
+                        <Link href="/pricing">
+                          <Button size="sm" className="gap-1">
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                            升级套餐
+                          </Button>
+                        </Link>
+                      )}
                       <Button
                         size="sm"
-                        disabled={upgradingPlan || selectedPlan === tenantData.tenant.plan}
-                        onClick={handleUpgradePlan}
+                        variant="outline"
+                        disabled={portalLoading}
+                        onClick={handleManageSubscription}
                       >
-                        {upgradingPlan ? '保存中...' : '应用套餐'}
+                        {portalLoading ? (
+                          <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        管理订阅
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* R3b: 账单历史 — 通过 Stripe Portal 查看发票 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CreditCard className="h-5 w-5" /> 账单历史
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-gray-500">
+                      付款记录与 PDF 发票请在 Stripe 客户门户查看；退款政策见帮助中心 FAQ。
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={portalLoading}
+                      onClick={handleManageSubscription}
+                      className="gap-1"
+                    >
+                      {portalLoading ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CreditCard className="h-3.5 w-3.5" />
+                      )}
+                      查看账单与发票
+                    </Button>
                   </CardContent>
                 </Card>
 
@@ -911,8 +1379,11 @@ export default function SettingsPage() {
                         value={tenantLanguage}
                         onChange={(e) => setTenantLanguage(e.target.value)}
                       >
-                        <option value="zh">中文</option>
-                        <option value="en">English</option>
+                        {LANGUAGES.map((lang) => (
+                          <option key={lang.code} value={lang.code}>
+                            {lang.nativeName}
+                          </option>
+                        ))}
                       </select>
                       <Button size="sm" onClick={handleSaveLanguage} disabled={savingLanguage}>
                         {savingLanguage ? '保存中...' : '保存'}
@@ -987,6 +1458,506 @@ export default function SettingsPage() {
               </>
             ) : (
               <Card><CardContent className="py-8 text-center text-gray-500">无法加载套餐信息</CardContent></Card>
+            )}
+          </TabsContent>
+
+          {/* M4c: 数据源配置 */}
+          <TabsContent value="data-sources" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" /> 外部数据源
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">配置外部数据源 API Key 以启用多源拓客和邮箱验证功能。未配置的数据源在拓客页将显示为不可用。API Key 由管理员在服务器环境变量中配置。</p>
+                {dataSourcesLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> 加载中...
+                  </div>
+                ) : dataSources.length === 0 ? (
+                  <p className="text-sm text-gray-500">无法加载数据源状态</p>
+                ) : (
+                  dataSources.map((src) => (
+                    <div key={src.env} className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{src.name}</p>
+                        <p className="text-xs text-gray-500">{src.desc}</p>
+                        <p className="text-xs text-gray-400 mt-1">环境变量：{src.env}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-1 rounded-full ${src.configured ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {src.configured ? '✅ 已配置' : '未配置'}
+                        </span>
+                        <a href={src.docs} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                          文档
+                        </a>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* S1c: 安全设置 */}
+          <TabsContent value="security" className="space-y-6">
+            {/* Global security message */}
+            {securityMessage && (
+              <div className={`rounded-lg p-3 text-sm ${securityMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {securityMessage.text}
+              </div>
+            )}
+
+            {/* 2FA Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Smartphone className="h-5 w-5" /> 两步验证（2FA）
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {twoFactorLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <RefreshCw className="h-4 w-4 animate-spin" /> 加载中...
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          两步验证：{twoFactorEnabled ? '已启用' : '未启用'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          启用后登录时需输入动态验证码，提升账户安全性
+                        </p>
+                      </div>
+                      <Badge className={twoFactorEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}>
+                        {twoFactorEnabled ? '已启用' : '未启用'}
+                      </Badge>
+                    </div>
+
+                    {!twoFactorEnabled && twoFactorSetupStep === 'idle' && (
+                      <Button onClick={handle2faEnableStart} disabled={twoFactorActionLoading}>
+                        {twoFactorActionLoading ? (
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Shield className="mr-2 h-4 w-4" />
+                        )}
+                        启用两步验证
+                      </Button>
+                    )}
+
+                    {/* 2FA Setup: QR Code scanning step */}
+                    {!twoFactorEnabled && twoFactorSetupStep === 'scan' && (
+                      <div className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <p className="text-sm font-medium text-blue-800">第 1 步：扫描二维码</p>
+                        <p className="text-xs text-blue-600">
+                          使用 Google Authenticator、Authy 或其他 TOTP 应用扫描下方二维码
+                        </p>
+                        {twoFactorQrCode && (
+                          <div className="flex justify-center">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(twoFactorQrCode)}`}
+                              alt="2FA QR Code"
+                              className="rounded-lg border border-gray-200 bg-white p-2"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <p className="text-xs text-gray-500">无法扫描？手动输入密钥：</p>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 rounded bg-white px-3 py-2 text-sm font-mono border border-gray-200">
+                              {twoFactorSecret}
+                            </code>
+                            <Button variant="outline" size="sm" onClick={() => copyToClipboard(twoFactorSecret)}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <Button onClick={() => setTwoFactorSetupStep('verify')}>
+                          下一步：输入验证码
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* 2FA Setup: Verification step */}
+                    {!twoFactorEnabled && twoFactorSetupStep === 'verify' && (
+                      <div className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <p className="text-sm font-medium text-blue-800">第 2 步：输入验证码</p>
+                        <p className="text-xs text-blue-600">
+                          输入 authenticator 应用中显示的 6 位数字验证码
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={twoFactorCode}
+                            onChange={(e) => setTwoFactorCode(e.target.value)}
+                            placeholder="000000"
+                            maxLength={6}
+                            className="w-40 text-center text-lg tracking-widest font-mono"
+                          />
+                          <Button onClick={handle2faVerify} disabled={twoFactorActionLoading || twoFactorCode.trim().length < 6}>
+                            {twoFactorActionLoading ? (
+                              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            确认启用
+                          </Button>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setTwoFactorSetupStep('scan')}>
+                          返回上一步
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Backup codes display (one-time) */}
+                    {twoFactorBackupCodes.length > 0 && (
+                      <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <p className="text-sm font-medium text-amber-800">请保存备份码</p>
+                        </div>
+                        <p className="text-xs text-amber-700">
+                          以下备份码仅显示一次。当您无法使用 authenticator 时，可使用备份码登录。每个备份码只能使用一次。
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {twoFactorBackupCodes.map((code) => (
+                            <code key={code} className="rounded bg-white px-3 py-1.5 text-sm font-mono border border-amber-200 text-center">
+                              {code}
+                            </code>
+                          ))}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={copyBackupCodes}>
+                          <Copy className="mr-2 h-3 w-3" />
+                          复制备份码
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Disable 2FA */}
+                    {twoFactorEnabled && (
+                      <>
+                        {!showDisable2fa ? (
+                          <Button variant="outline" onClick={() => { setShowDisable2fa(true); setSecurityMessage(null) }}>
+                            禁用两步验证
+                          </Button>
+                        ) : (
+                          <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4">
+                            <p className="text-sm font-medium text-red-800">禁用两步验证</p>
+                            <p className="text-xs text-red-600">
+                              请输入当前 authenticator 应用中的验证码以确认禁用
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={twoFactorDisableCode}
+                                onChange={(e) => setTwoFactorDisableCode(e.target.value)}
+                                placeholder="000000"
+                                maxLength={6}
+                                className="w-40 text-center text-lg tracking-widest font-mono"
+                              />
+                              <Button variant="destructive" onClick={handle2faDisable} disabled={twoFactorActionLoading || twoFactorDisableCode.trim().length < 6}>
+                                {twoFactorActionLoading ? (
+                                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                确认禁用
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => { setShowDisable2fa(false); setTwoFactorDisableCode('') }}>
+                                取消
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Password Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Lock className="h-5 w-5" /> 修改密码
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                  {passwordMessage && (
+                    <div className={`rounded-lg p-3 text-sm ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                      {passwordMessage.text}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">当前密码</Label>
+                    <div className="relative">
+                      <Input
+                        id="currentPassword"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="输入当前密码"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">新密码</Label>
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="至少 6 位"
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">确认新密码</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="再次输入新密码"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <Button type="submit" disabled={passwordSaving}>
+                    {passwordSaving ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <KeyRound className="mr-2 h-4 w-4" />
+                    )}
+                    修改密码
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* S4a: SSO Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-5 w-5" /> SSO 单点登录
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <Building2 className="mx-auto h-8 w-8 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500">SSO 单点登录为企业版功能</p>
+                  <p className="text-xs text-gray-400">支持 SAML 2.0 和 OIDC 协议</p>
+                  <Button variant="outline" size="sm" className="mt-4" asChild>
+                    <a href="mailto:sales@outreachhub.com">联系销售</a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sessions Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Monitor className="h-5 w-5" /> 会话管理
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <Monitor className="mx-auto h-8 w-8 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500">会话管理功能即将上线</p>
+                  <p className="text-xs text-gray-400">查看和管理活跃登录会话</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* U4: API Keys & Webhooks */}
+          <TabsContent value="api-keys" className="space-y-6">
+            {tenantData?.tenant.plan === 'FREE' || tenantData?.tenant.plan === 'BASIC' ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="rounded-full bg-gray-100 p-4 mb-4">
+                      <Lock className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">API Keys 和 Webhook 管理为专业版及以上功能</h3>
+                    <p className="mt-2 text-sm text-gray-500 max-w-md">
+                      升级至专业版或企业版即可创建和管理 API Keys、配置 Webhook 端点，实现程序化访问和实时事件通知。
+                    </p>
+                    <Button className="mt-6" asChild>
+                      <Link href="/pricing">升级套餐</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+            <>
+            {/* API Keys Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Key className="h-5 w-5" /> API Keys
+                  </CardTitle>
+                  <Button size="sm" onClick={() => setShowCreateKeyDialog(true)}>
+                    <Plus className="mr-2 h-3 w-3" />
+                    创建新 Key
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  使用 API Key 以编程方式访问 OutreachHub API。每个 Key 可配置独立的权限和速率限制。
+                </p>
+
+                {loadingKeys ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> 加载中...
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center">
+                    <Key className="mx-auto h-8 w-8 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">暂无 API Key</p>
+                    <p className="text-xs text-gray-400">点击「创建新 Key」开始</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {apiKeys.map((apiKey) => (
+                      <div key={apiKey.id} className="rounded-lg border border-gray-200 p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900">{apiKey.name}</p>
+                              <Badge className={apiKey.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                                {apiKey.status === 'active' ? '活跃' : '已吊销'}
+                              </Badge>
+                            </div>
+                            <p className="text-xs font-mono text-gray-500">{apiKey.keyPrefix}...</p>
+                            <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                              <span>权限：{apiKey.permissions.join(', ')}</span>
+                              <span>速率限制：{apiKey.rateLimit}/分钟</span>
+                              {apiKey.lastUsedAt && (
+                                <span>最后使用：{new Date(apiKey.lastUsedAt).toLocaleString('zh-CN')}</span>
+                              )}
+                            </div>
+                          </div>
+                          {apiKey.status === 'active' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRevokeKey(apiKey.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              吊销
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Webhook Endpoints Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Webhook className="h-5 w-5" /> Webhook 端点
+                  </CardTitle>
+                  <Button size="sm" onClick={() => setShowCreateWebhookDialog(true)}>
+                    <Plus className="mr-2 h-3 w-3" />
+                    添加 Webhook
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">
+                  配置 Webhook 端点以接收实时事件通知。当指定事件发生时，系统将向您的 URL 发送 POST 请求。
+                </p>
+
+                {loadingWebhooks ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> 加载中...
+                  </div>
+                ) : webhooks.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center">
+                    <Webhook className="mx-auto h-8 w-8 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">暂无 Webhook 端点</p>
+                    <p className="text-xs text-gray-400">点击「添加 Webhook」开始配置</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {webhooks.map((wh) => (
+                      <div key={wh.id} className="rounded-lg border border-gray-200 p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm text-gray-900 truncate">{wh.url}</code>
+                              <Badge className={wh.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}>
+                                {wh.status === 'active' ? '活跃' : '停用'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {wh.events.map((evt) => (
+                                <Badge key={evt} className="text-xs border border-gray-300">{evt}</Badge>
+                              ))}
+                            </div>
+                            {wh.lastTriggeredAt && (
+                              <p className="text-xs text-gray-400">
+                                最后触发：{new Date(wh.lastTriggeredAt).toLocaleString('zh-CN')}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleTestWebhook(wh.id)}
+                              disabled={testingWebhookId === wh.id}
+                            >
+                              {testingWebhookId === wh.id ? (
+                                <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                              ) : (
+                                <Zap className="mr-1 h-3 w-3" />
+                              )}
+                              测试
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteWebhook(wh.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            </>
             )}
           </TabsContent>
         </Tabs>
@@ -1065,6 +2036,201 @@ export default function SettingsPage() {
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* U4: Create API Key Dialog */}
+      <Dialog open={showCreateKeyDialog} onOpenChange={(open) => { if (!open) { setShowCreateKeyDialog(false); setCreatedKey(null) } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" /> 创建 API Key
+            </DialogTitle>
+            <DialogDescription>
+              创建一个新的 API Key 用于程序化访问 OutreachHub API。
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdKey ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <p className="text-sm font-medium text-amber-800">此密钥只会显示一次，请妥善保管</p>
+                </div>
+                <p className="text-xs text-amber-700 mb-3">
+                  关闭此对话框后将无法再次查看完整密钥。请立即复制并保存到安全位置。
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded bg-white px-3 py-2 text-sm font-mono border border-amber-200 break-all">
+                    {createdKey}
+                  </code>
+                  <Button variant="outline" size="sm" onClick={() => copyToClipboard(createdKey)}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setShowCreateKeyDialog(false); setCreatedKey(null) }}>
+                  我已保存，关闭
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="keyName">名称 *</Label>
+                <Input
+                  id="keyName"
+                  value={newKeyForm.name}
+                  onChange={(e) => setNewKeyForm({ ...newKeyForm, name: e.target.value })}
+                  placeholder="例如：生产环境、测试密钥"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>权限 *</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {AVAILABLE_PERMISSIONS.map((perm) => (
+                    <label key={perm.id} className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newKeyForm.permissions.includes(perm.id)}
+                        onChange={() => togglePermission(perm.id)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700">{perm.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rateLimit">速率限制（次/分钟）</Label>
+                <Input
+                  id="rateLimit"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={newKeyForm.rateLimit}
+                  onChange={(e) => setNewKeyForm({ ...newKeyForm, rateLimit: parseInt(e.target.value) || 100 })}
+                />
+                <p className="text-xs text-gray-400">默认 100 次/分钟，最大 1000</p>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreateKeyDialog(false)}>
+                  取消
+                </Button>
+                <Button onClick={handleCreateKey} disabled={creatingKey}>
+                  {creatingKey ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Key className="mr-2 h-4 w-4" />
+                  )}
+                  创建 Key
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* U4: Create Webhook Dialog */}
+      <Dialog open={showCreateWebhookDialog} onOpenChange={(open) => { if (!open) { setShowCreateWebhookDialog(false); setNewWebhookForm({ url: '', events: [] }) } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Webhook className="h-5 w-5" /> 添加 Webhook 端点
+            </DialogTitle>
+            <DialogDescription>
+              配置一个 Webhook URL 以接收事件通知。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="webhookUrl">Webhook URL *</Label>
+              <Input
+                id="webhookUrl"
+                type="url"
+                value={newWebhookForm.url}
+                onChange={(e) => setNewWebhookForm({ ...newWebhookForm, url: e.target.value })}
+                placeholder="https://your-server.com/webhook"
+              />
+              <p className="text-xs text-gray-400">必须是公网可访问的 HTTPS 地址</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>订阅事件 *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {AVAILABLE_WEBHOOK_EVENTS.map((evt) => (
+                  <label key={evt.id} className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={newWebhookForm.events.includes(evt.id)}
+                      onChange={() => toggleWebhookEvent(evt.id)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">{evt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateWebhookDialog(false)}>
+                取消
+              </Button>
+              <Button onClick={handleCreateWebhook} disabled={creatingWebhook}>
+                {creatingWebhook ? (
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Webhook className="mr-2 h-4 w-4" />
+                )}
+                添加端点
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* U4: Webhook Secret One-Time Display Dialog */}
+      <Dialog open={showWebhookSecretDialog} onOpenChange={(open) => { if (!open) { setShowWebhookSecretDialog(false); setCreatedWebhookSecret(null) } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" /> Webhook 签名密钥
+            </DialogTitle>
+            <DialogDescription>
+              此密钥用于验证 Webhook 请求的签名，请妥善保管。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <p className="text-sm font-medium text-amber-800">请立即保存此密钥，后续将无法再次查看</p>
+              </div>
+              <p className="text-xs text-amber-700 mb-3">
+                关闭此对话框后将无法再次查看完整签名密钥。请立即复制并保存到安全位置。
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded bg-white px-3 py-2 text-sm font-mono border border-amber-200 break-all">
+                  {createdWebhookSecret}
+                </code>
+                <Button variant="outline" size="sm" onClick={() => createdWebhookSecret && copyToClipboard(createdWebhookSecret)}>
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => { setShowWebhookSecretDialog(false); setCreatedWebhookSecret(null) }}>
+                我已保存
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

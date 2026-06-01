@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { getTenantLimits, getTenantUsage, syncTenantLimits } from '@/lib/plan-limits'
+import { getTenantLimits, getTenantUsage } from '@/lib/plan-limits'
+import { LANGUAGES } from '@/lib/i18n/languages'
 
 /**
  * GET /api/tenant/usage
@@ -17,7 +18,16 @@ export async function GET(req: NextRequest) {
     const [tenant, limits, usage] = await Promise.all([
       prisma.tenant.findUnique({
         where: { id: auth.tenantId },
-        select: { id: true, name: true, plan: true, expiresAt: true, createdAt: true, settings: true },
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          expiresAt: true,
+          createdAt: true,
+          settings: true,
+          trialStartedAt: true,
+          trialEndsAt: true,
+        },
       }),
       getTenantLimits(auth.tenantId),
       getTenantUsage(auth.tenantId),
@@ -48,6 +58,8 @@ export async function GET(req: NextRequest) {
           plan: tenant.plan,
           expiresAt: tenant.expiresAt,
           createdAt: tenant.createdAt,
+          trialStartedAt: tenant.trialStartedAt,
+          trialEndsAt: tenant.trialEndsAt,
           language: ((tenant.settings as Record<string, unknown>)?.language as string) || 'zh',
         },
         limits,
@@ -80,22 +92,18 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { plan, language } = body
+    const { language } = body
 
     const updateData: Record<string, unknown> = {}
 
-    // 套餐变更
-    if (plan !== undefined) {
-      const validPlans = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE']
-      if (!validPlans.includes(plan)) {
-        return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效套餐，可选：${validPlans.join(', ')}`, 400)
-      }
-      updateData.plan = plan
+    // R1: 套餐变更仅允许通过 Stripe Webhook，禁止 API 手动升级
+    if (body.plan !== undefined) {
+      return errorResponse(ErrorCodes.FORBIDDEN, '套餐变更请通过订阅结账或 Stripe 客户门户完成', 403)
     }
 
     // K6: 语言设置（写入 tenant.settings.language）
     if (language !== undefined) {
-      const validLangs = ['zh', 'en']
+      const validLangs = LANGUAGES.map((l) => l.code)
       if (!validLangs.includes(language)) {
         return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效语言，可选：${validLangs.join(', ')}`, 400)
       }
@@ -116,11 +124,6 @@ export async function PATCH(req: NextRequest) {
       data: updateData,
     })
 
-    // I1: 同步限额（仅套餐变更时）
-    if (updateData.plan) {
-      await syncTenantLimits(auth.tenantId, updateData.plan as string)
-    }
-
     const [limits, usage, updatedTenant] = await Promise.all([
       getTenantLimits(auth.tenantId),
       getTenantUsage(auth.tenantId),
@@ -135,7 +138,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        plan: updateData.plan || updatedTenant?.plan,
+        plan: updatedTenant?.plan,
         language: language !== undefined ? savedLanguage : undefined,
         limits,
         usage,

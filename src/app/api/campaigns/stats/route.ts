@@ -168,6 +168,21 @@ export async function GET(req: NextRequest) {
           'zh'
         )
 
+        // Q2b: 城市 Top 10 — 按 openCity 聚合打开数
+        const cityWhere: any = { tenantId: authResult.tenantId, openCity: { not: null } }
+        if (campaignId) cityWhere.campaignId = campaignId
+        const cityStats = await prisma.emailLog.groupBy({
+          by: ['openCity'],
+          where: cityWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 10,
+        })
+
+        const cities = cityStats
+          .filter((s) => s.openCity && s.openCity !== '')
+          .map((s) => ({ city: s.openCity, count: s._count.id }))
+
         return {
           overall: {
             totalSent,
@@ -183,6 +198,7 @@ export async function GET(req: NextRequest) {
           daily: dailyStats,
           comparison,
           geo,
+          cities,
         }
       },
       { ttl: 300 } // Cache for 5 minutes

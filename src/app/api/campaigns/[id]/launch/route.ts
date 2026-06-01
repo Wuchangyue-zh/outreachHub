@@ -9,8 +9,28 @@ import { checkDailyEmailLimit } from '@/lib/plan-limits'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
 import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
 import { getStorageBackend } from '@/lib/env'
+import { checkTrialStatus } from '@/lib/trial-guard'
+import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
 
 type RouteContext = { params: Promise<{ id: string }> }
+
+async function auditCampaignLaunch(
+  req: NextRequest,
+  auth: { userId?: string; tenantId?: string | null },
+  campaignId: string,
+  meta?: Record<string, unknown>
+) {
+  if (!auth.userId) return
+  await writeAuditLog({
+    userId: auth.userId,
+    tenantId: auth.tenantId || undefined,
+    action: 'launch_campaign',
+    resource: 'campaign',
+    resourceId: campaignId,
+    ...getAuditRequestMeta(req),
+    meta,
+  })
+}
 
 function getLaunchWarnings(): string[] {
   const appUrl = process.env.APP_URL || ''
@@ -37,6 +57,13 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     // #48: 启动活动需要 campaigns:manage 权限
     if (!hasPermission(auth.role, 'campaigns:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
+    }
+
+    // R2b: 试用期过期检查
+    const trial = await checkTrialStatus(auth.tenantId!)
+    if (!trial.allowed) {
+      return errorResponse(ErrorCodes.FORBIDDEN,
+        '试用期已结束，请升级套餐以继续使用。访问 /pricing 查看套餐方案。', 403)
     }
 
     const { id } = await ctx.params
@@ -76,6 +103,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         },
       })
 
+      await auditCampaignLaunch(req, auth, campaign.id, { status: 'SCHEDULED', scheduledAt: scheduledDate.toISOString() })
+
       return NextResponse.json({
         success: true,
         data: {
@@ -89,6 +118,29 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     // 立即启动
     const launchWarnings = getLaunchWarnings()
+
+    // O2c: 同联系人多 Campaign 冲突检测
+    const conflictingCampaigns = await prisma.campaign.findMany({
+      where: {
+        tenantId: auth.tenantId,
+        status: 'RUNNING',
+        id: { not: campaign.id },
+        campaignContacts: {
+          some: {
+            contactId: { in: campaignContactIds },
+            status: { in: ['PENDING', 'SENT'] },
+          },
+        },
+      },
+      select: { id: true, name: true, type: true },
+    })
+
+    if (conflictingCampaigns.length > 0) {
+      const conflictNames = conflictingCampaigns.map((c) => c.name).join('、')
+      launchWarnings.push(
+        `注意：${campaignContactIds.length} 个联系人中有部分正在参与其他运行中的活动（${conflictNames}），可能导致同一联系人短时间内收到多封邮件。`
+      )
+    }
 
     // 获取可用的发件账户（优先使用绑定账户，否则自动选择）
     const availableAccountId = await getAvailableAccount(auth.userId!, campaign.emailAccountId)
@@ -232,6 +284,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         abJobIds.push(...ids)
       }
 
+      await auditCampaignLaunch(req, auth, campaign.id, { type: 'AB_TEST', status: 'RUNNING' })
+
       return NextResponse.json({
         success: true,
         data: {
@@ -330,6 +384,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         seqJobIds.push(...ids)
       }
 
+      await auditCampaignLaunch(req, auth, campaign.id, { type: 'SEQUENCE', status: 'RUNNING' })
+
       return NextResponse.json({
         success: true,
         data: {
@@ -422,6 +478,8 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       const ids = await addBulkEmailJobs(batches[batchIdx] as any[], { delay })
       allJobIds.push(...ids)
     }
+
+    await auditCampaignLaunch(req, auth, campaign.id, { type: 'SINGLE', status: 'RUNNING', enqueued: emailJobs.length })
 
     return NextResponse.json({
       success: true,

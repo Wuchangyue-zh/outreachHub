@@ -6,8 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useCampaignWizardStore } from '@/store/campaign-wizard-store'
-import { ArrowRight, Mail, Loader2, AlertCircle, Plus, Trash2, Clock, Package } from 'lucide-react'
+import { ArrowRight, Mail, Loader2, AlertCircle, Plus, Trash2, Clock, Package, Layers } from 'lucide-react'
 import Link from 'next/link'
+import { SequenceBuilder } from '@/components/sequence-builder'
+import { validateWizardSequence } from '@/lib/sequence-utils'
+import { LANGUAGES } from '@/lib/i18n/languages'
 
 interface EmailAccountOption {
   id: string
@@ -21,6 +24,7 @@ interface EmailAccountOption {
 export function StepBasicInfo() {
   const {
     campaignName, setCampaignName,
+    language, setLanguage,
     targetTags, setTargetTags,
     senderAccountId, setSenderAccountId,
     productId, setProductId,
@@ -70,10 +74,9 @@ export function StepBasicInfo() {
       .finally(() => setLoading(false))
   }, [senderAccountId, setSenderAccountId])
 
-  // #7: SEQUENCE 至少需要一个有效步骤
+  // #7: SEQUENCE 至少一个有效 email 步骤；wait/condition 单独校验
   const sequenceValid =
-    campaignType !== 'SEQUENCE' ||
-    (sequence.length > 0 && sequence.every((s) => s.subject.trim() && s.content.trim()))
+    campaignType !== 'SEQUENCE' || validateWizardSequence(sequence)
 
   // #8: AB_TEST 需要变体 B 内容
   const abValid =
@@ -103,6 +106,23 @@ export function StepBasicInfo() {
           value={campaignName}
           onChange={(e) => setCampaignName(e.target.value)}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="language">目标语言</Label>
+        <select
+          id="language"
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          {LANGUAGES.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.nativeName} ({lang.name})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-400">AI 生成邮件时将使用此语言</p>
       </div>
 
       <div className="space-y-2">
@@ -201,64 +221,14 @@ export function StepBasicInfo() {
         </div>
       </div>
 
-      {/* #7: 序列步骤编辑器 */}
+      {/* O1d: 可视化序列编辑器 */}
       {campaignType === 'SEQUENCE' && (
         <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
-          <div className="flex items-center justify-between">
-            <Label>序列步骤</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addSequenceStep} className="gap-1">
-              <Plus className="h-3 w-3" />
-              添加步骤
-            </Button>
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-blue-600" />
+            <Label className="text-sm font-semibold text-blue-800">可视化序列编辑器</Label>
           </div>
-          {sequence.length === 0 && (
-            <p className="text-sm text-gray-500">点击「添加步骤」开始配置多封邮件序列</p>
-          )}
-          {sequence.map((step, idx) => (
-            <div key={idx} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  第 {idx + 1} 封邮件
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeSequenceStep(idx)}
-                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-              {idx > 0 && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-3 w-3 text-gray-400" />
-                  <Label className="text-xs text-gray-500">上封邮件发出后等待</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={step.delayHours}
-                    onChange={(e) => updateSequenceStep(idx, { delayHours: parseInt(e.target.value) || 1 })}
-                    className="h-7 w-20 text-xs"
-                  />
-                  <span className="text-xs text-gray-500">小时</span>
-                </div>
-              )}
-              <Input
-                placeholder="邮件主题"
-                value={step.subject}
-                onChange={(e) => updateSequenceStep(idx, { subject: e.target.value })}
-                className="text-sm"
-              />
-              <Textarea
-                placeholder="邮件内容（支持 {{FirstName}} 等变量）"
-                value={step.content}
-                onChange={(e) => updateSequenceStep(idx, { content: e.target.value })}
-                rows={4}
-                className="text-sm font-mono"
-              />
-            </div>
-          ))}
+          <SequenceBuilder />
         </div>
       )}
 

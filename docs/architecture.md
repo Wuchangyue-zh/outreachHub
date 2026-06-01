@@ -129,3 +129,66 @@ Launch / Cron 发信
   → email-worker
   → updateCampaignContactStatus(SENT)
 ```
+
+## sequence JSON Schema（O1a）
+
+Campaign.type === `SEQUENCE` 时，`Campaign.sequence` 字段存储如下 JSON 结构：
+
+```jsonc
+// Campaign.sequence — 序列步骤数组
+[
+  {
+    "id": "step-1",            // 前端生成的 cuid，用于可视化编辑器节点映射
+    "type": "email",           // "email" | "wait" | "condition"
+    "subject": "初次开发信",
+    "content": "Hi {{FirstName}}...",
+    "htmlContent": "<p>Hi {{FirstName}}...</p>",
+    "delayHours": 0,           // 距上一步的延迟小时数（第一步为 0）
+    "position": { "x": 0, "y": 0 }  // 可视化编辑器坐标（可选，不影响执行）
+  },
+  {
+    "id": "step-2",
+    "type": "wait",
+    "delayHours": 72,
+    "position": { "x": 0, "y": 100 }
+  },
+  {
+    "id": "step-3",
+    "type": "condition",
+    "conditionType": "opened",  // "opened" | "clicked" | "replied" | "not_opened"
+    "lookbackHours": 72,        // 回溯窗口（小时）
+    "branches": {
+      "true": "step-4",         // 条件满足时跳转到的 step id
+      "false": "step-5"         // 条件不满足时跳转到的 step id
+    },
+    "position": { "x": 0, "y": 200 }
+  },
+  {
+    "id": "step-4",
+    "type": "email",
+    "subject": "跟进邮件 - 已打开",
+    "content": "感谢关注...",
+    "htmlContent": "",
+    "delayHours": 0,
+    "position": { "x": -100, "y": 300 }
+  },
+  {
+    "id": "step-5",
+    "type": "email",
+    "subject": "换个角度",
+    "content": "我理解您可能很忙...",
+    "htmlContent": "",
+    "delayHours": 0,
+    "position": { "x": 100, "y": 300 }
+  }
+]
+```
+
+**Cron 执行编译规则：**
+1. `advance-sequences.ts` 按 `id` 索引步骤，从 `step-1` 开始线性执行
+2. 遇到 `wait` 节点：检查 `delayHours` 是否已过，未过则跳过本轮
+3. 遇到 `condition` 节点：查询 EmailLog 判断条件是否满足，跳转到对应分支
+4. 条件判断基于该联系人在当前 Campaign 的 EmailLog 状态（OPENED/CLICKED/REPLIED）
+5. `lookbackHours` 限定回溯窗口，默认 72 小时
+
+**兼容性：** 旧格式 `[{subject, content, delayHours}]` 仍然支持——无 `type` 字段时视为 `email` 步骤。

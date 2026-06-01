@@ -16,12 +16,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { email, password, name, company } = body
+    const { email, password, name, company, consentAt } = body
 
     if (!email || !password) {
       return errorResponse(
         ErrorCodes.MISSING_REQUIRED_FIELD,
         '邮箱和密码为必填项',
+        400
+      )
+    }
+
+    if (!consentAt) {
+      return errorResponse(
+        ErrorCodes.VALIDATION_ERROR,
+        '请同意服务条款和隐私政策',
         400
       )
     }
@@ -39,13 +47,21 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(password)
 
     // Create tenant for the new user
+    const trialStartedAt = new Date()
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 天试用期
+
+    const tenantSettings = { consentAt, consentVersion: '2026-05-31' }
+
     const tenant = await prisma.tenant.create({
       data: {
         name: company || `${name || email}的企业`,
         plan: 'FREE',
         maxUsers: 1,
         maxContacts: 1000,
-        maxEmailsPerDay: 50,
+        maxEmailsPerDay: 100,
+        trialStartedAt,
+        trialEndsAt,
+        settings: tenantSettings,
       },
     })
 

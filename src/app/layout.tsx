@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Toaster } from 'sonner'
 import { ToastProvider } from '@/components/ui/toast'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import './globals.css'
@@ -148,7 +149,10 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <ThemeProvider defaultTheme="system" storageKey="outreach-hub-theme">
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

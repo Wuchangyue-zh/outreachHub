@@ -24,7 +24,7 @@ function getModel(): string {
   return process.env.OPENAI_MODEL || 'doubao-seed-2-0-pro-260215'
 }
 
-async function createChatCompletion(
+export async function createChatCompletion(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   options?: { temperature?: number; max_tokens?: number }
 ) {
@@ -92,13 +92,14 @@ export async function generateEmail(input: EmailGenerationInput) {
   return parseEmailContent(content)
 }
 
-export async function generateCampaignEmail(productPrompt: string, tone: string) {
+export async function generateCampaignEmail(productPrompt: string, tone: string, language?: string) {
+  const targetLanguage = language && language !== 'English' ? language : 'English'
   const completion = await createChatCompletion(
     [
       {
         role: 'system',
         content: `You are a professional B2B cold outreach copywriter for Chinese exporters targeting overseas buyers.
-Write a complete cold email template in English with a ${tone} tone.
+Write a complete cold email template in ${targetLanguage} with a ${tone} tone.
 Keep placeholders exactly as: {{FirstName}}, {{CompanyName}}, {{Industry}}, {{Country}}.
 Include a subject line on the first line as: Subject: ...
 Use markdown-style bullet points where appropriate.`,

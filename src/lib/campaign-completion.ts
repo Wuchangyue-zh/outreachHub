@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { getCampaignContactIds } from './campaign-contacts'
+import { dispatchWebhook } from './webhook-dispatch'
 
 const TERMINAL_STATUSES = [
   'SENT',
@@ -28,6 +29,8 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
     where: { id: campaignId },
     select: {
       id: true,
+      tenantId: true,
+      name: true,
       status: true,
       type: true,
       scheduleType: true,
@@ -74,6 +77,14 @@ export async function maybeMarkCampaignCompleted(campaignId: string): Promise<bo
       completedAt: new Date(),
     },
   })
+
+  // Fire-and-forget webhook dispatch
+  if (hasSuccess && campaign.tenantId) {
+    dispatchWebhook(campaign.tenantId, 'campaign.completed', {
+      campaignId,
+      name: campaign.name,
+    }).catch(() => {})
+  }
 
   console.log(
     `[Campaign] ${campaignId} marked ${hasSuccess ? 'COMPLETED' : 'FAILED'} (${processedByContact.size}/${contactIds.length} contacts processed)`

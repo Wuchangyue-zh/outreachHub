@@ -38,6 +38,16 @@ export async function GET(req: NextRequest) {
       async () => {
         const tenantFilter = tenantWhere(auth.tenantId)
 
+        // M3e: 邮箱验证统计
+        const [verifiedEmails, totalEmails] = await Promise.all([
+          prisma.contactEmail.count({
+            where: { contact: tenantFilter, isVerified: true },
+          }),
+          prisma.contactEmail.count({
+            where: { contact: tenantFilter },
+          }),
+        ])
+
         // #4: recentCampaigns 从 EmailLog 聚合，避免 stale totalSent
         const [totalContacts, totalCompanies, totalCampaigns, emailStats, recentCampaignsRaw] = await Promise.all([
           prisma.contact.count({ where: tenantFilter }),
@@ -109,6 +119,38 @@ export async function GET(req: NextRequest) {
 
         result.openRate = totalSent > 0 ? (totalOpened / totalSent) * 100 : 0
         result.replyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0
+
+        // M3e: 邮箱验证率
+        result.emailVerification = {
+          verified: verifiedEmails,
+          total: totalEmails,
+          rate: totalEmails > 0 ? Math.round((verifiedEmails / totalEmails) * 1000) / 10 : 0,
+        }
+
+        // N4e: 海关数据统计
+        const [customsImports, highIntentBuyers] = await Promise.all([
+          prisma.customsBuyerProfile.count({
+            where: { ...tenantFilter, importedAsContact: true },
+          }),
+          prisma.customsBuyerProfile.count({
+            where: { ...tenantFilter, purchaseIntentScore: { gte: 70 } },
+          }),
+        ])
+        result.customsImports = customsImports
+        result.highIntentBuyers = highIntentBuyers
+
+        // P: 销售漏斗统计
+        const [activeDeals, wonAmountAgg] = await Promise.all([
+          prisma.deal.count({
+            where: { ...tenantFilter, stage: { notIn: ['WON', 'LOST'] } },
+          }),
+          prisma.deal.aggregate({
+            where: { ...tenantFilter, stage: 'WON' },
+            _sum: { amount: true },
+          }),
+        ])
+        result.activeDeals = activeDeals
+        result.wonAmount = wonAmountAgg._sum.amount ?? 0
 
         return result
       },

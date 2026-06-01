@@ -57,7 +57,7 @@ export const templateCreateSchema = z.object({
   subject: z.string().min(1, '邮件主题为必填项'),
   content: z.string().min(10, '邮件内容至少10个字符'),
   category: z.enum(['cold-outreach', 'follow-up', 'introduction', 'promotion', 'meeting-request']),
-  language: z.enum(['en', 'zh', 'de', 'fr', 'es', 'ja', 'ko', 'pt', 'ru', 'ar']),
+  language: z.enum(['en', 'zh', 'de', 'fr', 'es', 'ja', 'ko', 'pt', 'ru', 'ar', 'it', 'nl']),
   variables: z.array(z.string()).optional(),
 })
 

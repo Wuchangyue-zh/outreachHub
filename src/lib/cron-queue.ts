@@ -14,6 +14,7 @@ export type CronJobType =
   | 'process-follow-ups'
   | 'process-prospecting'
   | 'retry-failed'
+  | 'task-reminders'
 
 export interface CronJobData {
   type: CronJobType

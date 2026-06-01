@@ -30,6 +30,10 @@ export async function runCronHandler(type: CronJobType): Promise<unknown> {
       const { executeRetryFailed } = await import('./cron-jobs/retry-failed')
       return executeRetryFailed()
     }
+    case 'task-reminders': {
+      const { executeTaskReminders } = await import('./cron-jobs/task-reminders')
+      return executeTaskReminders()
+    }
     default:
       throw new Error(`Unknown cron job type: ${type}`)
   }

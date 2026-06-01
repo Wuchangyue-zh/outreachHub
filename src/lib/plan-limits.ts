@@ -15,7 +15,7 @@ export interface UsageInfo {
 
 // 各套餐默认限额
 const PLAN_DEFAULTS: Record<string, PlanLimits> = {
-  FREE: { maxContacts: 1000, maxUsers: 1, maxEmailsPerDay: 50 },
+  FREE: { maxContacts: 1000, maxUsers: 1, maxEmailsPerDay: 100 },
   BASIC: { maxContacts: 10000, maxUsers: 3, maxEmailsPerDay: 500 },
   PRO: { maxContacts: 100000, maxUsers: 10, maxEmailsPerDay: 5000 },
   ENTERPRISE: { maxContacts: 1000000, maxUsers: 50, maxEmailsPerDay: 50000 },
@@ -108,6 +108,19 @@ export async function checkDailyEmailLimit(tenantId: string, emailsToAdd: number
     current: usage.emailsSentToday,
     max: limits.maxEmailsPerDay,
   }
+}
+
+/**
+ * 检查租户套餐是否为 PRO 或 ENTERPRISE（开放 API 功能门槛）
+ * FREE / BASIC → 返回 false；PRO / ENTERPRISE → true
+ */
+export async function isProOrAbove(tenantId: string): Promise<boolean> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { plan: true },
+  })
+  if (!tenant) return false
+  return tenant.plan === 'PRO' || tenant.plan === 'ENTERPRISE'
 }
 
 /**

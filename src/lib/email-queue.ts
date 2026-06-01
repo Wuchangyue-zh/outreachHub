@@ -26,7 +26,7 @@ export interface EmailJobData {
   emailAccountId?: string  // 用户 EmailAccount ID
   fromEmail?: string
   fromName?: string
-  trackingPixel?: string
+  trackingPixel?: string | boolean
   trackingLinks?: boolean
   attachmentIds?: string[] // H1: 附件 ID 列表
 }

@@ -12,6 +12,7 @@ import {
   FileText, Plus, Edit, Trash2, X, Loader2, Wand2, Copy, Eye,
   Languages, Sparkles, Filter, BarChart3
 } from 'lucide-react'
+import { LANGUAGES, getLanguageLabel } from '@/lib/i18n/languages'
 
 interface Template {
   id: string
@@ -61,13 +62,9 @@ export default function TemplatesPage() {
     'meeting-request': '会议邀请',
   }
 
-  const languageLabels: Record<string, string> = {
-    en: 'English',
-    zh: '中文',
-    de: 'Deutsch',
-    fr: 'Français',
-    es: 'Español',
-  }
+  const languageLabels: Record<string, string> = Object.fromEntries(
+    LANGUAGES.map((l) => [l.code, l.nativeName])
+  )
 
   useEffect(() => {
     fetchTemplates()
@@ -356,11 +353,9 @@ export default function TemplatesPage() {
               onChange={(e) => setLanguage(e.target.value)}
               className="rounded-md border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.nativeName}</option>
+              ))}
             </select>
             <Button className="gap-2" onClick={openAddDialog}>
               <Plus className="h-4 w-4" /> 新建模板

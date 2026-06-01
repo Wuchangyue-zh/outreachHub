@@ -16,6 +16,8 @@ import {
   CampaignAttachmentPicker,
   type CampaignAttachmentItem,
 } from '@/components/campaign-wizard/CampaignAttachmentPicker'
+import { getFirstEmailStep, serializeSequenceForApi, validateWizardSequence } from '@/lib/sequence-utils'
+import { getLanguageName } from '@/lib/i18n/languages'
 
 const TONES: { id: ToneType; label: string; emoji: string }[] = [
   { id: 'professional', label: '专业', emoji: '💼' },
@@ -36,6 +38,7 @@ export function StepAiWriter() {
   const {
     productPrompt, setProductPrompt,
     tone, setTone,
+    language,
     generatedEmail, setGeneratedEmail,
     isGenerating, setIsGenerating,
     prevStep,
@@ -105,10 +108,7 @@ export function StepAiWriter() {
 
   const isSequence = campaignType === 'SEQUENCE'
   const isAbTest = campaignType === 'AB_TEST'
-  const sequenceReady =
-    isSequence &&
-    sequence.length > 0 &&
-    sequence.every((s) => s.subject.trim() && s.content.trim())
+  const sequenceReady = isSequence && validateWizardSequence(sequence)
   const abReady =
     isAbTest &&
     !!generatedEmail.trim() &&
@@ -134,7 +134,11 @@ export function StepAiWriter() {
       let htmlContent: string
 
       if (isSequence) {
-        const firstStep = sequence[0]
+        const firstStep = getFirstEmailStep(sequence)
+        if (!firstStep) {
+          setLaunchError('序列中至少需要一个邮件步骤')
+          return
+        }
         subjectLine = firstStep.subject.trim()
         emailContent = firstStep.content
         htmlContent = firstStep.htmlContent || firstStep.content.replace(/\n/g, '<br/>')
@@ -167,14 +171,9 @@ export function StepAiWriter() {
         createPayload.attachmentIds = attachments.map((a) => a.id)
       }
 
-      // #7: SEQUENCE 类型传递步骤配置
+      // #7: SEQUENCE 类型传递完整步骤配置（含 wait/condition）
       if (campaignType === 'SEQUENCE' && sequence.length > 0) {
-        createPayload.sequence = sequence.map((step, idx) => ({
-          subject: step.subject,
-          content: step.content,
-          htmlContent: step.content.replace(/\n/g, '<br/>'),
-          delayHours: idx === 0 ? 0 : step.delayHours,
-        }))
+        createPayload.sequence = serializeSequenceForApi(sequence)
       }
 
       // #8: A/B 测试变体 B 配置
@@ -243,7 +242,7 @@ export function StepAiWriter() {
       const res = await fetch('/api/campaigns/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productPrompt, tone, targetTags, productId }),
+        body: JSON.stringify({ productPrompt, tone, targetTags, productId, language: getLanguageName(language) }),
       })
       const data = await res.json()
       if (data.success) {

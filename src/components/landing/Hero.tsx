@@ -59,7 +59,7 @@ export function Hero() {
                 <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover/btn:translate-x-1" />
               </Link>
               <Link
-                href="#pricing"
+                href="/demo"
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-7 py-3.5 text-base font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-400 hover:bg-gray-50"
               >
                 {heroData.cta.secondary}

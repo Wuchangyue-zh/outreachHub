@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
-import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe } from 'lucide-react'
+import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe, MapPin } from 'lucide-react'
 
 interface CampaignStatsProps {
   campaignId?: string
@@ -45,6 +45,11 @@ interface GeoStats {
   count: number
 }
 
+interface CityStats {
+  city: string
+  count: number
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 export function CampaignStats({ campaignId }: CampaignStatsProps) {
@@ -52,6 +57,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [campaignComparison, setCampaignComparison] = useState<CampaignComparison[]>([])
   const [geoStats, setGeoStats] = useState<GeoStats[]>([])
+  const [cityStats, setCityStats] = useState<CityStats[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -69,6 +75,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
         setDailyStats(statsData.data.daily || [])
         setCampaignComparison(statsData.data.comparison || [])
         setGeoStats(statsData.data.geo || [])
+        setCityStats(statsData.data.cities || [])
       }
     } catch (e) {
       console.error('Failed to fetch campaign stats:', e)
@@ -247,6 +254,32 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                   }}
                 />
                 <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Q2b: 城市分布 Top 10 */}
+      {cityStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              城市分布 Top 10
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(200, cityStats.length * 32)}>
+              <BarChart data={cityStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="city" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => [value, 'Opens']}
+                  labelFormatter={(label) => label}
+                />
+                <Bar dataKey="count" fill="#10b981" name="Opens" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

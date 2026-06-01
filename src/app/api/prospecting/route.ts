@@ -4,6 +4,10 @@ import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import * as rocketreach from '@/lib/rocketreach'
 import { generateCustomerProfile, generateKeywordSuggestions, generatePositionSuggestions } from '@/lib/openai'
+import { RocketReachProvider } from '@/lib/data-providers/rocketreach'
+import { ApolloProvider } from '@/lib/data-providers/apollo'
+import { dedupContacts } from '@/lib/contact-dedup'
+import type { SearchPeopleInput } from '@/lib/data-providers/types'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +31,49 @@ export async function POST(req: NextRequest) {
     if (type === 'search-people') {
       const people = await rocketreach.searchPeople(params)
       return NextResponse.json({ success: true, data: people })
+    }
+
+    // M1d: 多源联系人搜索（RocketReach + Apollo 并行）
+    if (type === 'search-people-multi') {
+      const { sources, ...searchParams } = params || {}
+      const requestedSources: string[] = sources || ['rocketreach']
+      const input: SearchPeopleInput = {
+        keywords: searchParams.keywords || (searchParams.name ? [searchParams.name] : []),
+        title: searchParams.title ? [searchParams.title] : searchParams.titles,
+        location: searchParams.location ? [searchParams.location] : undefined,
+        page: searchParams.page,
+        perPage: searchParams.limit || 25,
+      }
+
+      const allProviders = [
+        requestedSources.includes('rocketreach') ? new RocketReachProvider() : null,
+        requestedSources.includes('apollo') ? new ApolloProvider() : null,
+      ]
+      const configuredProviders = allProviders.filter((p): p is RocketReachProvider | ApolloProvider => p !== null && p.isConfigured())
+      if (configuredProviders.length === 0) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '所选数据源未配置 API Key', 400)
+      }
+
+      // 并行搜索所有源
+      const allResults = await Promise.allSettled(
+        configuredProviders.map((p) => p.searchPeople(input))
+      )
+
+      const contacts = allResults
+        .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof configuredProviders[0]['searchPeople']>>> => r.status === 'fulfilled')
+        .flatMap((r) => r.value)
+
+      const deduped = dedupContacts(contacts)
+
+      return NextResponse.json({
+        success: true,
+        data: deduped,
+        meta: {
+          sources: configuredProviders.map((p) => p!.name),
+          totalRaw: contacts.length,
+          totalDeduped: deduped.length,
+        },
+      })
     }
 
     if (type === 'company-employees') {
@@ -190,7 +237,7 @@ export async function POST(req: NextRequest) {
               countryCode: contactData.countryCode || null,
               companyId: companyId || null,
               tags: contactData.tags || [],
-              source: 'rocketreach',
+              source: contactData.source || 'prospecting',
             },
           })
 

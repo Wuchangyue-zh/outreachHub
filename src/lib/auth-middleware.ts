@@ -7,25 +7,44 @@ export interface AuthResult {
   tenantId?: string
   role?: string
   error?: string
+  apiKeyId?: string
+  effectivePermissions?: string[] // API key granular permissions mapped to backend format
 }
 
 // #48: 角色权限定义
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   OWNER: ['*'], // 所有权限
-  ADMIN: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'settings:manage', 'inbox:manage', 'reports:view'],
-  MANAGER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view'],
-  USER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view'],
+  ADMIN: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'settings:manage', 'inbox:manage', 'reports:view', 'deals:manage', 'audit:view', 'billing:manage'],
+  MANAGER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view', 'deals:manage'],
+  USER: ['campaigns:manage', 'contacts:manage', 'templates:manage', 'inbox:manage', 'reports:view', 'deals:manage'],
   MEMBER: ['campaigns:view', 'contacts:view', 'templates:view', 'inbox:manage'],
   VIEWER: ['campaigns:view', 'contacts:view', 'templates:view', 'reports:view'],
 }
 
 /**
  * 检查用户是否有指定权限
+ * @param role - 用户角色（或 'API_KEY'）
+ * @param permission - 需要检查的权限，如 'contacts:manage'
+ * @param effectivePermissions - API key 的有效权限列表（已映射为后端格式），优先于角色检查
  */
-export function hasPermission(role: string | undefined, permission: string): boolean {
+export function hasPermission(role: string | undefined, permission: string, effectivePermissions?: string[]): boolean {
+  // API keys: check effective permissions first
+  if (effectivePermissions) {
+    return effectivePermissions.includes('*') || effectivePermissions.includes(permission)
+  }
+
+  // Standard role-based check
   if (!role) return false
   const permissions = ROLE_PERMISSIONS[role] || []
   return permissions.includes('*') || permissions.includes(permission)
+}
+
+/** API Key 或 JWT 用户是否可读联系人 */
+export function canReadContacts(auth: Pick<AuthResult, 'role' | 'effectivePermissions'>): boolean {
+  return (
+    hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions) ||
+    hasPermission(auth.role, 'contacts:view', auth.effectivePermissions)
+  )
 }
 
 /**
@@ -93,6 +112,25 @@ export async function verifyAuthToken(req: NextRequest): Promise<AuthResult> {
       error: '认证验证失败',
     }
   }
+}
+
+/**
+ * Unified auth resolver: tries API key first, then falls back to JWT.
+ * Use this in API routes that should accept both authentication methods.
+ */
+export async function resolveAuth(req: NextRequest): Promise<AuthResult> {
+  // Try API key first (check for oh_ prefix in Bearer or x-api-key header)
+  const apiKeyHeader = req.headers.get('x-api-key')
+  const authHeader = req.headers.get('authorization')
+  const hasApiKey = apiKeyHeader?.startsWith('oh_') || authHeader?.startsWith('Bearer oh_')
+
+  if (hasApiKey) {
+    const { verifyApiKey } = await import('./api-key')
+    return verifyApiKey(req)
+  }
+
+  // Fall back to JWT
+  return verifyAuthToken(req)
 }
 
 /**

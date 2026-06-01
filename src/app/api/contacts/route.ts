@@ -4,6 +4,7 @@ import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
 import { checkContactLimit } from '@/lib/plan-limits'
+import { checkTrialStatus } from '@/lib/trial-guard'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || ''
     const country = searchParams.get('country') || ''
     const tags = searchParams.get('tags')?.split(',') || []
+    const pool = searchParams.get('pool') || ''
+    const ownerId = searchParams.get('ownerId') || ''
+    const publicPool = searchParams.get('publicPool') || ''
 
     const skip = (page - 1) * limit
 
@@ -40,8 +44,41 @@ export async function GET(req: NextRequest) {
     if (tags.length > 0 && tags[0] !== '') {
       where.tags = { hasSome: tags }
     }
+    if (pool) where.pool = pool
+    if (ownerId) {
+      if (ownerId === 'me') {
+        if (!auth.userId) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            pagination: { page, limit, total: 0, pages: 0 },
+          })
+        }
+        where.ownerId = auth.userId
+      } else {
+        where.ownerId = ownerId
+      }
+    }
+    if (publicPool === 'true') where.ownerId = null
 
-    const [contacts, total] = await Promise.all([
+    const includePoolStats = searchParams.get('poolStats') === 'true'
+
+    const countQueries: Promise<number>[] = [prisma.contact.count({ where })]
+    if (includePoolStats && auth.userId) {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      countQueries.push(
+        prisma.contact.count({
+          where: {
+            tenantId: auth.tenantId,
+            ownerId: auth.userId,
+            claimedAt: { gte: todayStart },
+          },
+        })
+      )
+    }
+
+    const [contacts, ...counts] = await Promise.all([
       prisma.contact.findMany({
         where,
         include: {
@@ -52,13 +89,19 @@ export async function GET(req: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.contact.count({ where }),
+      ...countQueries,
     ])
+
+    const total = counts[0]
+    const poolStats = includePoolStats && auth.userId
+      ? { claimedToday: counts[1] ?? 0 }
+      : undefined
 
     return NextResponse.json({
       success: true,
       data: contacts,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      ...(poolStats ? { poolStats } : {}),
     })
   } catch (error) {
     return handleApiError(error)
@@ -76,6 +119,13 @@ export async function POST(req: NextRequest) {
     // #48: 创建联系人需要 contacts:manage 权限
     if (!hasPermission(auth.role, 'contacts:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
+
+    // R2b: 试用期过期检查
+    const trial = await checkTrialStatus(auth.tenantId)
+    if (!trial.allowed) {
+      return errorResponse(ErrorCodes.FORBIDDEN,
+        '试用期已结束，请升级套餐以继续使用。访问 /pricing 查看套餐方案。', 403)
     }
 
     // #46: 检查联系人数量限额

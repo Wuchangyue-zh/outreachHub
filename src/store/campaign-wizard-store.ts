@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createStepId, type SequenceStepPayload } from '@/lib/sequence-utils'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -25,13 +26,8 @@ export interface ContactRecord {
 export type ScheduleType = 'IMMEDIATE' | 'SCHEDULED' | 'RECURRING'
 export type RecurrenceRule = 'daily' | 'weekly' | 'monthly'
 
-// #7: 序列步骤定义
-export interface SequenceStep {
-  subject: string
-  content: string
-  htmlContent?: string
-  delayHours: number  // 距上一步的延迟小时数（第一步为 0）
-}
+// #7: 序列步骤定义（支持 email / wait / condition）
+export type SequenceStep = SequenceStepPayload
 
 export interface WizardState {
   // Step tracking
@@ -43,6 +39,8 @@ export interface WizardState {
   // Step 1: Basic Info
   campaignName: string
   setCampaignName: (v: string) => void
+  language: string
+  setLanguage: (v: string) => void
   targetTags: string
   setTargetTags: (v: string) => void
   senderAccountId: string
@@ -118,6 +116,8 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
   // Step 1
   campaignName: '',
   setCampaignName: (v) => set({ campaignName: v }),
+  language: 'en',
+  setLanguage: (v) => set({ language: v }),
   targetTags: '',
   setTargetTags: (v) => set({ targetTags: v }),
   senderAccountId: '',
@@ -143,7 +143,13 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
     set((s) => ({
       sequence: [
         ...s.sequence,
-        { subject: '', content: '', delayHours: s.sequence.length === 0 ? 0 : 24 },
+        {
+          id: createStepId(s.sequence),
+          type: 'email',
+          subject: '',
+          content: '',
+          delayHours: s.sequence.length === 0 ? 0 : 24,
+        },
       ],
     })),
   removeSequenceStep: (idx) =>
@@ -196,6 +202,7 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
     set({
       currentStep: 1,
       campaignName: '',
+      language: 'en',
       targetTags: '',
       senderAccountId: '',
       productId: '',
