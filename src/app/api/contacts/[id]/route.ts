@@ -48,7 +48,24 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     }
 
     const body = await req.json()
-    const { firstName, lastName, title, department, emails, country, city, tags, notes, status } = body
+    const { firstName, lastName, title, department, companyId: inputCompanyId, emails, country, city, tags, notes, status } = body
+
+    // Resolve companyId if provided
+    let resolvedCompanyId: string | null | undefined = undefined
+    if (inputCompanyId !== undefined) {
+      if (inputCompanyId) {
+        const existing = await prisma.company.findFirst({
+          where: { id: inputCompanyId, tenantId: auth.tenantId },
+          select: { id: true },
+        })
+        if (!existing) {
+          return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+        }
+        resolvedCompanyId = existing.id
+      } else {
+        resolvedCompanyId = null // explicit unlink
+      }
+    }
 
     const contact = await prisma.contact.update({
       where: { id, tenantId: auth.tenantId },
@@ -58,17 +75,19 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
         fullName: `${firstName || ''} ${lastName || ''}`.trim(),
         title,
         department,
+        ...(resolvedCompanyId !== undefined && { companyId: resolvedCompanyId }),
         country,
         city,
         tags: tags || [],
         notes,
         status,
       },
-      include: { emails: true },
+      include: { emails: true, company: true },
     })
 
     if (emails && emails.length > 0) {
-      await prisma.contactEmail.deleteMany({ where: { contactId: id } })
+      // 通过关系过滤确保租户隔离（ContactEmail 无 tenantId 字段）
+      await prisma.contactEmail.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
       await prisma.contactEmail.createMany({
         data: emails.map((email: string, i: number) => ({
           contactId: id,
@@ -104,10 +123,10 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '客户不存在或无权操作', 404)
     }
 
-    // J3: GDPR — 级联删除关联数据
-    await prisma.contactEmail.deleteMany({ where: { contactId: id } })
-    await prisma.emailLog.deleteMany({ where: { contactId: id } })
-    await prisma.campaignContact.deleteMany({ where: { contactId: id } })
+    // J3: GDPR — 级联删除关联数据（通过关系过滤确保租户隔离）
+    await prisma.contactEmail.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
+    await prisma.emailLog.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
+    await prisma.campaignContact.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
     await prisma.contact.delete({ where: { id, tenantId: auth.tenantId } })
 
     if (auth.userId) {

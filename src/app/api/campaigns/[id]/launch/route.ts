@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       }
 
       await prisma.campaign.update({
-        where: { id: campaign.id },
+        where: { id: campaign.id, tenantId: auth.tenantId },
         data: {
           status: 'SCHEDULED',
           scheduledAt: scheduledDate,
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     // #46: 检查租户每日发信限额（按本次实际待发送数量）
     const alreadySentForLimit = await prisma.emailLog.findMany({
       where: {
-        campaignId: campaign.id,
+        campaign: { id: campaign.id, tenantId: auth.tenantId },
         status: { in: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'] },
       },
       select: { contactId: true },
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       }
 
       await prisma.campaign.update({
-        where: { id: campaign.id },
+        where: { id: campaign.id, tenantId: auth.tenantId },
         data: {
           status: 'RUNNING',
           sentAt: campaign.sentAt || new Date(),
@@ -363,7 +363,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
       // 标记序列启动，记录当前步骤索引
       await prisma.campaign.update({
-        where: { id: campaign.id },
+        where: { id: campaign.id, tenantId: auth.tenantId },
         data: {
           status: 'RUNNING',
           sentAt: campaign.sentAt || new Date(),
@@ -408,7 +408,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     // Skip contacts already sent for this campaign
     const alreadySent = await prisma.emailLog.findMany({
       where: {
-        campaignId: campaign.id,
+        campaign: { id: campaign.id, tenantId: auth.tenantId },
         status: { in: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'] },
       },
       select: { contactId: true },

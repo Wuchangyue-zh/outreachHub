@@ -58,8 +58,26 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (expectedClose !== undefined) updateData.expectedClose = expectedClose ? new Date(expectedClose) : null
     if (probability !== undefined) updateData.probability = probability
     if (notes !== undefined) updateData.notes = notes
-    if (contactId !== undefined) updateData.contactId = contactId
-    if (companyId !== undefined) updateData.companyId = companyId
+    if (contactId !== undefined) {
+      if (contactId) {
+        const contact = await prisma.contact.findFirst({
+          where: { id: contactId, tenantId: auth.tenantId },
+          select: { id: true },
+        })
+        if (!contact) return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在', 404)
+      }
+      updateData.contactId = contactId
+    }
+    if (companyId !== undefined) {
+      if (companyId) {
+        const company = await prisma.company.findFirst({
+          where: { id: companyId, tenantId: auth.tenantId },
+          select: { id: true },
+        })
+        if (!company) return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+      }
+      updateData.companyId = companyId
+    }
     if (ownerId !== undefined) updateData.ownerId = ownerId
     if (lostReason !== undefined) updateData.lostReason = lostReason
 

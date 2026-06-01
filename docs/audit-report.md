@@ -1401,4 +1401,32 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 ---
 
-*本报告最后更新：2026-05-30。Batch D–U + Post-GA + Launch Prep 全部完成。*
+### §9.42 Security Fix — 多租户隔离加固
+
+**背景：** CLAUDE.md 全量代码审查发现 14 个路由存在多租户隔离缺陷。核心问题：`EmailLog`、`CampaignContact`、`ContactEmail` 三个表无 `tenantId` 字段，查询时需通过关联关系（`contact` / `campaign`）做租户过滤。
+
+**P0 — 关系过滤修复（12 文件，25+ 查询）：**
+
+| 类型 | 文件 | 修复方式 |
+|------|------|----------|
+| EmailLog 读查询 | `contacts/[id]/timeline`, `/export`, `/360` | `{ contact: { id, tenantId } }` |
+| EmailLog 读查询 | `campaigns/[id]/launch` ×4 | `{ campaign: { id, tenantId } }` |
+| CampaignContact 读查询 | `contacts/[id]/export`, `/360` | `{ contact: { id, tenantId } }` |
+| Cascade delete | `contacts/[id]` DELETE, `v1/contacts/[id]` DELETE | 三个 deleteMany 全部改关系过滤 |
+| Campaign cascade | `campaigns/[id]` DELETE | emailLog.deleteMany 改关系过滤 |
+| contactEmail cascade | `contacts/[id]` PUT, `v1/contacts/[id]` PUT | deleteMany 改关系过滤 |
+| Update where 子句 | `contacts/[id]/claim`, `/release` | `where: { id, tenantId }` |
+| Update where 子句 | `companies/[id]` PUT + DELETE | `where: { id, tenantId }` |
+| Campaign update | `campaigns/[id]/launch` ×4, `/sequence` | `where: { id, tenantId }` |
+| v1 contact update | `v1/contacts/[id]` PUT + DELETE | `where: { id, tenantId }` |
+
+**关系过滤方案：**
+- ContactEmail → `{ contact: { id, tenantId } }`
+- EmailLog → `{ contact: { id, tenantId } }` 或 `{ campaign: { id, tenantId } }`
+- CampaignContact → `{ contact: { id, tenantId } }` 或 `{ campaign: { id, tenantId } }`
+
+**验证：** `npm run build` ✅ · `npm test` 78 条全通过 · TypeScript 零错误
+
+---
+
+*本报告最后更新：2026-06-01。Batch D–U + Post-GA + Launch Prep + Security Fix 全部完成。*

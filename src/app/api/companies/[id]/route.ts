@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const { name, domain, website, industry, size, country, countryCode, city, linkedinUrl, description } = body
 
     const company = await prisma.company.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: { name, domain, website, industry, size, country, countryCode, city, linkedinUrl, description },
     })
 
@@ -78,7 +78,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在或无权操作', 404)
     }
 
-    const contactsCount = await prisma.contact.count({ where: { companyId: id } })
+    const contactsCount = await prisma.contact.count({ where: { companyId: id, tenantId: auth.tenantId } })
 
     if (contactsCount > 0) {
       return NextResponse.json(
@@ -87,7 +87,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       )
     }
 
-    await prisma.company.delete({ where: { id } })
+    await prisma.company.delete({ where: { id, tenantId: auth.tenantId } })
     return NextResponse.json({ success: true, message: '公司已删除' })
   } catch (error) {
     return handleApiError(error)

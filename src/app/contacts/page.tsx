@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
 import { CSVImport } from '@/components/CSVImport'
 import {
   Users, Plus, Download, Upload, Search, Mail, Building, Tag,
@@ -126,7 +127,7 @@ export default function ContactsPage() {
     lastName: '',
     title: '',
     department: '',
-    company: '',
+    companyId: '',
     email: '',
     phone: '',
     country: '',
@@ -134,6 +135,23 @@ export default function ContactsPage() {
     tags: '',
     notes: '',
   })
+  const [editCompanyLabel, setEditCompanyLabel] = useState('')
+  const [showQuickCompany, setShowQuickCompany] = useState(false)
+  const [quickCompanyName, setQuickCompanyName] = useState('')
+  const [quickCompanyDomain, setQuickCompanyDomain] = useState('')
+
+  const fetchCompanyOptions = useCallback(async (query: string): Promise<SearchableOption[]> => {
+    const params = new URLSearchParams({ limit: '20' })
+    if (query) params.set('search', query)
+    const res = await fetch(`/api/companies?${params}`)
+    const data = await res.json()
+    if (!data.success) return []
+    return (data.data || []).map((c: { id: string; name: string; domain?: string }) => ({
+      id: c.id,
+      label: c.name,
+      sublabel: c.domain || undefined,
+    }))
+  }, [])
 
   useEffect(() => {
     fetchContacts()
@@ -161,8 +179,9 @@ export default function ContactsPage() {
   const resetForm = () => {
     setForm({
       firstName: '', lastName: '', title: '', department: '',
-      company: '', email: '', phone: '', country: '', city: '', tags: '', notes: '',
+      companyId: '', email: '', phone: '', country: '', city: '', tags: '', notes: '',
     })
+    setEditCompanyLabel('')
   }
 
   const openAddDialog = () => {
@@ -177,7 +196,7 @@ export default function ContactsPage() {
       lastName: contact.lastName || '',
       title: contact.title || '',
       department: contact.department || '',
-      company: contact.company?.name || '',
+      companyId: contact.companyId || '',
       email: contact.emails[0]?.address || '',
       phone: '',
       country: contact.country || '',
@@ -185,6 +204,7 @@ export default function ContactsPage() {
       tags: contact.tags.join(', '),
       notes: contact.notes || '',
     })
+    setEditCompanyLabel(contact.company?.name || '')
     setShowEditDialog(true)
   }
 
@@ -308,7 +328,7 @@ export default function ContactsPage() {
           lastName: form.lastName,
           title: form.title,
           department: form.department,
-          company: form.company,
+          companyId: form.companyId || null,
           emails: [form.email],
           phones: form.phone ? [form.phone] : [],
           country: form.country,
@@ -749,10 +769,19 @@ export default function ContactsPage() {
               </div>
               <div>
                 <Label>公司</Label>
-                <Input
-                  value={form.company}
-                  onChange={(e) => setForm({ ...form, company: e.target.value })}
-                  placeholder="公司名称"
+                <SearchableSelect
+                  value={form.companyId}
+                  onChange={(id) => setForm({ ...form, companyId: id })}
+                  onClear={() => setForm({ ...form, companyId: '' })}
+                  onQuickCreate={() => {
+                    setQuickCompanyName('')
+                    setQuickCompanyDomain('')
+                    setShowQuickCompany(true)
+                  }}
+                  fetchOptions={fetchCompanyOptions}
+                  placeholder="搜索公司..."
+                  quickCreateLabel="新建公司"
+                  initialLabel={editCompanyLabel}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -829,6 +858,70 @@ export default function ContactsPage() {
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 确认删除
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick-create Company Dialog */}
+      {showQuickCompany && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold">快速新建公司</h3>
+              <div className="space-y-3">
+                <div>
+                  <Label>公司名称 *</Label>
+                  <Input
+                    value={quickCompanyName}
+                    onChange={(e) => setQuickCompanyName(e.target.value)}
+                    placeholder="ABC 科技有限公司"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <Label>域名</Label>
+                  <Input
+                    value={quickCompanyDomain}
+                    onChange={(e) => setQuickCompanyDomain(e.target.value)}
+                    placeholder="example.com"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setShowQuickCompany(false)}>取消</Button>
+                <Button
+                  onClick={async () => {
+                    if (!quickCompanyName.trim()) {
+                      addToast({ type: 'error', title: '请输入公司名称' })
+                      return
+                    }
+                    try {
+                      const res = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: quickCompanyName.trim(),
+                          domain: quickCompanyDomain.trim() || undefined,
+                        }),
+                      })
+                      const data = await res.json()
+                      if (data.success) {
+                        setForm((prev) => ({ ...prev, companyId: data.data.id }))
+                        setEditCompanyLabel(data.data.name)
+                        setShowQuickCompany(false)
+                        addToast({ type: 'success', title: '公司已创建' })
+                      } else {
+                        addToast({ type: 'error', title: data.error?.message || '创建失败' })
+                      }
+                    } catch {
+                      addToast({ type: 'error', title: '创建公司失败' })
+                    }
+                  }}
+                >
+                  创建
+                </Button>
+              </div>
             </div>
           </div>
         </div>

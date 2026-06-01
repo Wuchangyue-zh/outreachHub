@@ -42,9 +42,9 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.FORBIDDEN, '只能释放自己领取的联系人', 403)
     }
 
-    // 释放联系人回公海
+    // 释放联系人回公海（where 带 tenantId 防止跨租户操作）
     const updated = await prisma.contact.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         ownerId: null,
         pool: 'PUBLIC',

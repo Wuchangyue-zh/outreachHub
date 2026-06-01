@@ -144,7 +144,8 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '活动不存在或无权操作', 404)
     }
 
-    await prisma.emailLog.deleteMany({ where: { campaignId: id } })
+    // 通过关系过滤确保租户隔离（EmailLog 无 tenantId 字段）
+    await prisma.emailLog.deleteMany({ where: { campaign: { id, tenantId: auth.tenantId } } })
     await prisma.campaign.delete({ where: { id, tenantId: auth.tenantId } })
 
     if (auth.userId) {

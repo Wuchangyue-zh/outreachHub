@@ -40,9 +40,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在或无权访问', 404)
     }
 
-    // 获取该联系人的所有邮件日志
+    // 获取该联系人的所有邮件日志（通过关系过滤确保租户隔离）
     const emailLogs = await prisma.emailLog.findMany({
-      where: { contactId: id },
+      where: { contact: { id, tenantId: auth.tenantId } },
       include: {
         campaign: {
           select: { id: true, name: true },

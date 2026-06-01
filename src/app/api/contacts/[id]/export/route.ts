@@ -35,9 +35,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在', 404)
     }
 
-    // 获取关联的邮件日志
+    // 获取关联的邮件日志（通过关系过滤确保租户隔离）
     const emailLogs = await prisma.emailLog.findMany({
-      where: { contactId: id },
+      where: { contact: { id, tenantId: auth.tenantId } },
       select: {
         id: true,
         fromEmail: true,
@@ -55,9 +55,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // 获取关联的 Campaign
+    // 获取关联的 Campaign（通过关系过滤确保租户隔离）
     const campaignContacts = await prisma.campaignContact.findMany({
-      where: { contactId: id },
+      where: { contact: { id, tenantId: auth.tenantId } },
       include: {
         campaign: {
           select: { id: true, name: true, type: true, status: true, createdAt: true },

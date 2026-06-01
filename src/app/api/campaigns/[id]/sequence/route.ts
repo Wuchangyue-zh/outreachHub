@@ -199,7 +199,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const normalized = normalizeSequence(steps)
 
     await prisma.campaign.update({
-      where: { id: campaign.id },
+      where: { id: campaign.id, tenantId: auth.tenantId },
       data: { sequence: normalized as any },
     })
 

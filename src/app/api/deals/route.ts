@@ -80,6 +80,26 @@ export async function POST(req: NextRequest) {
     const dealStage = stage || 'LEAD'
     const isClosed = dealStage === 'WON' || dealStage === 'LOST'
 
+    // Verify FK references belong to this tenant
+    if (contactId) {
+      const contact = await prisma.contact.findFirst({
+        where: { id: contactId, tenantId: auth.tenantId },
+        select: { id: true },
+      })
+      if (!contact) {
+        return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在', 404)
+      }
+    }
+    if (companyId) {
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, tenantId: auth.tenantId },
+        select: { id: true },
+      })
+      if (!company) {
+        return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+      }
+    }
+
     const deal = await prisma.deal.create({
       data: {
         title,

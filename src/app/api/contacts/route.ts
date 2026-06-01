@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { firstName, lastName, title, department, company, emails, phones, tags, notes, country, city } = body
+    const { firstName, lastName, title, department, companyId: inputCompanyId, company, emails, phones, tags, notes, country, city } = body
 
     if (!firstName || !emails || emails.length === 0) {
       return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '姓名和邮箱为必填项', 400)
@@ -153,19 +153,28 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.CONFLICT, '该邮箱已被其他客户使用', 409)
     }
 
-    // Create or find company within the same tenant
-    let companyId = null
-    if (company) {
+    // Resolve companyId: prefer explicit companyId, fallback to company name lookup
+    let resolvedCompanyId: string | null = null
+    if (inputCompanyId) {
+      const existing = await prisma.company.findFirst({
+        where: { id: inputCompanyId, tenantId: auth.tenantId },
+        select: { id: true },
+      })
+      if (!existing) {
+        return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+      }
+      resolvedCompanyId = existing.id
+    } else if (company) {
       const existingCompany = await prisma.company.findFirst({
         where: { name: { equals: company, mode: 'insensitive' }, tenantId: auth.tenantId },
       })
       if (existingCompany) {
-        companyId = existingCompany.id
+        resolvedCompanyId = existingCompany.id
       } else {
         const newCompany = await prisma.company.create({
           data: { name: company, tenantId: auth.tenantId, country, city },
         })
-        companyId = newCompany.id
+        resolvedCompanyId = newCompany.id
       }
     }
 
@@ -177,7 +186,7 @@ export async function POST(req: NextRequest) {
         title,
         department,
         tenantId: auth.tenantId,
-        companyId,
+        companyId: resolvedCompanyId,
         emails: {
           create: emails.map((email: string, i: number) => ({
             address: email,

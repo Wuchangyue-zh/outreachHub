@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const { fullName, firstName, lastName, title, companyId, emails, tags, notes, status } = body
 
     const contact = await prisma.contact.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         fullName: fullName || (firstName || lastName ? `${firstName || ''} ${lastName || ''}`.trim() : undefined),
         firstName,
@@ -80,7 +80,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     })
 
     if (Array.isArray(emails)) {
-      await prisma.contactEmail.deleteMany({ where: { contactId: id } })
+      // 通过关系过滤确保租户隔离（ContactEmail 无 tenantId 字段）
+      await prisma.contactEmail.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
       if (emails.length > 0) {
         await prisma.contactEmail.createMany({
           data: emails.map((email: string, i: number) => ({
@@ -127,10 +128,11 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在', 404)
     }
 
-    await prisma.contactEmail.deleteMany({ where: { contactId: id } })
-    await prisma.emailLog.deleteMany({ where: { contactId: id } })
-    await prisma.campaignContact.deleteMany({ where: { contactId: id } })
-    await prisma.contact.delete({ where: { id } })
+    // 通过关系过滤确保租户隔离（关联表无 tenantId 字段）
+    await prisma.contactEmail.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
+    await prisma.emailLog.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
+    await prisma.campaignContact.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
+    await prisma.contact.delete({ where: { id, tenantId: auth.tenantId } })
 
     return NextResponse.json({ success: true, data: { deleted: true } })
   } catch (error) {

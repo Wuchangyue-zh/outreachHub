@@ -37,9 +37,9 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.CONFLICT, '该联系人已被其他人领取', 409)
     }
 
-    // 领取联系人
+    // 领取联系人（where 带 tenantId 防止跨租户操作）
     const updated = await prisma.contact.update({
-      where: { id },
+      where: { id, tenantId: auth.tenantId },
       data: {
         ownerId: auth.userId,
         pool: 'PRIVATE',

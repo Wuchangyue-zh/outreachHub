@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
 import { toast } from 'sonner'
 import {
   Plus,
@@ -386,6 +387,14 @@ export default function PipelinePage() {
   const [formData, setFormData] = useState<DealFormData>(EMPTY_FORM)
   const [dragOverStage, setDragOverStage] = useState<StageKey | null>(null)
 
+  // Quick-create dialog state
+  const [quickCreateType, setQuickCreateType] = useState<'contact' | 'company' | null>(null)
+  const [quickCreateSaving, setQuickCreateSaving] = useState(false)
+  const [contactForm, setContactForm] = useState({ firstName: '', lastName: '', email: '', companyId: '' })
+  const [companyForm, setCompanyForm] = useState({ name: '', domain: '' })
+  const [editContactLabel, setEditContactLabel] = useState('')
+  const [editCompanyLabel, setEditCompanyLabel] = useState('')
+
   // ── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchDeals = useCallback(async () => {
@@ -423,6 +432,102 @@ export default function PipelinePage() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  // ── Searchable Select fetchers ─────────────────────────────────────────
+
+  const fetchContactOptions = useCallback(async (query: string): Promise<SearchableOption[]> => {
+    const params = new URLSearchParams({ limit: '20' })
+    if (query) params.set('search', query)
+    const res = await fetch(`/api/contacts?${params}`)
+    const data = await res.json()
+    if (!data.success) return []
+    return (data.data || []).map((c: { id: string; fullName: string; company?: { name?: string } | null }) => ({
+      id: c.id,
+      label: c.fullName,
+      sublabel: c.company?.name || undefined,
+    }))
+  }, [])
+
+  const fetchCompanyOptions = useCallback(async (query: string): Promise<SearchableOption[]> => {
+    const params = new URLSearchParams({ limit: '20' })
+    if (query) params.set('search', query)
+    const res = await fetch(`/api/companies?${params}`)
+    const data = await res.json()
+    if (!data.success) return []
+    return (data.data || []).map((c: { id: string; name: string; domain?: string }) => ({
+      id: c.id,
+      label: c.name,
+      sublabel: c.domain || undefined,
+    }))
+  }, [])
+
+  // ── Quick-create handlers ──────────────────────────────────────────────
+
+  const handleQuickCreateContact = async () => {
+    if (!contactForm.firstName.trim()) {
+      toast.error('请输入姓')
+      return
+    }
+    setQuickCreateSaving(true)
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: contactForm.firstName.trim(),
+          lastName: contactForm.lastName.trim(),
+          companyId: contactForm.companyId || undefined,
+          emails: contactForm.email.trim() ? [contactForm.email.trim()] : [],
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const newContact = data.data
+        setFormData((prev) => ({ ...prev, contactId: newContact.id }))
+        toast.success('联系人已创建')
+        setQuickCreateType(null)
+        setContactForm({ firstName: '', lastName: '', email: '', companyId: '' })
+      } else {
+        toast.error(data.error?.message || '创建失败')
+      }
+    } catch {
+      toast.error('创建联系人失败')
+    } finally {
+      setQuickCreateSaving(false)
+    }
+  }
+
+  const handleQuickCreateCompany = async () => {
+    if (!companyForm.name.trim()) {
+      toast.error('请输入公司名称')
+      return
+    }
+    setQuickCreateSaving(true)
+    try {
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: companyForm.name.trim(),
+          domain: companyForm.domain.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const newCompany = data.data
+        setFormData((prev) => ({ ...prev, companyId: newCompany.id }))
+        toast.success('公司已创建')
+        setQuickCreateType(null)
+        setCompanyForm({ name: '', domain: '' })
+      } else {
+        toast.error(data.error?.message || '创建失败')
+      }
+    } catch {
+      toast.error('创建公司失败')
+    } finally {
+      setQuickCreateSaving(false)
+    }
+  }
 
   // ── Group deals by stage ───────────────────────────────────────────────
 
@@ -507,6 +612,8 @@ export default function PipelinePage() {
     setDialogOpen(false)
     setEditingDeal(null)
     setFormData(EMPTY_FORM)
+    setEditContactLabel('')
+    setEditCompanyLabel('')
   }
 
   const openCreateDialog = () => {
@@ -528,6 +635,8 @@ export default function PipelinePage() {
       companyId: deal.companyId || '',
       notes: deal.notes || '',
     })
+    setEditContactLabel(deal.contactName || '')
+    setEditCompanyLabel(deal.companyName || '')
     setDialogOpen(true)
   }
 
@@ -842,25 +951,29 @@ export default function PipelinePage() {
             {/* Contact + Company */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="deal-contact">联系人 ID</Label>
-                <Input
-                  id="deal-contact"
+                <Label>联系人</Label>
+                <SearchableSelect
                   value={formData.contactId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contactId: e.target.value })
-                  }
-                  placeholder="联系人 ID"
+                  onChange={(id) => setFormData({ ...formData, contactId: id })}
+                  onClear={() => setFormData({ ...formData, contactId: '' })}
+                  onQuickCreate={() => setQuickCreateType('contact')}
+                  fetchOptions={fetchContactOptions}
+                  placeholder="搜索联系人..."
+                  quickCreateLabel="新建联系人"
+                  initialLabel={editContactLabel}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="deal-company">公司 ID</Label>
-                <Input
-                  id="deal-company"
+                <Label>公司</Label>
+                <SearchableSelect
                   value={formData.companyId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, companyId: e.target.value })
-                  }
-                  placeholder="公司 ID"
+                  onChange={(id) => setFormData({ ...formData, companyId: id })}
+                  onClear={() => setFormData({ ...formData, companyId: '' })}
+                  onQuickCreate={() => setQuickCreateType('company')}
+                  fetchOptions={fetchCompanyOptions}
+                  placeholder="搜索公司..."
+                  quickCreateLabel="新建公司"
+                  initialLabel={editCompanyLabel}
                 />
               </div>
             </div>
@@ -892,6 +1005,136 @@ export default function PipelinePage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick-create Contact Dialog */}
+      <Dialog
+        open={quickCreateType === 'contact'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQuickCreateType(null)
+            setContactForm({ firstName: '', lastName: '', email: '', companyId: '' })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>快速新建联系人</DialogTitle>
+            <DialogDescription>填写基本信息，创建后自动关联到当前商机</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="qc-lastName">姓 *</Label>
+                <Input
+                  id="qc-lastName"
+                  value={contactForm.lastName}
+                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                  placeholder="张"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="qc-firstName">名 *</Label>
+                <Input
+                  id="qc-firstName"
+                  value={contactForm.firstName}
+                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                  placeholder="三"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="qc-email">邮箱</Label>
+              <Input
+                id="qc-email"
+                type="email"
+                value={contactForm.email}
+                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                placeholder="zhangsan@example.com"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>公司</Label>
+              <SearchableSelect
+                value={contactForm.companyId}
+                onChange={(id) => setContactForm({ ...contactForm, companyId: id })}
+                onClear={() => setContactForm({ ...contactForm, companyId: '' })}
+                onQuickCreate={() => setQuickCreateType('company')}
+                fetchOptions={fetchCompanyOptions}
+                placeholder="搜索公司..."
+                quickCreateLabel="新建公司"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQuickCreateType(null)
+                setContactForm({ firstName: '', lastName: '', email: '', companyId: '' })
+              }}
+            >
+              取消
+            </Button>
+            <Button type="button" onClick={handleQuickCreateContact} disabled={quickCreateSaving}>
+              {quickCreateSaving ? '创建中...' : '创建'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick-create Company Dialog */}
+      <Dialog
+        open={quickCreateType === 'company'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQuickCreateType(null)
+            setCompanyForm({ name: '', domain: '' })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>快速新建公司</DialogTitle>
+            <DialogDescription>填写基本信息，创建后自动关联到当前商机</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="qc-company-name">公司名称 *</Label>
+              <Input
+                id="qc-company-name"
+                value={companyForm.name}
+                onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
+                placeholder="ABC 科技有限公司"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="qc-company-domain">域名</Label>
+              <Input
+                id="qc-company-domain"
+                value={companyForm.domain}
+                onChange={(e) => setCompanyForm({ ...companyForm, domain: e.target.value })}
+                placeholder="example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQuickCreateType(null)
+                setCompanyForm({ name: '', domain: '' })
+              }}
+            >
+              取消
+            </Button>
+            <Button type="button" onClick={handleQuickCreateCompany} disabled={quickCreateSaving}>
+              {quickCreateSaving ? '创建中...' : '创建'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardLayout>
