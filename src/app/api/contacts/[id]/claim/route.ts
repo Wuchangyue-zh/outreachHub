@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -47,6 +48,18 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       },
       include: { emails: true, company: true },
     })
+
+    // 审计日志
+    const meta = getAuditRequestMeta(req)
+    writeAuditLog({
+      userId: auth.userId!,
+      tenantId: auth.tenantId,
+      action: 'claim_contact',
+      resource: 'contact',
+      resourceId: id,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, data: updated })
   } catch (error) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission, tenantWhere } from '@/lib/auth-middleware'
 import { generateApiKey } from '@/lib/api-key'
-import { isProOrAbove } from '@/lib/plan-limits'
+import { isProOrAbove, planUpgradeRequiredResponse } from '@/lib/plan-limits'
 
 /**
  * GET /api/api-keys — List all API keys for the current tenant.
@@ -16,10 +16,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!auth.tenantId || !(await isProOrAbove(auth.tenantId))) {
-    return NextResponse.json(
-      { error: 'API Keys 功能需要专业版及以上套餐', code: 'PLAN_UPGRADE_REQUIRED' },
-      { status: 403 }
-    )
+    return planUpgradeRequiredResponse('API Keys')
   }
 
   const keys = await prisma.apiKey.findMany({
@@ -66,10 +63,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!(await isProOrAbove(auth.tenantId))) {
-    return NextResponse.json(
-      { error: 'API Keys 功能需要专业版及以上套餐', code: 'PLAN_UPGRADE_REQUIRED' },
-      { status: 403 }
-    )
+    return planUpgradeRequiredResponse('API Keys')
   }
 
   try {

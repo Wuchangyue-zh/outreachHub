@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission, tenantWhere } from '@/lib/auth-middleware'
+import { isProOrAbove, planUpgradeRequiredResponse } from '@/lib/plan-limits'
 
 /**
  * PATCH /api/api-keys/:id — Update an API key (name, permissions, rateLimit, isActive).
@@ -16,6 +17,10 @@ export async function PATCH(
 
   if (!hasPermission(auth.role, 'settings:manage')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!auth.tenantId || !(await isProOrAbove(auth.tenantId))) {
+    return planUpgradeRequiredResponse('API Keys')
   }
 
   const { id } = await params
@@ -94,6 +99,10 @@ export async function DELETE(
 
   if (!hasPermission(auth.role, 'settings:manage')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!auth.tenantId || !(await isProOrAbove(auth.tenantId))) {
+    return planUpgradeRequiredResponse('API Keys')
   }
 
   const { id } = await params

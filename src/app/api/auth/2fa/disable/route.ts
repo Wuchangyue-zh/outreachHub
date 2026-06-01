@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { verifyTOTP } from '@/lib/two-factor'
+import { safeDecrypt } from '@/lib/encryption'
 import { writeAuditLog } from '@/lib/audit'
 import { successResponse, errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
@@ -38,7 +39,9 @@ export async function POST(req: NextRequest) {
       return errorResponse(ErrorCodes.CONFLICT, '两步验证未启用', 409)
     }
 
-    const isValid = verifyTOTP(code.trim(), user.twoFactorSecret)
+    // Decrypt the stored secret (may be encrypted or legacy plaintext)
+    const decryptedSecret = safeDecrypt(user.twoFactorSecret)
+    const isValid = verifyTOTP(code.trim(), decryptedSecret)
     if (!isValid) {
       return errorResponse(ErrorCodes.VALIDATION_ERROR, '验证码无效', 400)
     }

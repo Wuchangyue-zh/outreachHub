@@ -2,22 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveAuth, hasPermission, tenantWhere, canReadContacts } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, checkApiKeyRateLimit } from '@/lib/rate-limit'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
-  const rateLimitResult = await limiter.check(req, 30)
-  if (rateLimitResult) return rateLimitResult
+  const auth = await resolveAuth(req)
+  if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+  if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
+  if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
+
+  // Per-key rate limit for API key auth, global for JWT
+  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
+    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
+    : await limiter.check(req, 30)
+  if (keyLimit) return keyLimit
 
   try {
-    const auth = await resolveAuth(req)
-    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
-    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
-    if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
-
     const { id } = await ctx.params
     const contact = await prisma.contact.findFirst({
       where: { id, ...tenantWhere(auth.tenantId) },
@@ -35,17 +38,20 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
-  const rateLimitResult = await limiter.check(req, 10)
-  if (rateLimitResult) return rateLimitResult
+  const auth = await resolveAuth(req)
+  if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+  if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
+  if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) {
+    return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
+  }
+
+  // Per-key rate limit for API key auth, global for JWT
+  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
+    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
+    : await limiter.check(req, 10)
+  if (keyLimit) return keyLimit
 
   try {
-    const auth = await resolveAuth(req)
-    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
-    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
-    if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) {
-      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
-    }
-
     const { id } = await ctx.params
     const existing = await prisma.contact.findFirst({
       where: { id, ...tenantWhere(auth.tenantId) },
@@ -98,17 +104,20 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(req: NextRequest, ctx: RouteContext) {
-  const rateLimitResult = await limiter.check(req, 10)
-  if (rateLimitResult) return rateLimitResult
+  const auth = await resolveAuth(req)
+  if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+  if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
+  if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) {
+    return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
+  }
+
+  // Per-key rate limit for API key auth, global for JWT
+  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
+    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
+    : await limiter.check(req, 10)
+  if (keyLimit) return keyLimit
 
   try {
-    const auth = await resolveAuth(req)
-    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
-    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
-    if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) {
-      return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
-    }
-
     const { id } = await ctx.params
     const existing = await prisma.contact.findFirst({
       where: { id, ...tenantWhere(auth.tenantId) },

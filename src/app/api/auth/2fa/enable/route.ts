@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { generateTOTPSecret } from '@/lib/two-factor'
+import { encrypt } from '@/lib/encryption'
 import { successResponse, errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -33,10 +34,13 @@ export async function POST(req: NextRequest) {
 
     const { secret, otpauthUrl } = generateTOTPSecret(user.email)
 
-    // Store the secret temporarily (not yet enabled)
+    // Encrypt the TOTP secret before storing (AES-256-GCM)
+    const encryptedSecret = encrypt(secret)
+
+    // Store the encrypted secret temporarily (not yet enabled)
     await prisma.user.update({
       where: { id: user.id },
-      data: { twoFactorSecret: secret },
+      data: { twoFactorSecret: encryptedSecret },
     })
 
     return successResponse({

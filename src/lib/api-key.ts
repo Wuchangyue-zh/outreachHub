@@ -102,5 +102,6 @@ export async function verifyApiKey(req: Request): Promise<AuthResult & { apiKeyI
     role: 'API_KEY',
     effectivePermissions: computeEffectivePermissions(apiKey.permissions),
     apiKeyId: apiKey.id,
+    apiKeyRateLimit: apiKey.rateLimit,
   }
 }

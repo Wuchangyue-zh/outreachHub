@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verify2FAToken, generateToken } from '@/lib/jwt'
 import { verifyTOTP, verifyBackupCode } from '@/lib/two-factor'
+import { safeDecrypt } from '@/lib/encryption'
 import { writeAuditLog } from '@/lib/audit'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
@@ -49,8 +50,9 @@ export async function POST(req: NextRequest) {
     let matchedBackupIndex = -1
 
     if (code) {
-      // TOTP verification
-      verified = verifyTOTP(code.trim(), user.twoFactorSecret)
+      // TOTP verification — decrypt stored secret (may be encrypted or legacy plaintext)
+      const decryptedSecret = safeDecrypt(user.twoFactorSecret)
+      verified = verifyTOTP(code.trim(), decryptedSecret)
     } else if (backupCode && user.twoFactorBackupCodes) {
       // Backup code verification
       const hashedCodes: string[] = JSON.parse(user.twoFactorBackupCodes)

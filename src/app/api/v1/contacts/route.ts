@@ -2,21 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveAuth, hasPermission, canReadContacts } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { rateLimit } from '@/lib/rate-limit'
+import { rateLimit, checkApiKeyRateLimit } from '@/lib/rate-limit'
 import { checkContactLimit } from '@/lib/plan-limits'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function GET(req: NextRequest) {
-  const rateLimitResult = await limiter.check(req, 30)
-  if (rateLimitResult) return rateLimitResult
+  const auth = await resolveAuth(req)
+  if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+  if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
+  if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
+
+  // Per-key rate limit for API key auth, global for JWT
+  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
+    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
+    : await limiter.check(req, 30)
+  if (keyLimit) return keyLimit
 
   try {
-    const auth = await resolveAuth(req)
-    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
-    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
-    if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
-
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')))
@@ -54,15 +57,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const rateLimitResult = await limiter.check(req, 10)
-  if (rateLimitResult) return rateLimitResult
+  const auth = await resolveAuth(req)
+  if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
+  if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
+  if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
+
+  // Per-key rate limit for API key auth, global for JWT
+  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
+    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
+    : await limiter.check(req, 10)
+  if (keyLimit) return keyLimit
 
   try {
-    const auth = await resolveAuth(req)
-    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
-    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
-    if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
-
     const limitCheck = await checkContactLimit(auth.tenantId)
     if (!limitCheck.allowed) {
       return errorResponse(ErrorCodes.FORBIDDEN, `联系人数量已达上限（${limitCheck.current}/${limitCheck.max}）`, 403)

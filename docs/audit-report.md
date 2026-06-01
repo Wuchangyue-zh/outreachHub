@@ -1360,8 +1360,45 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - Webhook secret 对话框读取路径错误（`data.data.secret` → `data.secret`），创建后 secret 无法展示
 - 新增 permission mapping 单元测试 2 条（共 78 条）
 
-**未纳入（上线前建议）：** 后端 API Key/Webhook 路由 PRO 计划服务端 enforcement、Playwright E2E、Demo 邮件 HTML 转义、按 Key 独立 rateLimit
+**未纳入（上线前建议）：** ~~后端 API Key/Webhook 路由 PRO 计划服务端 enforcement、Playwright E2E、Demo 邮件 HTML 转义、按 Key 独立 rateLimit~~ → 已于 §9.41 完成。
 
 ---
 
-*本报告最后更新：2026-05-30。Batch D–U + Post-GA 全部完成。*
+### 9.41 Launch Prep — 上线准备（2026-06-01）
+
+**P0 — 上线阻断：**
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| P0-1 | 后端 PRO gating：`POST/GET/PATCH/DELETE /api/api-keys` + `/api/webhooks` 全链路校验 `tenant.plan ∈ {PRO, ENTERPRISE}`，FREE/BASIC 返回 403 | `api/api-keys/route.ts`, `api/api-keys/[id]/route.ts`, `api/webhooks/route.ts`, `api/webhooks/[id]/route.ts`, `api/webhooks/[id]/test/route.ts`, `lib/plan-limits.ts` |
+| P0-2 | Playwright E2E：注册 → FREE plan 403 → Demo XSS 转义 → 认证校验 | `e2e/api/launch-prep.spec.ts` |
+| P0-3 | Demo 邮件 HTML 字段转义（防 XSS）：`escapeHtml()` 对 name/email/company/phone/message 转义 | `api/demo/route.ts` |
+| P0-4 | Schema 生产就绪：ApiKey/WebhookEndpoint/DemoRequest/AuditLog 模型已确认 | `prisma/schema.prisma` |
+
+**P1 — polish：**
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| P1-5 | ApiKey 按 Key 独立 rateLimit：`verifyApiKey()` 返回 `apiKeyRateLimit`；`v1/contacts` 路由使用 `checkApiKeyRateLimit()` | `lib/api-key.ts`, `lib/auth-middleware.ts`, `lib/rate-limit.ts`, `api/v1/contacts/route.ts`, `api/v1/contacts/[id]/route.ts` |
+| P1-6 | Swagger Redoc `/developers` 嵌入 OpenAPI spec：交互文档按钮 + iframe Redoc 渲染 | `app/developers/page.tsx` |
+| P1-7 | claim/release 审计日志：`writeAuditLog` 记录 `claim_contact` / `release_contact`；TOTP secret 加密存储（AES-256-GCM） | `api/contacts/[id]/claim/route.ts`, `api/contacts/[id]/release/route.ts`, `api/auth/2fa/enable/route.ts`, `api/auth/2fa/verify/route.ts`, `api/auth/2fa/disable/route.ts`, `api/auth/login/verify-2fa/route.ts` |
+| P1-8 | docker-compose 生产 env 清单：worker 服务改为 `profiles: ["full"]`，顶部注释列出生产必填变量 | `docker-compose.yml` |
+
+**架构决策：**
+- PRO gating 通过 `isProOrAbove(tenantId)` 在每个 API Key/Webhook 路由入口处检查，返回 `PLAN_UPGRADE_REQUIRED` code
+- Per-key rate limit 使用独立 Redis key `apikey:{apiKeyId}`，不与全局 IP 限流混用
+- TOTP secret 使用 `encrypt()` / `safeDecrypt()` 向后兼容已存储的明文 secret
+- docker-compose worker 服务使用 `profiles: ["full"]`，`docker compose up` 只启 PG + Redis，`--profile full` 启全部
+
+**验证：** `npm run build` ✅ · `npm test` 78 条全通过 · TypeScript 零错误
+
+**核实修复（2026-05-30）：**
+- Webhooks 4 个路由 PRO gating 原先无 `PLAN_UPGRADE_REQUIRED` code — 抽取 `planUpgradeRequiredResponse()` 统一 api-keys + webhooks 响应
+- E2E webhooks FREE 403 测试补充 `code` 断言
+- 移除 `2fa/enable` 未使用的 `isEncrypted` import
+
+**未纳入（生产部署阶段）：** E2E 完整 PRO 升级 → API Key → v1 CRUD → Webhook test 链路（需 test helper 或 Stripe mock）、Vercel 生产部署 + 监控、SSO OIDC 实际集成
+
+---
+
+*本报告最后更新：2026-05-30。Batch D–U + Post-GA + Launch Prep 全部完成。*

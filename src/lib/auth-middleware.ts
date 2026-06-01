@@ -8,6 +8,7 @@ export interface AuthResult {
   role?: string
   error?: string
   apiKeyId?: string
+  apiKeyRateLimit?: number // Per-key rate limit (requests/min), only set for API key auth
   effectivePermissions?: string[] // API key granular permissions mapped to backend format
 }
 

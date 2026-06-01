@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, ExternalLink, Code, Lock, ArrowLeft } from 'lucide-react'
+import { FileText, ExternalLink, Code, Lock, ArrowLeft, BookOpen } from 'lucide-react'
+import { useState } from 'react'
 
 const endpoints = [
   { method: 'GET', path: '/api/v1/contacts', description: '获取联系人列表（公开 API v1）', auth: true },
@@ -25,6 +26,8 @@ const endpoints = [
   { method: 'GET', path: '/api/deals/stats', description: '漏斗统计', auth: true },
   { method: 'GET', path: '/api/stats', description: '租户统计', auth: true },
   { method: 'GET', path: '/api/stats/team', description: '团队绩效', auth: true },
+  { method: 'GET', path: '/api/api-keys', description: '获取 API Key 列表', auth: true },
+  { method: 'POST', path: '/api/api-keys', description: '创建 API Key', auth: true },
   { method: 'GET', path: '/api/webhooks', description: '获取 Webhook 端点列表', auth: true },
   { method: 'POST', path: '/api/webhooks', description: '创建 Webhook 端点', auth: true },
   { method: 'POST', path: '/api/webhooks/{id}/test', description: '发送测试 Webhook', auth: true },
@@ -40,6 +43,8 @@ const methodColors: Record<string, string> = {
 }
 
 export default function DevelopersPage() {
+  const [showRedoc, setShowRedoc] = useState(false)
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
       <header className="border-b">
@@ -60,12 +65,30 @@ export default function DevelopersPage() {
               API 访问需要<a href="/pricing" className="underline font-medium">专业版及以上套餐</a>
             </p>
           </div>
-          <a href="/docs/openapi.yaml" download>
-            <Button variant="outline" className="gap-2">
-              <FileText className="h-4 w-4" /> 下载 OpenAPI Spec
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setShowRedoc(!showRedoc)}>
+              <BookOpen className="h-4 w-4" /> {showRedoc ? '关闭' : 'Redoc'} 交互文档
             </Button>
-          </a>
+            <a href="/docs/openapi.yaml" download>
+              <Button variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" /> 下载 OpenAPI Spec
+              </Button>
+            </a>
+          </div>
         </div>
+
+        {/* Redoc embed */}
+        {showRedoc && (
+          <Card className="mt-6 overflow-hidden">
+            <CardContent className="p-0">
+              <iframe
+                src={`https://cdn.redoc.ly/redoc/embed?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin + '/docs/openapi.yaml' : '/docs/openapi.yaml')}`}
+                style={{ width: '100%', height: '80vh', border: 'none' }}
+                title="API 文档 (Redoc)"
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Auth */}
         <Card className="mt-8">
@@ -126,8 +149,8 @@ export default function DevelopersPage() {
             <CardTitle className="text-base">速率限制</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-gray-600 space-y-2">
-            <p>• GET 请求：30 次/分钟</p>
-            <p>• POST/PUT/DELETE 请求：10 次/分钟</p>
+            <p>• GET 请求：30 次/分钟（API Key 可自定义）</p>
+            <p>• POST/PUT/DELETE 请求：10 次/分钟（API Key 可自定义）</p>
             <p>• 认证接口：5 次/分钟</p>
             <p>超出限制将返回 <code>429 Too Many Requests</code></p>
           </CardContent>

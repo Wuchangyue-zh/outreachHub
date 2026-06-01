@@ -5,6 +5,16 @@ import { handleApiError } from '@/lib/api-errors'
 import { isValidEmailFormat } from '@/lib/email-guess'
 import { sendPlatformMail } from '@/lib/email'
 
+/** Escape HTML special characters to prevent XSS */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
@@ -39,16 +49,22 @@ export async function POST(req: NextRequest) {
 
     // Send notification email to sales team
     try {
+      const safeName = escapeHtml(name)
+      const safeEmail = escapeHtml(email)
+      const safeCompany = company ? escapeHtml(company) : null
+      const safePhone = phone ? escapeHtml(phone) : null
+      const safeMessage = message ? escapeHtml(message) : null
+
       await sendPlatformMail({
         to: process.env.SMTP_USER || 'sales@outreachhub.com',
-        subject: `[OutreachHub] 新演示预约: ${name}`,
+        subject: `[OutreachHub] 新演示预约: ${safeName}`,
         html: `
           <h2>新的演示预约</h2>
-          <p><strong>姓名：</strong>${name}</p>
-          <p><strong>邮箱：</strong>${email}</p>
-          ${company ? `<p><strong>公司：</strong>${company}</p>` : ''}
-          ${phone ? `<p><strong>电话：</strong>${phone}</p>` : ''}
-          ${message ? `<p><strong>备注：</strong>${message}</p>` : ''}
+          <p><strong>姓名：</strong>${safeName}</p>
+          <p><strong>邮箱：</strong>${safeEmail}</p>
+          ${safeCompany ? `<p><strong>公司：</strong>${safeCompany}</p>` : ''}
+          ${safePhone ? `<p><strong>电话：</strong>${safePhone}</p>` : ''}
+          ${safeMessage ? `<p><strong>备注：</strong>${safeMessage}</p>` : ''}
           <p><strong>时间：</strong>${new Date().toLocaleString('zh-CN')}</p>
         `,
       })

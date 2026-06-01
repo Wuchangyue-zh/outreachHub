@@ -88,6 +88,37 @@ export function rateLimit(config: RateLimitConfig = { interval: 60000, uniqueTok
   }
 }
 
+/**
+ * Check rate limit for a specific API key (uses apiKeyId as the rate limit key).
+ * Falls back to IP-based limiting if no apiKeyId is provided.
+ */
+export async function checkApiKeyRateLimit(
+  req: NextRequest,
+  apiKeyId: string | undefined,
+  limit: number,
+  intervalMs: number = 60000
+): Promise<NextResponse | null> {
+  if (process.env.DISABLE_RATE_LIMIT === 'true') {
+    return null
+  }
+
+  const key = apiKeyId
+    ? `apikey:${apiKeyId}`
+    : `ip:${req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'anonymous'}:${req.nextUrl.pathname}`
+
+  const result = await redisRateLimitCheck(key, limit, intervalMs)
+  if (!result.allowed) {
+    return NextResponse.json(
+      { error: '请求过于频繁，请稍后再试' },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(result.retryAfter || Math.ceil(intervalMs / 1000)) },
+      }
+    )
+  }
+  return null
+}
+
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()

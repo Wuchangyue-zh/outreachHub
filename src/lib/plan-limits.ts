@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 
 export interface PlanLimits {
@@ -121,6 +122,21 @@ export async function isProOrAbove(tenantId: string): Promise<boolean> {
   })
   if (!tenant) return false
   return tenant.plan === 'PRO' || tenant.plan === 'ENTERPRISE'
+}
+
+/** 统一 PRO/ENTERPRISE 套餐门槛 403 响应 */
+export function planUpgradeRequiredResponse(
+  feature: 'API Keys' | 'Webhooks' = 'API Keys'
+): NextResponse {
+  const label = feature === 'Webhooks' ? 'Webhooks' : 'API Keys'
+  return NextResponse.json(
+    {
+      success: false,
+      error: `${label} 功能需要专业版及以上套餐`,
+      code: 'PLAN_UPGRADE_REQUIRED',
+    },
+    { status: 403 }
+  )
 }
 
 /**
