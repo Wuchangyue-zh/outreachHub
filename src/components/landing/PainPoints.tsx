@@ -1,5 +1,6 @@
 import { Flame, Search, MailX, Database, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { painPointsData, type PainPoint } from '@/lib/landing-data'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const iconMap: Record<string, React.ElementType> = {
   flame: Flame,
@@ -12,7 +13,7 @@ function PainCard({ point, index }: { point: PainPoint; index: number }) {
   const Icon = iconMap[point.icon] || Flame
 
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:border-red-200 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-red-200 hover:shadow-lg">
       {/* Number badge */}
       <div className="absolute right-4 top-4 text-6xl font-black text-gray-100/80 transition-colors group-hover:text-red-100/80">
         {String(index + 1).padStart(2, '0')}
@@ -52,30 +53,36 @@ export function PainPoints() {
     <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            {painPointsData.title}
-          </h2>
-          <p className="mt-4 text-base text-gray-500">{painPointsData.subtitle}</p>
-        </div>
+        <ScrollReveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              {painPointsData.title}
+            </h2>
+            <p className="mt-4 text-base text-gray-500">{painPointsData.subtitle}</p>
+          </div>
+        </ScrollReveal>
 
         {/* Pain cards grid */}
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {painPointsData.points.map((point, i) => (
-            <PainCard key={point.title} point={point} index={i} />
+            <ScrollReveal key={point.title} delay={i * 100}>
+              <PainCard point={point} index={i} />
+            </ScrollReveal>
           ))}
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-12 text-center">
-          <a
-            href="#solutions"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
-          >
-            了解 OutreachHub 如何解决这些问题
-            <ArrowRight className="h-4 w-4" />
-          </a>
-        </div>
+        <ScrollReveal delay={400}>
+          <div className="mt-12 text-center">
+            <a
+              href="#solutions"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
+            >
+              了解 OutreachHub 如何解决这些问题
+              <ArrowRight className="h-4 w-4 transition-transform hover:translate-x-1" />
+            </a>
+          </div>
+        </ScrollReveal>
       </div>
     </section>
   )

@@ -1,5 +1,6 @@
 import { Lock, Shield, UserCheck, Server } from 'lucide-react'
 import { securityData, type SecurityFeature } from '@/lib/landing-data'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const iconMap: Record<string, React.ElementType> = {
   lock: Lock,
@@ -20,10 +21,10 @@ function SecurityCard({ feature, index }: { feature: SecurityFeature; index: num
   const gradient = gradients[index % gradients.length]
 
   return (
-    <div className="group rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:shadow-lg">
+    <div className="group rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-lg">
       {/* Icon */}
       <div
-        className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg`}
+        className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-lg transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110`}
       >
         <Icon className="h-6 w-6 text-white" />
       </div>
@@ -49,21 +50,25 @@ export function Security() {
     <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
-        <div className="mx-auto max-w-2xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-            <Shield className="h-3 w-3" />
-            安全合规
+        <ScrollReveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <Shield className="h-3 w-3" />
+              安全合规
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              {securityData.title}
+            </h2>
+            <p className="mt-4 text-base text-gray-500">{securityData.subtitle}</p>
           </div>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            {securityData.title}
-          </h2>
-          <p className="mt-4 text-base text-gray-500">{securityData.subtitle}</p>
-        </div>
+        </ScrollReveal>
 
         {/* Cards */}
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {securityData.features.map((f, i) => (
-            <SecurityCard key={f.title} feature={f} index={i} />
+            <ScrollReveal key={f.title} delay={i * 100}>
+              <SecurityCard feature={f} index={i} />
+            </ScrollReveal>
           ))}
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Quote, TrendingUp, ArrowRight } from 'lucide-react'
 import { caseStudiesData, type CaseStudy } from '@/lib/landing-data'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const industryColors: Record<string, { bg: string; text: string; border: string; accent: string }> = {
   '电子行业': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', accent: 'bg-blue-600' },
@@ -120,34 +121,40 @@ export function CaseStudies() {
     <section id="cases" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
-        <div className="mx-auto max-w-2xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-            <TrendingUp className="h-3 w-3" />
-            客户案例
+        <ScrollReveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <TrendingUp className="h-3 w-3" />
+              客户案例
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              {caseStudiesData.title}
+            </h2>
+            <p className="mt-4 text-base text-gray-500">{caseStudiesData.subtitle}</p>
           </div>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            {caseStudiesData.title}
-          </h2>
-          <p className="mt-4 text-base text-gray-500">{caseStudiesData.subtitle}</p>
-        </div>
+        </ScrollReveal>
 
         {/* Case cards */}
         <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {caseStudiesData.cases.map((c, i) => (
-            <CaseCard key={c.id} caseData={c} index={i} />
+            <ScrollReveal key={c.id} delay={i * 120}>
+              <CaseCard key={c.id} caseData={c} index={i} />
+            </ScrollReveal>
           ))}
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-12 text-center">
-          <a
-            href="/register"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors duration-300 hover:text-blue-700"
-          >
-            查看更多客户案例
-            <ArrowRight className="h-4 w-4" />
-          </a>
-        </div>
+        <ScrollReveal delay={360}>
+          <div className="mt-12 text-center">
+            <a
+              href="/register"
+              className="group/cases-cta inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors duration-300 hover:text-blue-700"
+            >
+              查看更多客户案例
+              <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover/cases-cta:translate-x-1" />
+            </a>
+          </div>
+        </ScrollReveal>
       </div>
     </section>
   )

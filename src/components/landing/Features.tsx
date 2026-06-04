@@ -4,6 +4,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { featuresData, type Feature } from '@/lib/landing-data'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const iconMap: Record<string, React.ElementType> = {
   brain: Brain,
@@ -34,7 +35,7 @@ function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
   return (
     <Link
       href={feature.href}
-      className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-gray-100 bg-white p-7 text-center shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.03] hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50"
+      className="group relative flex flex-col items-center overflow-hidden rounded-2xl border border-gray-100 bg-white p-7 text-center shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50"
     >
       {/* Icon */}
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 group-hover:scale-110">
@@ -67,21 +68,25 @@ export function Features() {
     <section id="features" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
         {/* Section header */}
-        <div className="mx-auto max-w-2xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-            <Brain className="h-3 w-3" />
-            核心功能
+        <ScrollReveal>
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <Brain className="h-3 w-3" />
+              核心功能
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              {featuresData.title}
+            </h2>
+            <p className="mt-4 text-base text-gray-500">{featuresData.subtitle}</p>
           </div>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            {featuresData.title}
-          </h2>
-          <p className="mt-4 text-base text-gray-500">{featuresData.subtitle}</p>
-        </div>
+        </ScrollReveal>
 
-        {/* 4-col uniform grid — zero col-span, zero bento */}
+        {/* 4-col uniform grid */}
         <div className="mt-14 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           {featuresData.features.map((feature, i) => (
-            <FeatureCard key={feature.title} feature={feature} index={i} />
+            <ScrollReveal key={feature.title} delay={i * 80}>
+              <FeatureCard feature={feature} index={i} />
+            </ScrollReveal>
           ))}
         </div>
       </div>

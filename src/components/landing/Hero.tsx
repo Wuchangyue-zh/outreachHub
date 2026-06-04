@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Users, Globe, Mail, TrendingUp, ArrowRight, Search, UserCheck, Send, MessageSquare, Trophy, Sparkles } from 'lucide-react'
 import { heroData, heroWorkflowData } from '@/lib/landing-data'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const statIcons = { users: Users, globe: Globe, mail: Mail }
 
@@ -157,7 +158,8 @@ export function Hero() {
         </div>
 
         {/* ─── Workflow Pipeline ─── */}
-        <div className="mt-20">
+        <ScrollReveal>
+          <div className="mt-20">
           {/* Section heading */}
           <div className="mb-10 text-center">
             <p className="text-sm font-semibold uppercase tracking-widest text-blue-600">
@@ -277,22 +279,25 @@ export function Hero() {
             })}
           </div>
         </div>
+        </ScrollReveal>
 
         {/* Bottom stats */}
-        <div className="mt-16 grid grid-cols-3 gap-6 rounded-2xl border border-gray-100 bg-white/80 px-8 py-6 shadow-sm backdrop-blur-sm sm:gap-8">
-          {heroData.stats.map((stat) => {
-            const Icon = statIcons[stat.icon as keyof typeof statIcons] || Users
-            return (
-              <div key={stat.label} className="text-center">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                  <Icon className="h-5 w-5 text-blue-600" />
+        <ScrollReveal delay={200}>
+          <div className="mt-16 grid grid-cols-3 gap-6 rounded-2xl border border-gray-100 bg-white/80 px-8 py-6 shadow-sm backdrop-blur-sm sm:gap-8">
+            {heroData.stats.map((stat) => {
+              const Icon = statIcons[stat.icon as keyof typeof statIcons] || Users
+              return (
+                <div key={stat.label} className="text-center">
+                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                    <Icon className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
+                  <p className="mt-1 text-xs text-gray-500">{stat.label}</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
-                <p className="mt-1 text-xs text-gray-500">{stat.label}</p>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </ScrollReveal>
       </div>
     </section>
   )

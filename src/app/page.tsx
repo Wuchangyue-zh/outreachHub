@@ -14,6 +14,8 @@ import { Security } from '@/components/landing/Security'
 import { Knowledge } from '@/components/landing/Knowledge'
 import { CTA } from '@/components/landing/CTA'
 import { Footer } from '@/components/landing/Footer'
+import { ScrollProgress } from '@/components/landing/ScrollProgress'
+import { SmoothScroll } from '@/components/landing/SmoothScroll'
 
 export const metadata: Metadata = {
   title: 'OutreachHub - AI 驱动的海外获客与邮件营销平台',
@@ -56,6 +58,8 @@ export default function LandingPage() {
       <div className="fixed left-0 top-0 -z-10 h-[600px] w-[800px] opacity-30 blur-3xl" style={{ background: 'radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.15), transparent 70%)' }} />
       <div className="fixed right-0 top-1/3 -z-10 h-[500px] w-[600px] opacity-20 blur-3xl" style={{ background: 'radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.12), transparent 70%)' }} />
 
+      <ScrollProgress />
+      <SmoothScroll />
       <Navbar />
       <Hero />
       <TrustBar />
