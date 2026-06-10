@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { GitBranch, Trash2, Eye, MousePointerClick, MessageSquare, EyeOff } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 type ConditionType = 'opened' | 'clicked' | 'replied' | 'not_opened'
 
@@ -14,16 +15,17 @@ interface ConditionNodeData {
   [key: string]: unknown
 }
 
-const CONDITION_CONFIG: Record<ConditionType, { label: string; icon: typeof Eye; color: string }> = {
-  opened: { label: '已打开邮件', icon: Eye, color: 'text-green-600' },
-  clicked: { label: '已点击链接', icon: MousePointerClick, color: 'text-blue-600' },
-  replied: { label: '已回复', icon: MessageSquare, color: 'text-purple-600' },
-  not_opened: { label: '未打开', icon: EyeOff, color: 'text-red-600' },
+const CONDITION_ICONS: Record<ConditionType, { icon: typeof Eye; color: string; key: string }> = {
+  opened: { icon: Eye, color: 'text-green-600', key: 'sequenceBuilder.condition.opened' },
+  clicked: { icon: MousePointerClick, color: 'text-blue-600', key: 'sequenceBuilder.condition.clicked' },
+  replied: { icon: MessageSquare, color: 'text-purple-600', key: 'sequenceBuilder.condition.replied' },
+  not_opened: { icon: EyeOff, color: 'text-red-600', key: 'sequenceBuilder.condition.notOpened' },
 }
 
 function ConditionNodeComponent({ id, data }: NodeProps) {
   const nodeData = data as ConditionNodeData
-  const config = CONDITION_CONFIG[nodeData.conditionType] || CONDITION_CONFIG.opened
+  const { t } = useI18n()
+  const config = CONDITION_ICONS[nodeData.conditionType] || CONDITION_ICONS.opened
   const Icon = config.icon
 
   return (
@@ -35,13 +37,13 @@ function ConditionNodeComponent({ id, data }: NodeProps) {
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100">
             <GitBranch className="h-3 w-3 text-purple-600" />
           </div>
-          <span className="text-xs font-semibold text-purple-700">条件分支</span>
+          <span className="text-xs font-semibold text-purple-700">{t('sequenceBuilder.condition.branch')}</span>
         </div>
         <div className="flex items-center justify-center gap-1">
           <Icon className={`h-4 w-4 ${config.color}`} />
-          <p className="text-sm font-medium text-gray-900">{config.label}</p>
+          <p className="text-sm font-medium text-gray-900">{t(config.key)}</p>
         </div>
-        <p className="mt-1 text-[10px] text-gray-400">回溯 {nodeData.lookbackHours || 72}h</p>
+        <p className="mt-1 text-[10px] text-gray-400">{t('sequenceBuilder.condition.lookback', { hours: nodeData.lookbackHours || 72 })}</p>
       </div>
 
       <button
@@ -70,8 +72,8 @@ function ConditionNodeComponent({ id, data }: NodeProps) {
 
       {/* 分支标签 */}
       <div className="absolute -bottom-5 left-0 right-0 flex justify-around">
-        <span className="text-[9px] text-green-600 font-medium">✓ 是</span>
-        <span className="text-[9px] text-red-400 font-medium">✗ 否</span>
+        <span className="text-[9px] text-green-600 font-medium">✓ {t('sequenceBuilder.condition.yes')}</span>
+        <span className="text-[9px] text-red-400 font-medium">✗ {t('sequenceBuilder.condition.no')}</span>
       </div>
     </div>
   )

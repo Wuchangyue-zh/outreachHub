@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import { Quote, TrendingUp, ArrowRight } from 'lucide-react'
 import { caseStudiesData, type CaseStudy } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
@@ -12,6 +13,7 @@ const industryColors: Record<string, { bg: string; text: string; border: string;
 }
 
 function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
+  const { t } = useI18n()
   const colors = industryColors[caseData.industryTag] || industryColors['电子行业']
   const [expanded, setExpanded] = useState(false)
 
@@ -23,7 +25,7 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${colors.bg} ${colors.text} ring-1 ring-inset ${colors.border}`}>
             {caseData.industryTag}
           </span>
-          <span className="text-xs text-gray-400">案例 #{String(index + 1).padStart(2, '0')}</span>
+          <span className="text-xs text-gray-400">{t('landingComponents.cases.caseNumber', { num: String(index + 1).padStart(2, '0') })}</span>
         </div>
         <h3 className="mt-3 text-lg font-bold text-gray-900">{caseData.company}</h3>
         <p className="mt-1 text-xs text-gray-500">{caseData.companyDesc}</p>
@@ -33,7 +35,7 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
       <div className="px-6 py-5">
         {/* Challenge with smooth collapse */}
         <div className="mb-4">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">面临挑战</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t('landingComponents.cases.challenge')}</h4>
           <div
             className="grid transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
             style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
@@ -49,7 +51,7 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
 
         {/* Solution with smooth collapse */}
         <div className="mb-5">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">解决方案</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t('landingComponents.cases.solution')}</h4>
           <div
             className="grid transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
             style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
@@ -68,7 +70,7 @@ function CaseCard({ caseData, index }: { caseData: CaseStudy; index: number }) {
           onClick={() => setExpanded(!expanded)}
           className="mb-5 flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-300"
         >
-          {expanded ? '收起详情' : '展开完整案例'}
+          {expanded ? t('landingComponents.cases.collapse') : t('landingComponents.cases.expand')}
           <ChevronIcon isOpen={expanded} />
         </button>
 
@@ -117,6 +119,7 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 }
 
 export function CaseStudies() {
+  const { t } = useI18n()
   return (
     <section id="cases" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -125,7 +128,7 @@ export function CaseStudies() {
           <div className="mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               <TrendingUp className="h-3 w-3" />
-              客户案例
+              {t('landingComponents.cases.badge')}
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {caseStudiesData.title}
@@ -150,7 +153,7 @@ export function CaseStudies() {
               href="/register"
               className="group/cases-cta inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors duration-300 hover:text-blue-700"
             >
-              查看更多客户案例
+              {t('landingComponents.cases.viewMore')}
               <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover/cases-cta:translate-x-1" />
             </a>
           </div>

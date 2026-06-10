@@ -9,6 +9,7 @@ import {
 import { TableOfContents } from './TableOfContents'
 import { ArticleContent } from './ArticleContent'
 import { useReadingProgress } from '@/hooks/useReadingProgress'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface KnowledgeArticleLayoutProps {
   article: {
@@ -53,6 +54,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
   const [tocOpen, setTocOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [shareMenuOpen, setShareMenuOpen] = useState(false)
+  const { t } = useI18n()
 
   // Close share menu on outside click
   useEffect(() => {
@@ -108,7 +110,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
               className="hidden items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 sm:flex"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              知识库
+              {t('knowledge.knowledgeBase')}
             </Link>
           </div>
 
@@ -120,7 +122,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
               >
                 <Share2 className="h-4 w-4" />
-                <span className="hidden sm:inline">分享</span>
+                <span className="hidden sm:inline">{t('knowledge.share')}</span>
               </button>
               {shareMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
@@ -149,7 +151,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                    {copied ? '已复制!' : '复制链接'}
+                    {copied ? t('knowledge.copied') : t('knowledge.copyLink')}
                   </button>
                 </div>
               )}
@@ -164,9 +166,9 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
         <div className="relative mx-auto max-w-4xl px-6 py-12 lg:py-16">
           {/* Breadcrumb */}
           <nav className="mb-6 flex items-center gap-2 text-sm text-white/60">
-            <Link href="/" className="hover:text-white transition-colors">首页</Link>
+            <Link href="/" className="hover:text-white transition-colors">{t('knowledge.home')}</Link>
             <span>/</span>
-            <Link href="/#knowledge" className="hover:text-white transition-colors">知识库</Link>
+            <Link href="/#knowledge" className="hover:text-white transition-colors">{t('knowledge.knowledgeBase')}</Link>
             <span>/</span>
             <span className="text-white">{article.category}</span>
           </nav>
@@ -244,13 +246,13 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
                 <div>
                   <p className="text-base font-bold text-gray-900">{article.author}</p>
                   <p className="mt-1 text-sm text-gray-500">
-                    OutreachHub 研究与内容团队，专注外贸增长策略、邮件营销最佳实践与数据驱动的市场洞察。
+                    {t('knowledge.authorBio')}
                   </p>
                   <Link
                     href="/#knowledge"
                     className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
                   >
-                    阅读更多文章 →
+                    {t('knowledge.readMore')}
                   </Link>
                 </div>
               </div>
@@ -259,7 +261,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
             {/* Related articles */}
             {relatedArticles.length > 0 && (
               <div className="mt-12">
-                <h3 className="text-xl font-bold text-gray-900">相关文章</h3>
+                <h3 className="text-xl font-bold text-gray-900">{t('knowledge.relatedArticles')}</h3>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   {relatedArticles.map((rel) => (
                     <Link
@@ -292,13 +294,13 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
                 className="flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
               >
                 <ArrowLeft className="h-4 w-4" />
-                返回知识库
+                {t('knowledge.backToKnowledgeBase')}
               </Link>
               <Link
                 href="/register"
                 className="group/btn inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
               >
-                免费试用
+                {t('knowledge.freeTrial')}
                 <ArrowLeft className="h-3.5 w-3.5 rotate-180 transition-transform group-hover/btn:translate-x-0.5" />
               </Link>
             </div>
@@ -315,7 +317,7 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
               onClick={() => setTocOpen(!tocOpen)}
               className="flex w-full items-center justify-between rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm"
             >
-              文章目录
+              {t('knowledge.articleToc')}
               <ChevronDown className={`h-4 w-4 transition-transform ${tocOpen ? 'rotate-180' : ''}`} />
             </button>
             {tocOpen && (
@@ -336,21 +338,21 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
           <div className="relative mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-blue-200">
               <Zap className="h-3 w-3" />
-              开始免费试用
+              {t('knowledge.cta.badge')}
             </div>
             <h2 className="mt-5 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              准备好提升你的外贸效率了吗？
+              {t('knowledge.cta.title')}
             </h2>
             <p className="mt-4 text-lg text-blue-100">
-              加入 2,800+ 外贸企业的行列，用 OutreachHub 实现智能拓客与邮件营销
+              {t('knowledge.cta.subtitle')}
             </p>
 
             {/* Feature pills */}
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               {[
-                { icon: Zap, text: '5 分钟完成注册' },
-                { icon: Shield, text: '14 天全功能免费' },
-                { icon: Users, text: '无需绑定信用卡' },
+                { icon: Zap, text: t('knowledge.cta.feature1') },
+                { icon: Shield, text: t('knowledge.cta.feature2') },
+                { icon: Users, text: t('knowledge.cta.feature3') },
               ].map((f) => (
                 <div key={f.text} className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
                   <f.icon className="h-4 w-4 text-blue-200" />
@@ -365,20 +367,20 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
                 href="/register"
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-blue-700 shadow-lg transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:bg-blue-50 hover:shadow-xl"
               >
-                免费试用 14 天
+                {t('knowledge.cta.freeTrial14Days')}
                 <ArrowLeft className="h-4 w-4 rotate-180" />
               </Link>
               <Link
                 href="/demo"
                 className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-8 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
               >
-                预约产品演示
+                {t('knowledge.cta.bookDemo')}
               </Link>
             </div>
 
             {/* Trust */}
             <p className="mt-5 text-xs text-blue-200/60">
-              已有 2,800+ 外贸企业信赖 · 无需信用卡 · 随时可取消
+              {t('knowledge.cta.trust')}
             </p>
           </div>
         </div>
@@ -394,9 +396,9 @@ export function KnowledgeArticleLayout({ article, relatedArticles }: KnowledgeAr
             <span>© 2026 OutreachHub</span>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/terms" className="transition-colors hover:text-gray-900">服务条款</Link>
-            <Link href="/privacy" className="transition-colors hover:text-gray-900">隐私政策</Link>
-            <Link href="/#knowledge" className="transition-colors hover:text-gray-900">知识库</Link>
+            <Link href="/terms" className="transition-colors hover:text-gray-900">{t('knowledge.terms')}</Link>
+            <Link href="/privacy" className="transition-colors hover:text-gray-900">{t('knowledge.privacy')}</Link>
+            <Link href="/#knowledge" className="transition-colors hover:text-gray-900">{t('knowledge.knowledgeBase')}</Link>
           </div>
         </div>
       </footer>

@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Loader2, AlertCircle, Shield } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function LoginForm() {
+  const { t } = useI18n()
   const router = useRouter()
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/dashboard'
@@ -29,7 +31,7 @@ export default function LoginForm() {
     setError('')
 
     if (!email || !password) {
-      setError('请输入邮箱和密码')
+      setError(t('loginForm.enterEmailAndPassword'))
       return
     }
 
@@ -44,7 +46,7 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: '登录成功', description: `欢迎回来，${data.user.name}` })
+        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: `${t('loginForm.welcomeBack')}${data.user.name}` })
         router.push(redirectTo)
       } else if (data.requires2FA) {
         // Switch to 2FA verification step
@@ -52,11 +54,11 @@ export default function LoginForm() {
         setTempToken(data.tempToken)
         setError('')
       } else {
-        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || '登录失败'
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('loginForm.loginFailed')
         setError(errorMsg)
       }
     } catch {
-      setError('网络错误，请稍后重试')
+      setError(t('loginForm.networkError'))
     } finally {
       setLoading(false)
     }
@@ -84,14 +86,14 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: '登录成功', description: `欢迎回来，${data.user.name}` })
+        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: `${t('loginForm.welcomeBack')}${data.user.name}` })
         router.push(redirectTo)
       } else {
-        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || '验证失败'
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('loginForm.verifyFailed')
         setError(errorMsg)
       }
     } catch {
-      setError('网络错误，请稍后重试')
+      setError(t('loginForm.networkError'))
     } finally {
       setLoading(false)
     }
@@ -111,10 +113,10 @@ export default function LoginForm() {
             <div className="mt-12">
               <div className="flex items-center gap-2">
                 <Shield className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold text-gray-900">两步验证</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{t('loginForm.twoFactorTitle')}</h1>
               </div>
               <p className="mt-2 text-sm text-gray-500">
-                {useBackupCode ? '请输入备用恢复码' : '请输入身份验证器应用中的6位验证码'}
+                {useBackupCode ? t('loginForm.enterBackupCode') : t('loginForm.enter2faCode')}
               </p>
             </div>
 
@@ -127,7 +129,7 @@ export default function LoginForm() {
             <form onSubmit={handle2FAVerify} className="mt-8 space-y-5">
               {useBackupCode ? (
                 <div>
-                  <label htmlFor="backupCode" className="block text-sm font-medium text-gray-700">备用恢复码</label>
+                  <label htmlFor="backupCode" className="block text-sm font-medium text-gray-700">{t('loginForm.backupCode')}</label>
                   <input
                     id="backupCode"
                     type="text"
@@ -142,7 +144,7 @@ export default function LoginForm() {
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="twoFactorCode" className="block text-sm font-medium text-gray-700">验证码</label>
+                  <label htmlFor="twoFactorCode" className="block text-sm font-medium text-gray-700">{t('loginForm.verificationCode')}</label>
                   <input
                     id="twoFactorCode"
                     type="text"
@@ -167,7 +169,7 @@ export default function LoginForm() {
                 className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {loading ? '验证中...' : '验证'}
+                {loading ? t('loginForm.verifying') : t('loginForm.verify')}
               </button>
             </form>
 
@@ -182,7 +184,7 @@ export default function LoginForm() {
                 }}
                 className="text-sm font-medium text-primary hover:text-primary/80"
               >
-                {useBackupCode ? '使用身份验证器验证码' : '使用备用恢复码'}
+                {useBackupCode ? t('loginForm.useAuthenticator') : t('loginForm.useBackupCodeLink')}
               </button>
             </div>
 
@@ -199,7 +201,7 @@ export default function LoginForm() {
                 }}
                 className="font-medium text-primary hover:text-primary/80"
               >
-                返回登录
+                {t('loginForm.backToLogin')}
               </button>
             </p>
           </div>
@@ -207,9 +209,9 @@ export default function LoginForm() {
 
         <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
           <div className="mx-auto max-w-md text-white">
-            <h2 className="text-3xl font-bold">智能海外拓客与邮件营销</h2>
+            <h2 className="text-3xl font-bold">{t('loginForm.heroTitle')}</h2>
             <p className="mt-4 text-lg text-blue-100">
-              帮助中国出海企业高效拓展海外客户，通过AI驱动的邮件营销提升转化率
+              {t('loginForm.heroSubtitle')}
             </p>
           </div>
         </div>
@@ -228,8 +230,8 @@ export default function LoginForm() {
           </Link>
 
           <div className="mt-12">
-            <h1 className="text-2xl font-bold text-gray-900">欢迎回来</h1>
-            <p className="mt-2 text-sm text-gray-500">登录您的账户以继续</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('loginForm.welcome')}</h1>
+            <p className="mt-2 text-sm text-gray-500">{t('loginForm.loginToContinue')}</p>
           </div>
 
           {error && (
@@ -240,7 +242,7 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">邮箱地址</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('loginForm.email')}</label>
               <input
                 id="email"
                 type="email"
@@ -255,9 +257,9 @@ export default function LoginForm() {
 
             <div>
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">密码</label>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">{t('loginForm.password')}</label>
                 <Link href="/forgot-password" className="text-sm font-medium text-primary hover:text-primary/80">
-                  忘记密码？
+                  {t('loginForm.forgotPassword')}
                 </Link>
               </div>
               <input
@@ -267,7 +269,7 @@ export default function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="输入密码"
+                placeholder={t('loginForm.enterPassword')}
                 disabled={loading}
               />
             </div>
@@ -278,26 +280,26 @@ export default function LoginForm() {
               className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {loading ? '登录中...' : '登录'}
+              {loading ? t('loginForm.loggingIn') : t('loginForm.login')}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <p className="text-gray-500">演示账户：admin@outreachhub.com / admin123</p>
+            <p className="text-gray-500">{t('loginForm.demoAccount')} admin@outreachhub.com / admin123</p>
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            还没有账户？{' '}
-            <Link href="/register" className="font-medium text-primary hover:text-primary/80">免费注册</Link>
+            {t('loginForm.noAccount')}{' '}
+            <Link href="/register" className="font-medium text-primary hover:text-primary/80">{t('loginForm.register')}</Link>
           </p>
         </div>
       </div>
 
       <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
         <div className="mx-auto max-w-md text-white">
-          <h2 className="text-3xl font-bold">智能海外拓客与邮件营销</h2>
+          <h2 className="text-3xl font-bold">{t('loginForm.heroTitle')}</h2>
           <p className="mt-4 text-lg text-blue-100">
-            帮助中国出海企业高效拓展海外客户，通过AI驱动的邮件营销提升转化率
+            {t('loginForm.heroSubtitle')}
           </p>
         </div>
       </div>

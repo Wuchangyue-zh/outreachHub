@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Mail, Clock, GitBranch } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 type ConditionTypeLocal = ConditionType
 
@@ -49,7 +50,7 @@ const nodeTypes = {
 /**
  * 将序列步骤转换为 ReactFlow 节点和边
  */
-function stepsToFlow(steps: ExtendedSequenceStep[]) {
+function stepsToFlow(steps: ExtendedSequenceStep[], t: (key: string) => string) {
   const nodes: Node[] = []
   const edges: Edge[] = []
   const Y_GAP = 160
@@ -145,7 +146,7 @@ function stepsToFlow(steps: ExtendedSequenceStep[]) {
           source: step.id,
           target: step.branches.true,
           sourceHandle: 'true',
-          label: '是',
+          label: t('sequenceBuilder.condition.yes'),
           animated: true,
           style: { stroke: '#22c55e' },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#22c55e' },
@@ -158,7 +159,7 @@ function stepsToFlow(steps: ExtendedSequenceStep[]) {
           source: step.id,
           target: step.branches.false,
           sourceHandle: 'false',
-          label: '否',
+          label: t('sequenceBuilder.condition.no'),
           animated: true,
           style: { stroke: '#f87171' },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#f87171' },
@@ -188,6 +189,7 @@ function stepsToFlow(steps: ExtendedSequenceStep[]) {
 export function SequenceBuilder() {
   const { sequence, addSequenceStep, removeSequenceStep, updateSequenceStep } =
     useCampaignWizardStore()
+  const { t } = useI18n()
 
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
@@ -214,7 +216,7 @@ export function SequenceBuilder() {
   )
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => stepsToFlow(extendedSteps),
+    () => stepsToFlow(extendedSteps, t),
     [extendedSteps]
   )
 
@@ -222,7 +224,7 @@ export function SequenceBuilder() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
   useEffect(() => {
-    const { nodes: nextNodes, edges: nextEdges } = stepsToFlow(extendedSteps)
+    const { nodes: nextNodes, edges: nextEdges } = stepsToFlow(extendedSteps, t)
     setNodes(nextNodes)
     setEdges(nextEdges)
   }, [extendedSteps, setNodes, setEdges])
@@ -379,15 +381,15 @@ export function SequenceBuilder() {
       <div className="flex items-center gap-2">
         <Button type="button" variant="outline" size="sm" onClick={handleAddEmail} className="gap-1">
           <Mail className="h-3 w-3" />
-          邮件步骤
+          {t('sequenceBuilder.emailStep')}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={handleAddWait} className="gap-1">
           <Clock className="h-3 w-3" />
-          等待节点
+          {t('sequenceBuilder.waitNode')}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={handleAddCondition} className="gap-1">
           <GitBranch className="h-3 w-3" />
-          条件分支
+          {t('sequenceBuilder.conditionBranch')}
         </Button>
       </div>
 
@@ -431,7 +433,7 @@ export function SequenceBuilder() {
 
       {/* 提示 */}
       <p className="text-xs text-gray-400">
-        双击节点编辑内容 · 拖拽节点调整布局 · 点击工具栏添加新节点
+        {t('sequenceBuilder.hint')}
       </p>
 
       {/* 编辑对话框 */}
@@ -440,30 +442,30 @@ export function SequenceBuilder() {
           <DialogHeader>
             <DialogTitle>
               {editingStep?.type === 'email'
-                ? '编辑邮件步骤'
+                ? t('sequenceBuilder.editEmailStep')
                 : editingStep?.type === 'wait'
-                ? '编辑等待节点'
-                : '编辑条件分支'}
+                ? t('sequenceBuilder.editWaitNode')
+                : t('sequenceBuilder.editConditionBranch')}
             </DialogTitle>
           </DialogHeader>
 
           {editingStep?.type === 'email' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>邮件主题</Label>
+                <Label>{t('sequenceBuilder.emailSubject')}</Label>
                 <Input
                   value={editForm.subject}
                   onChange={(e) => setEditForm((f) => ({ ...f, subject: e.target.value }))}
-                  placeholder="支持 {{FirstName}} 等变量"
+                  placeholder={t('sequenceBuilder.emailSubjectPlaceholder')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>邮件内容</Label>
+                <Label>{t('sequenceBuilder.emailContent')}</Label>
                 <Textarea
                   value={editForm.content}
                   onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))}
                   rows={6}
-                  placeholder="支持 {{FirstName}}, {{CompanyName}} 等变量"
+                  placeholder={t('sequenceBuilder.emailContentPlaceholder')}
                 />
               </div>
             </div>
@@ -472,7 +474,7 @@ export function SequenceBuilder() {
           {editingStep?.type === 'wait' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>等待时间（小时）</Label>
+                <Label>{t('sequenceBuilder.waitHours')}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -481,8 +483,8 @@ export function SequenceBuilder() {
                 />
                 <p className="text-xs text-gray-400">
                   {editForm.delayHours >= 24
-                    ? `约 ${Math.floor(editForm.delayHours / 24)} 天 ${editForm.delayHours % 24} 小时`
-                    : `${editForm.delayHours} 小时`}
+                    ? t('sequenceBuilder.waitDaysHours', { days: Math.floor(editForm.delayHours / 24), hours: editForm.delayHours % 24 })
+                    : t('sequenceBuilder.waitHoursOnly', { hours: editForm.delayHours })}
                 </p>
               </div>
             </div>
@@ -491,7 +493,7 @@ export function SequenceBuilder() {
           {editingStep?.type === 'condition' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>判断条件</Label>
+                <Label>{t('sequenceBuilder.conditionType')}</Label>
                 <Select
                   value={editForm.conditionType}
                   onValueChange={(v) => setEditForm((f) => ({ ...f, conditionType: v as ConditionType }))}
@@ -500,15 +502,15 @@ export function SequenceBuilder() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="opened">已打开邮件</SelectItem>
-                    <SelectItem value="clicked">已点击链接</SelectItem>
-                    <SelectItem value="replied">已回复</SelectItem>
-                    <SelectItem value="not_opened">未打开</SelectItem>
+                    <SelectItem value="opened">{t('sequenceBuilder.condition.opened')}</SelectItem>
+                    <SelectItem value="clicked">{t('sequenceBuilder.condition.clicked')}</SelectItem>
+                    <SelectItem value="replied">{t('sequenceBuilder.condition.replied')}</SelectItem>
+                    <SelectItem value="not_opened">{t('sequenceBuilder.condition.notOpened')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>回溯窗口（小时）</Label>
+                <Label>{t('sequenceBuilder.lookbackWindow')}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -516,7 +518,7 @@ export function SequenceBuilder() {
                   onChange={(e) => setEditForm((f) => ({ ...f, lookbackHours: parseInt(e.target.value) || 72 }))}
                 />
                 <p className="text-xs text-gray-400">
-                  检查最近 {editForm.lookbackHours} 小时内是否有匹配行为
+                  {t('sequenceBuilder.lookbackHint', { hours: editForm.lookbackHours })}
                 </p>
               </div>
             </div>
@@ -524,9 +526,9 @@ export function SequenceBuilder() {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              取消
+              {t('sequenceBuilder.cancel')}
             </Button>
-            <Button onClick={handleSaveEdit}>保存</Button>
+            <Button onClick={handleSaveEdit}>{t('sequenceBuilder.save')}</Button>
           </div>
         </DialogContent>
       </Dialog>

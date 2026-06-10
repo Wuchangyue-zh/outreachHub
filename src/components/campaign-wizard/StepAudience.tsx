@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useCampaignWizardStore } from '@/store/campaign-wizard-store'
 import { ArrowRight, ArrowLeft, Check, Users, ClipboardList, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface ContactRecord {
   id: string
@@ -23,6 +24,8 @@ export function StepAudience() {
     selectedContactIds, toggleContact, selectAllContacts, clearContacts,
     nextStep, prevStep,
   } = useCampaignWizardStore()
+
+  const { t } = useI18n()
 
   const [contacts, setContacts] = useState<ContactRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -63,8 +66,8 @@ export function StepAudience() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">受众导入</h2>
-        <p className="mt-1 text-sm text-gray-500">粘贴邮箱或从已有联系人中选择</p>
+        <h2 className="text-lg font-bold text-gray-900">{t('campaignWizard.audience.title')}</h2>
+        <p className="mt-1 text-sm text-gray-500">{t('campaignWizard.audience.subtitle')}</p>
       </div>
 
       <div className="flex gap-2 rounded-xl bg-gray-100 p-1">
@@ -79,7 +82,7 @@ export function StepAudience() {
           )}
         >
           <ClipboardList className="h-4 w-4" />
-          手动粘贴邮箱
+          {t('campaignWizard.audience.pasteTab')}
         </button>
         <button
           type="button"
@@ -92,29 +95,29 @@ export function StepAudience() {
           )}
         >
           <Users className="h-4 w-4" />
-          从已有联系人选择
+          {t('campaignWizard.audience.contactsTab')}
         </button>
       </div>
 
       {audienceTab === 'paste' ? (
         <div className="space-y-3">
-          <Label htmlFor="pastedEmails">邮箱地址</Label>
+          <Label htmlFor="pastedEmails">{t('campaignWizard.audience.emailLabel')}</Label>
           <Textarea
             id="pastedEmails"
             rows={8}
-            placeholder={'每行一个邮箱，或用逗号/分号分隔\n例：\nbuyer@company.com\nsales@example.de'}
+            placeholder={t('campaignWizard.audience.emailPlaceholder')}
             value={pastedEmails}
             onChange={(e) => setPastedEmails(e.target.value)}
           />
           <p className="text-sm text-gray-500">
-            已识别 <span className="font-semibold text-blue-600">{parsedEmails.length}</span> 个有效邮箱
+            {t('campaignWizard.audience.emailsFound')} <span className="font-semibold text-blue-600">{parsedEmails.length}</span> {t('campaignWizard.audience.emailsFoundSuffix')}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              已选 {selectedContactIds.length} / {contacts.length} 位联系人
+              {t('campaignWizard.audience.selected')} {selectedContactIds.length} / {contacts.length} {t('campaignWizard.audience.selectedSuffix')}
             </p>
             <div className="flex gap-2">
               <Button
@@ -124,10 +127,10 @@ export function StepAudience() {
                 onClick={() => selectAllContacts(contacts.map((c) => c.id))}
                 disabled={loading || contacts.length === 0}
               >
-                全选
+                {t('campaignWizard.audience.selectAll')}
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={clearContacts}>
-                清空
+                {t('campaignWizard.audience.clear')}
               </Button>
             </div>
           </div>
@@ -135,10 +138,10 @@ export function StepAudience() {
           {loading ? (
             <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
               <Loader2 className="h-4 w-4 animate-spin" />
-              加载联系人...
+              {t('campaignWizard.audience.loading')}
             </div>
           ) : contacts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">暂无联系人，请先在客户管理中添加</p>
+            <p className="py-8 text-center text-sm text-gray-500">{t('campaignWizard.audience.empty')}</p>
           ) : (
             <div className="max-h-80 space-y-2 overflow-y-auto rounded-xl border border-gray-200 p-2">
               {contacts.map((contact) => {
@@ -182,12 +185,12 @@ export function StepAudience() {
       <div className="flex items-center justify-between border-t border-gray-100 pt-6">
         <Button type="button" variant="outline" onClick={prevStep} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          上一步
+          {t('campaignWizard.prev')}
         </Button>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">共 {totalAudience} 位收件人</span>
+          <span className="text-sm text-gray-500">{t('campaignWizard.audience.total')} {totalAudience} {t('campaignWizard.audience.totalSuffix')}</span>
           <Button onClick={nextStep} disabled={!canProceed} className="gap-2">
-            下一步：AI 写信
+            {t('campaignWizard.audience.next')}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

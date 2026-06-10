@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 import { Mail, Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
 
 export default function ForgotPasswordPage() {
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -15,7 +17,7 @@ export default function ForgotPasswordPage() {
     setError('')
 
     if (!email.trim()) {
-      setError('请输入邮箱地址')
+      setError(t('forgotPassword.enterEmail'))
       return
     }
 
@@ -31,10 +33,10 @@ export default function ForgotPasswordPage() {
       if (res.ok && data.success) {
         setSent(true)
       } else {
-        setError(data.message || data.error?.message || '发送失败，请稍后重试')
+        setError(data.message || data.error?.message || t('forgotPassword.sendFailed'))
       }
     } catch {
-      setError('网络错误，请稍后重试')
+      setError(t('forgotPassword.networkError'))
     } finally {
       setLoading(false)
     }
@@ -50,9 +52,9 @@ export default function ForgotPasswordPage() {
           </Link>
 
           <div className="mt-12">
-            <h1 className="text-2xl font-bold text-gray-900">忘记密码</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('forgotPassword.title')}</h1>
             <p className="mt-2 text-sm text-gray-500">
-              输入注册邮箱，我们将发送密码重置链接
+              {t('forgotPassword.subtitle')}
             </p>
           </div>
 
@@ -61,9 +63,9 @@ export default function ForgotPasswordPage() {
               <div className="flex items-start gap-3 rounded-lg bg-green-50 p-4 text-sm text-green-800">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-medium">邮件已发送</p>
+                  <p className="font-medium">{t('forgotPassword.emailSent')}</p>
                   <p className="mt-1 text-green-700">
-                    如果 <strong>{email}</strong> 已注册，请查收邮件并点击重置链接（1 小时内有效）。
+                    {t('forgotPassword.emailSentDesc').replace('{email}', `<strong>${email}</strong>`).split('<strong>').map((part, i) => i === 0 ? part : <strong key={i}>{part.split('</strong>')[0]}</strong>)}
                   </p>
                 </div>
               </div>
@@ -72,7 +74,7 @@ export default function ForgotPasswordPage() {
                 className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80"
               >
                 <ArrowLeft className="h-4 w-4" />
-                返回登录
+                {t('forgotPassword.backToLogin')}
               </Link>
             </div>
           ) : (
@@ -86,7 +88,7 @@ export default function ForgotPasswordPage() {
               <form onSubmit={handleSubmit} className="mt-8 space-y-5">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    邮箱地址
+                    {t('forgotPassword.emailLabel')}
                   </label>
                   <input
                     id="email"
@@ -106,14 +108,14 @@ export default function ForgotPasswordPage() {
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {loading ? '发送中...' : '发送重置链接'}
+                  {loading ? t('forgotPassword.sending') : t('forgotPassword.sendResetLink')}
                 </button>
               </form>
 
               <p className="mt-6 text-center text-sm text-gray-500">
                 <Link href="/login" className="inline-flex items-center gap-1 font-medium text-primary hover:text-primary/80">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  返回登录
+                  {t('forgotPassword.backToLogin')}
                 </Link>
               </p>
             </>
@@ -123,9 +125,9 @@ export default function ForgotPasswordPage() {
 
       <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
         <div className="mx-auto max-w-md text-white">
-          <h2 className="text-3xl font-bold">安全重置密码</h2>
+          <h2 className="text-3xl font-bold">{t('forgotPassword.secureReset')}</h2>
           <p className="mt-4 text-lg text-blue-100">
-            重置链接将发送至您的注册邮箱，请勿将链接分享给他人。
+            {t('forgotPassword.secureResetDesc')}
           </p>
         </div>
       </div>

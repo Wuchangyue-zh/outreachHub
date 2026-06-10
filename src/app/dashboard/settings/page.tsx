@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { LANGUAGES } from '@/lib/i18n/languages'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   Mail,
   Plus,
@@ -216,6 +217,7 @@ const PLAN_LABELS: Record<string, string> = { FREE: '免费版', BASIC: '基础�
 const PLAN_COLORS: Record<string, string> = { FREE: 'bg-gray-100 text-gray-700', BASIC: 'bg-blue-100 text-blue-700', PRO: 'bg-purple-100 text-purple-700', ENTERPRISE: 'bg-amber-100 text-amber-700' }
 
 export default function SettingsPage() {
+  const { t } = useI18n()
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -290,7 +292,7 @@ export default function SettingsPage() {
         setAccounts(data.data)
       }
     } catch (error) {
-      toast.error('加载账户失败')
+      toast.error(t('dashboardSettings.loadAccountsFailed'))
     } finally {
       setLoading(false)
     }
@@ -323,13 +325,13 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(`邀请已发送至 ${inviteEmail}`)
+        toast.success(t('dashboardSettings.inviteSent').replace('{email}', inviteEmail))
         setInviteEmail('')
         loadTenantUsage()
       } else {
-        toast.error(data.error?.message || data.error || '邀请失败')
+        toast.error(data.error?.message || data.error || t('dashboardSettings.inviteFailed'))
       }
-    } catch { toast.error('邀请失败') } finally { setInviting(false) }
+    } catch { toast.error(t('dashboardSettings.inviteFailed')) } finally { setInviting(false) }
   }
 
   // R2c: Stripe 客户门户
@@ -342,10 +344,10 @@ export default function SettingsPage() {
       if (data.success && data.data?.url) {
         window.location.href = data.data.url
       } else {
-        toast.error(data.error?.message || '无法打开订阅管理页面')
+        toast.error(data.error?.message || t('dashboardSettings.portalFailed'))
       }
     } catch {
-      toast.error('订阅管理服务暂时不可用')
+      toast.error(t('dashboardSettings.portalUnavailable'))
     } finally {
       setPortalLoading(false)
     }
@@ -362,12 +364,12 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success('退订页语言已更新')
+        toast.success(t('dashboardSettings.languageUpdated'))
         await loadTenantUsage()
       } else {
-        toast.error(data.error?.message || '保存失败')
+        toast.error(data.error?.message || t('dashboardSettings.saveFailed'))
       }
-    } catch { toast.error('保存失败') } finally { setSavingLanguage(false) }
+    } catch { toast.error(t('dashboardSettings.saveFailed')) } finally { setSavingLanguage(false) }
   }
 
   // H3d: 撤销邀请
@@ -376,12 +378,12 @@ export default function SettingsPage() {
       const res = await fetch(`/api/tenant/invite?id=${inviteId}`, { method: 'DELETE' })
       const data = await res.json()
       if (data.success) {
-        toast.success('邀请已撤销')
+        toast.success(t('dashboardSettings.inviteRevoked'))
         loadTenantUsage()
       } else {
-        toast.error(data.error?.message || '撤销失败')
+        toast.error(data.error?.message || t('dashboardSettings.revokeFailed'))
       }
-    } catch { toast.error('撤销失败') }
+    } catch { toast.error(t('dashboardSettings.revokeFailed')) }
   }
 
   // J1: 获取 DNS 记录

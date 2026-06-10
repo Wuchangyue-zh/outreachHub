@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 import { knowledgeData } from '@/lib/landing-data'
 import { BookOpen, ArrowRight } from 'lucide-react'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 export function Knowledge() {
+  const { t } = useI18n()
   return (
     <section id="knowledge" className="py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -12,7 +14,7 @@ export function Knowledge() {
           <div className="text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               <BookOpen className="h-3 w-3" />
-              知识库
+              {t('landingComponents.knowledge.badge')}
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {knowledgeData.title}
@@ -63,7 +65,7 @@ export function Knowledge() {
 
                 {/* Read more */}
                 <div className="mt-5 flex items-center gap-1 text-sm font-semibold text-blue-600 transition-colors group-hover:text-blue-700">
-                  阅读全文
+                  {t('landingComponents.knowledge.readMore')}
                   <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover:translate-x-1" />
                 </div>
               </Link>

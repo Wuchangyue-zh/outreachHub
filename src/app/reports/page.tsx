@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -123,6 +124,7 @@ function formatDate(dateStr: string): string {
 // ---------------------------------------------------------------------------
 
 export default function ReportsPage() {
+  const { t } = useI18n()
   // Period state
   const [period, setPeriod] = useState(30)
 
@@ -155,7 +157,7 @@ export default function ReportsPage() {
       const campaignJson = await campaignRes.json()
 
       if (!teamJson.success) {
-        setError(teamJson.error?.message || '获取团队数据失败')
+        setError(teamJson.error?.message || t('reports.fetchTeamFailed'))
       } else {
         setTeamData(teamJson.data as TeamData)
       }
@@ -164,7 +166,7 @@ export default function ReportsPage() {
         setCampaignStats(campaignJson.data as CampaignStatsData)
       }
     } catch {
-      setError('获取数据失败，请稍后重试')
+      setError(t('reports.fetchDataFailed'))
     } finally {
       setLoading(false)
     }
@@ -202,8 +204,8 @@ export default function ReportsPage() {
     const lines: string[] = []
 
     // Team section
-    lines.push('=== 团队绩效 ===')
-    lines.push('姓名,邮箱,成交数,成交金额,总商机,领取客户')
+    lines.push(`=== ${t('reports.teamPerformance')} ===`)
+    lines.push(`${t('reports.member')},邮箱,${t('reports.dealsWon')},${t('reports.dealsWonAmount')},${t('reports.totalDeals')},${t('reports.claimedContacts')}`)
     if (teamData) {
       for (const u of teamData.users) {
         lines.push(
@@ -222,26 +224,26 @@ export default function ReportsPage() {
     lines.push('')
 
     // Campaign section
-    lines.push('=== 营销效果 ===')
-    lines.push('指标,数值')
+    lines.push(`=== ${t('reports.totalSent')}${t('reports.openRate')} ===`)
+    lines.push(`指标,数值`)
     if (campaignStats) {
       const o = campaignStats.overall
-      lines.push(`总发送,${o.totalSent}`)
-      lines.push(`总打开,${o.totalOpened}`)
-      lines.push(`总点击,${o.totalClicked}`)
-      lines.push(`总回复,${o.totalReplied}`)
-      lines.push(`总退信,${o.totalBounced}`)
-      lines.push(`打开率,${o.openRate.toFixed(2)}%`)
-      lines.push(`点击率,${o.clickRate.toFixed(2)}%`)
-      lines.push(`回复率,${o.replyRate.toFixed(2)}%`)
-      lines.push(`退信率,${o.bounceRate.toFixed(2)}%`)
+      lines.push(`${t('reports.totalSent')},${o.totalSent}`)
+      lines.push(`${t('reports.chartOpened')},${o.totalOpened}`)
+      lines.push(`${t('reports.chartClicked')},${o.totalClicked}`)
+      lines.push(`${t('reports.chartReplied')},${o.totalReplied}`)
+      lines.push(`${t('reports.bounceRate')},${o.totalBounced}`)
+      lines.push(`${t('reports.openRate')},${o.openRate.toFixed(2)}%`)
+      lines.push(`${t('reports.clickRate')},${o.clickRate.toFixed(2)}%`)
+      lines.push(`${t('reports.replyRate')},${o.replyRate.toFixed(2)}%`)
+      lines.push(`${t('reports.bounceRate')},${o.bounceRate.toFixed(2)}%`)
     }
 
     lines.push('')
 
     // Daily trend
-    lines.push('=== 每日趋势 ===')
-    lines.push('日期,发送,打开,点击,回复')
+    lines.push(`=== ${t('reports.dailyTrend')} ===`)
+    lines.push(`日期,${t('reports.chartSent')},${t('reports.chartOpened')},${t('reports.chartClicked')},${t('reports.chartReplied')}`)
     if (campaignStats) {
       for (const d of campaignStats.daily) {
         lines.push(`${d.date},${d.sent},${d.opened},${d.clicked},${d.replied}`)
@@ -251,8 +253,8 @@ export default function ReportsPage() {
     lines.push('')
 
     // Campaign comparison
-    lines.push('=== Campaign 对比 ===')
-    lines.push('名称,打开率,点击率,回复率')
+    lines.push(`=== ${t('reports.campaignComparison')} ===`)
+    lines.push(`名称,${t('reports.openRate')},${t('reports.clickRate')},${t('reports.replyRate')}`)
     if (campaignStats) {
       for (const c of campaignStats.comparison) {
         lines.push(
@@ -265,13 +267,13 @@ export default function ReportsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `数据报表_${period}天_${new Date().toISOString().split('T')[0]}.csv`
+    a.download = t('reports.csvFileName').replace('{period}', String(period)).replace('{date}', new Date().toISOString().split('T')[0])
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    toast.success('CSV 文件已下载')
+    toast.success(t('reports.csvDownloaded'))
   }
 
   // -----------------------------------------------------------------------
@@ -311,8 +313,8 @@ export default function ReportsPage() {
         {/* ================================================================ */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">数据报表</h1>
-            <p className="text-sm text-gray-500">团队绩效与营销效果分析</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('reports.title')}</h1>
+            <p className="text-sm text-gray-500">{t('reports.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Period selector */}
@@ -328,13 +330,13 @@ export default function ReportsPage() {
                       : 'text-gray-600 hover:text-gray-900'
                   )}
                 >
-                  {d}天
+                  {t('reports.days').replace('{d}', String(d))}
                 </button>
               ))}
             </div>
             <Button variant="outline" size="sm" className="gap-1" onClick={handleExportCsv}>
               <Download className="h-4 w-4" />
-              导出 CSV
+              {t('reports.exportCsv')}
             </Button>
           </div>
         </div>
@@ -360,9 +362,9 @@ export default function ReportsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Users className="h-5 w-5 text-primary" />
-                  团队绩效
+                  {t('reports.teamPerformance')}
                   <Badge className="ml-auto font-normal border border-gray-300">
-                    近 {period} 天
+                    {t('reports.recentDays').replace('{period}', String(period))}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -370,37 +372,37 @@ export default function ReportsPage() {
                 {!teamData || teamData.users.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <Users className="h-10 w-10 mb-3 text-gray-300" />
-                    <p className="text-sm">暂无团队绩效数据</p>
+                    <p className="text-sm">{t('reports.noTeamData')}</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="text-left text-xs text-gray-500 border-b">
                         <tr>
-                          <th className="pb-3 font-medium">成员</th>
+                          <th className="pb-3 font-medium">{t('reports.member')}</th>
                           <th
                             className="pb-3 font-medium cursor-pointer select-none hover:text-gray-700"
                             onClick={() => handleSort('dealsWon')}
                           >
-                            成交数 <SortIndicator field="dealsWon" />
+                            {t('reports.dealsWon')} <SortIndicator field="dealsWon" />
                           </th>
                           <th
                             className="pb-3 font-medium cursor-pointer select-none hover:text-gray-700"
                             onClick={() => handleSort('dealsWonAmount')}
                           >
-                            成交金额 <SortIndicator field="dealsWonAmount" />
+                            {t('reports.dealsWonAmount')} <SortIndicator field="dealsWonAmount" />
                           </th>
                           <th
                             className="pb-3 font-medium cursor-pointer select-none hover:text-gray-700"
                             onClick={() => handleSort('totalDeals')}
                           >
-                            总商机 <SortIndicator field="totalDeals" />
+                            {t('reports.totalDeals')} <SortIndicator field="totalDeals" />
                           </th>
                           <th
                             className="pb-3 font-medium cursor-pointer select-none hover:text-gray-700"
                             onClick={() => handleSort('contactsClaimed')}
                           >
-                            领取客户 <SortIndicator field="contactsClaimed" />
+                            {t('reports.claimedContacts')} <SortIndicator field="contactsClaimed" />
                           </th>
                         </tr>
                       </thead>
@@ -444,35 +446,35 @@ export default function ReportsPage() {
                     icon={Mail}
                     iconBg="bg-blue-50"
                     iconColor="text-blue-600"
-                    label="总发送"
+                    label={t('reports.totalSent')}
                     value={campaignStats.overall.totalSent.toLocaleString()}
                   />
                   <MetricCard
                     icon={FileText}
                     iconBg="bg-green-50"
                     iconColor="text-green-600"
-                    label="打开率"
+                    label={t('reports.openRate')}
                     value={`${campaignStats.overall.openRate.toFixed(1)}%`}
                   />
                   <MetricCard
                     icon={MousePointerClick}
                     iconBg="bg-orange-50"
                     iconColor="text-orange-600"
-                    label="点击率"
+                    label={t('reports.clickRate')}
                     value={`${campaignStats.overall.clickRate.toFixed(1)}%`}
                   />
                   <MetricCard
                     icon={Reply}
                     iconBg="bg-purple-50"
                     iconColor="text-purple-600"
-                    label="回复率"
+                    label={t('reports.replyRate')}
                     value={`${campaignStats.overall.replyRate.toFixed(1)}%`}
                   />
                   <MetricCard
                     icon={AlertTriangle}
                     iconBg="bg-red-50"
                     iconColor="text-red-600"
-                    label="退信率"
+                    label={t('reports.bounceRate')}
                     value={`${campaignStats.overall.bounceRate.toFixed(1)}%`}
                   />
                 </div>
@@ -484,14 +486,14 @@ export default function ReportsPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <TrendingUp className="h-5 w-5 text-primary" />
-                        每日趋势
+                        {t('reports.dailyTrend')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {campaignStats.daily.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                           <TrendingUp className="h-10 w-10 mb-3 text-gray-300" />
-                          <p className="text-sm">暂无趋势数据</p>
+                          <p className="text-sm">{t('reports.noTrendData')}</p>
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height={300}>
@@ -504,14 +506,14 @@ export default function ReportsPage() {
                             />
                             <YAxis tick={{ fontSize: 11 }} />
                             <Tooltip
-                              labelFormatter={(v) => `日期: ${v}`}
+                              labelFormatter={(v) => t('reports.dateLabel').replace('{v}', String(v))}
                               contentStyle={{ fontSize: 12 }}
                             />
                             <Legend wrapperStyle={{ fontSize: 12 }} />
                             <Line
                               type="monotone"
                               dataKey="sent"
-                              name="发送"
+                              name={t('reports.chartSent')}
                               stroke={CHART_COLORS[0]}
                               strokeWidth={2}
                               dot={false}
@@ -519,7 +521,7 @@ export default function ReportsPage() {
                             <Line
                               type="monotone"
                               dataKey="opened"
-                              name="打开"
+                              name={t('reports.chartOpened')}
                               stroke={CHART_COLORS[1]}
                               strokeWidth={2}
                               dot={false}
@@ -527,7 +529,7 @@ export default function ReportsPage() {
                             <Line
                               type="monotone"
                               dataKey="clicked"
-                              name="点击"
+                              name={t('reports.chartClicked')}
                               stroke={CHART_COLORS[2]}
                               strokeWidth={2}
                               dot={false}
@@ -535,7 +537,7 @@ export default function ReportsPage() {
                             <Line
                               type="monotone"
                               dataKey="replied"
-                              name="回复"
+                              name={t('reports.chartReplied')}
                               stroke={CHART_COLORS[4]}
                               strokeWidth={2}
                               dot={false}
@@ -551,14 +553,14 @@ export default function ReportsPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <BarChart3 className="h-5 w-5 text-primary" />
-                        Campaign 对比（Top 10）
+                        {t('reports.campaignComparison')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {campaignStats.comparison.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                           <BarChart3 className="h-10 w-10 mb-3 text-gray-300" />
-                          <p className="text-sm">暂无 Campaign 数据</p>
+                          <p className="text-sm">{t('reports.noCampaignData')}</p>
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height={300}>
@@ -586,19 +588,19 @@ export default function ReportsPage() {
                             <Legend wrapperStyle={{ fontSize: 12 }} />
                             <Bar
                               dataKey="openRate"
-                              name="打开率"
+                              name={t('reports.chartOpenRate')}
                               fill={CHART_COLORS[0]}
                               radius={[0, 4, 4, 0]}
                             />
                             <Bar
                               dataKey="clickRate"
-                              name="点击率"
+                              name={t('reports.chartClickRate')}
                               fill={CHART_COLORS[1]}
                               radius={[0, 4, 4, 0]}
                             />
                             <Bar
                               dataKey="replyRate"
-                              name="回复率"
+                              name={t('reports.chartReplyRate')}
                               fill={CHART_COLORS[2]}
                               radius={[0, 4, 4, 0]}
                             />
@@ -619,7 +621,7 @@ export default function ReportsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <PieChartIcon className="h-5 w-5 text-primary" />
-                    地理分布
+                    {t('reports.geoDistribution')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

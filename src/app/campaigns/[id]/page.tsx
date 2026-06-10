@@ -12,6 +12,7 @@ import {
   ArrowLeft, RefreshCw, Mail, Eye, MousePointer, MessageSquare,
   AlertCircle, Users, Calendar, Clock, Play, Pause, BarChart3,
 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface Campaign {
   id: string
@@ -60,16 +61,17 @@ interface CampaignContact {
   contact?: { fullName: string; emails?: { address: string }[] }
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  DRAFT: { label: '草稿', color: 'text-gray-700', bg: 'bg-gray-100' },
-  SCHEDULED: { label: '已排期', color: 'text-blue-700', bg: 'bg-blue-100' },
-  RUNNING: { label: '运行中', color: 'text-green-700', bg: 'bg-green-100' },
-  PAUSED: { label: '已暂停', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  COMPLETED: { label: '已完成', color: 'text-purple-700', bg: 'bg-purple-100' },
-  FAILED: { label: '失败', color: 'text-red-700', bg: 'bg-red-100' },
+const STATUS_CONFIG: Record<string, { labelKey: string; color: string; bg: string }> = {
+  DRAFT: { labelKey: 'campaignDetail.status.draft', color: 'text-gray-700', bg: 'bg-gray-100' },
+  SCHEDULED: { labelKey: 'campaignDetail.status.scheduled', color: 'text-blue-700', bg: 'bg-blue-100' },
+  RUNNING: { labelKey: 'campaignDetail.status.running', color: 'text-green-700', bg: 'bg-green-100' },
+  PAUSED: { labelKey: 'campaignDetail.status.paused', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  COMPLETED: { labelKey: 'campaignDetail.status.completed', color: 'text-purple-700', bg: 'bg-purple-100' },
+  FAILED: { labelKey: 'campaignDetail.status.failed', color: 'text-red-700', bg: 'bg-red-100' },
 }
 
 export default function CampaignDetailPage() {
+  const { t } = useI18n()
   const params = useParams()
   const router = useRouter()
   const campaignId = params.id as string
@@ -90,12 +92,12 @@ export default function CampaignDetailPage() {
         setEmailLogs(c.emailLogs || [])
         setContacts(c.campaignContacts || [])
       } else {
-        toast.error(data.error?.message || '加载失败')
+        toast.error(data.error?.message || t('campaignDetail.loadFailed'))
       }
     } catch {
-      toast.error('加载活动详情失败')
+      toast.error(t('campaignDetail.loadDetailFailed'))
     }
-  }, [campaignId])
+  }, [campaignId, t])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -119,12 +121,12 @@ export default function CampaignDetailPage() {
       const data = await res.json()
       if (data.success) {
         setCampaign(data.data)
-        toast.success(newStatus === 'PAUSED' ? '活动已暂停' : '活动已恢复')
+        toast.success(newStatus === 'PAUSED' ? t('campaignDetail.campaignPaused') : t('campaignDetail.campaignResumed'))
       } else {
-        toast.error(data.error?.message || '操作失败')
+        toast.error(data.error?.message || t('campaignDetail.operationFailed'))
       }
     } catch {
-      toast.error('操作失败')
+      toast.error(t('campaignDetail.operationFailed'))
     }
   }
 
@@ -142,9 +144,9 @@ export default function CampaignDetailPage() {
     return (
       <DashboardLayout>
         <div className="text-center py-20">
-          <p className="text-gray-500">活动不存在</p>
+          <p className="text-gray-500">{t('campaignDetail.notExist')}</p>
           <Button variant="outline" className="mt-4" onClick={() => router.push('/campaigns')}>
-            返回活动列表
+            {t('campaignDetail.backToList')}
           </Button>
         </div>
       </DashboardLayout>
@@ -160,25 +162,25 @@ export default function CampaignDetailPage() {
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/campaigns')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            返回
+            {t('campaignDetail.back')}
           </Button>
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
-              <Badge className={`${statusCfg.bg} ${statusCfg.color}`}>{statusCfg.label}</Badge>
+              <Badge className={`${statusCfg.bg} ${statusCfg.color}`}>{t(statusCfg.labelKey)}</Badge>
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              {campaign.type === 'SINGLE' ? '单次发送' : campaign.type === 'SEQUENCE' ? '序列邮件' : campaign.type}
-              {campaign.sentAt && ` · 发送于 ${new Date(campaign.sentAt).toLocaleString('zh-CN')}`}
+              {campaign.type === 'SINGLE' ? t('campaignDetail.typeSingle') : campaign.type === 'SEQUENCE' ? t('campaignDetail.typeSequence') : campaign.type}
+              {campaign.sentAt && ` · ${t('campaignDetail.sentAt')} ${new Date(campaign.sentAt).toLocaleString('zh-CN')}`}
             </p>
           </div>
           <div className="flex gap-2">
             {(campaign.status === 'RUNNING' || campaign.status === 'PAUSED') && (
               <Button variant="outline" onClick={handlePauseResume}>
                 {campaign.status === 'RUNNING' ? (
-                  <><Pause className="h-4 w-4 mr-1" /> 暂停</>
+                  <><Pause className="h-4 w-4 mr-1" /> {t('campaignDetail.pause')}</>
                 ) : (
-                  <><Play className="h-4 w-4 mr-1" /> 恢复</>
+                  <><Play className="h-4 w-4 mr-1" /> {t('campaignDetail.resume')}</>
                 )}
               </Button>
             )}
@@ -188,12 +190,12 @@ export default function CampaignDetailPage() {
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
-            { icon: Mail, label: '已发送', value: campaign.totalSent, color: 'text-blue-600' },
-            { icon: Eye, label: '已打开', value: campaign.totalOpened, color: 'text-green-600', sub: `${campaign.openRate}%` },
-            { icon: MousePointer, label: '已点击', value: campaign.totalClicked, color: 'text-purple-600', sub: `${campaign.clickRate}%` },
-            { icon: MessageSquare, label: '已回复', value: campaign.totalReplied, color: 'text-cyan-600', sub: `${campaign.replyRate}%` },
-            { icon: AlertCircle, label: '退信', value: campaign.totalBounced, color: 'text-orange-600', sub: `${campaign.bounceRate}%` },
-            { icon: Users, label: '受众', value: contacts.length, color: 'text-gray-600' },
+            { icon: Mail, label: t('campaignDetail.sent'), value: campaign.totalSent, color: 'text-blue-600' },
+            { icon: Eye, label: t('campaignDetail.opened'), value: campaign.totalOpened, color: 'text-green-600', sub: `${campaign.openRate}%` },
+            { icon: MousePointer, label: t('campaignDetail.clicked'), value: campaign.totalClicked, color: 'text-purple-600', sub: `${campaign.clickRate}%` },
+            { icon: MessageSquare, label: t('campaignDetail.replied'), value: campaign.totalReplied, color: 'text-cyan-600', sub: `${campaign.replyRate}%` },
+            { icon: AlertCircle, label: t('campaignDetail.bounced'), value: campaign.totalBounced, color: 'text-orange-600', sub: `${campaign.bounceRate}%` },
+            { icon: Users, label: t('campaignDetail.audience'), value: contacts.length, color: 'text-gray-600' },
           ].map((stat) => (
             <Card key={stat.label}>
               <CardContent className="p-4">
@@ -211,32 +213,32 @@ export default function CampaignDetailPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="overview">概览</TabsTrigger>
-            <TabsTrigger value="logs">发送日志 ({emailLogs.length})</TabsTrigger>
-            <TabsTrigger value="contacts">受众 ({contacts.length})</TabsTrigger>
+            <TabsTrigger value="overview">{t('campaignDetail.tabOverview')}</TabsTrigger>
+            <TabsTrigger value="logs">{t('campaignDetail.tabLogs')} ({emailLogs.length})</TabsTrigger>
+            <TabsTrigger value="contacts">{t('campaignDetail.tabAudience')} ({contacts.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">基本信息</CardTitle>
+                  <CardTitle className="text-base">{t('campaignDetail.basicInfo')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">主题</span>
+                    <span className="text-gray-500">{t('campaignDetail.subject')}</span>
                     <span className="font-medium">{campaign.subject || '-'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">发件人</span>
+                    <span className="text-gray-500">{t('campaignDetail.sender')}</span>
                     <span className="font-medium">{campaign.fromName ? `${campaign.fromName} <${campaign.fromEmail}>` : campaign.fromEmail || '-'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">排期类型</span>
-                    <span className="font-medium">{campaign.scheduleType || '立即发送'}</span>
+                    <span className="text-gray-500">{t('campaignDetail.scheduleType')}</span>
+                    <span className="font-medium">{campaign.scheduleType || t('campaignDetail.sendImmediately')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">创建时间</span>
+                    <span className="text-gray-500">{t('campaignDetail.createdAt')}</span>
                     <span className="font-medium">{new Date(campaign.createdAt).toLocaleString('zh-CN')}</span>
                   </div>
                 </CardContent>
@@ -244,14 +246,14 @@ export default function CampaignDetailPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">效果概览</CardTitle>
+                  <CardTitle className="text-base">{t('campaignDetail.performanceOverview')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {[
-                    { label: '打开率', value: campaign.openRate, color: 'bg-green-500' },
-                    { label: '点击率', value: campaign.clickRate, color: 'bg-purple-500' },
-                    { label: '回复率', value: campaign.replyRate, color: 'bg-cyan-500' },
-                    { label: '退信率', value: campaign.bounceRate, color: 'bg-orange-500' },
+                    { label: t('campaignDetail.openRate'), value: campaign.openRate, color: 'bg-green-500' },
+                    { label: t('campaignDetail.clickRate'), value: campaign.clickRate, color: 'bg-purple-500' },
+                    { label: t('campaignDetail.replyRate'), value: campaign.replyRate, color: 'bg-cyan-500' },
+                    { label: t('campaignDetail.bounceRate'), value: campaign.bounceRate, color: 'bg-orange-500' },
                   ].map((metric) => (
                     <div key={metric.label}>
                       <div className="flex justify-between text-sm mb-1">
@@ -273,7 +275,7 @@ export default function CampaignDetailPage() {
             {campaign.content && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">邮件内容</CardTitle>
+                  <CardTitle className="text-base">{t('campaignDetail.emailContent')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: campaign.content }} />
@@ -289,18 +291,18 @@ export default function CampaignDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50">
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">收件人</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">主题</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">发送时间</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">打开/点击</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.recipient')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.subject')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.status')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.sentTime')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.openClick')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {emailLogs.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                            暂无发送日志
+                            {t('campaignDetail.noLogs')}
                           </td>
                         </tr>
                       ) : (
@@ -323,9 +325,9 @@ export default function CampaignDetailPage() {
                               {log.sentAt ? new Date(log.sentAt).toLocaleString('zh-CN') : '-'}
                             </td>
                             <td className="px-4 py-3 text-gray-500">
-                              {log.openedAt && <span className="text-green-600">✓ 打开</span>}
-                              {log.clickedAt && <span className="ml-2 text-purple-600">✓ 点击</span>}
-                              {log.repliedAt && <span className="ml-2 text-cyan-600">✓ 回复</span>}
+                              {log.openedAt && <span className="text-green-600">✓ {t('campaignDetail.openedMark')}</span>}
+                              {log.clickedAt && <span className="ml-2 text-purple-600">✓ {t('campaignDetail.clickedMark')}</span>}
+                              {log.repliedAt && <span className="ml-2 text-cyan-600">✓ {t('campaignDetail.repliedMark')}</span>}
                             </td>
                           </tr>
                         ))
@@ -344,16 +346,16 @@ export default function CampaignDetailPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-gray-50">
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">姓名</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">邮箱</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.name')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.email')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaignDetail.status')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {contacts.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
-                            暂无受众联系人
+                            {t('campaignDetail.noAudienceContacts')}
                           </td>
                         </tr>
                       ) : (

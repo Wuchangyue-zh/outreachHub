@@ -1,10 +1,12 @@
 import { Target, ScanSearch, Rocket, ArrowRight } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 import { howItWorksData } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const stepIcons = [Target, ScanSearch, Rocket]
 
 export function HowItWorks() {
+  const { t } = useI18n()
   return (
     <section className="py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -13,7 +15,7 @@ export function HowItWorks() {
           <div className="mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               <Rocket className="h-3 w-3" />
-              使用流程
+              {t('landingComponents.howItWorks.badge')}
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {howItWorksData.title}
@@ -69,7 +71,7 @@ export function HowItWorks() {
               href="/register"
               className="group/step-btn inline-flex items-center gap-2 rounded-xl bg-blue-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-blue-600/20 transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:bg-blue-700 hover:shadow-xl"
             >
-              立即体验 3 步获客
+              {t('landingComponents.howItWorks.cta')}
               <ArrowRight className="h-4 w-4 transition-transform duration-500 group-hover/step-btn:translate-x-1" />
             </a>
           </div>

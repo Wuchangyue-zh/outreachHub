@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +38,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 
 export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
+  const { t } = useI18n()
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -70,17 +72,17 @@ export default function AuditPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">审计日志</h1>
-            <p className="text-sm text-gray-500">记录所有关键操作，共 {total} 条</p>
+            <h1 className="text-2xl font-bold">{t('audit.title')}</h1>
+            <p className="text-sm text-gray-500">{t('audit.totalRecords').replace('{total}', String(total))}</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchLogs}>
-            <RefreshCw className="mr-2 h-4 w-4" />刷新
+            <RefreshCw className="mr-2 h-4 w-4" />{t('audit.refresh')}
           </Button>
         </div>
 
         {/* Filter */}
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant={actionFilter === '' ? 'default' : 'outline'} onClick={() => { setActionFilter(''); setPage(1) }}>全部</Button>
+          <Button size="sm" variant={actionFilter === '' ? 'default' : 'outline'} onClick={() => { setActionFilter(''); setPage(1) }}>{t('audit.all')}
           {Object.entries(ACTION_LABELS).map(([key, { label }]) => (
             <Button key={key} size="sm" variant={actionFilter === key ? 'default' : 'outline'} onClick={() => { setActionFilter(key); setPage(1) }}>{label}</Button>
           ))}
@@ -92,17 +94,17 @@ export default function AuditPage() {
             {loading ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
             ) : logs.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">暂无审计记录</div>
+              <div className="py-12 text-center text-gray-500">{t('audit.noRecords')}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-gray-50 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium">时间</th>
-                      <th className="px-4 py-3 text-left font-medium">操作</th>
-                      <th className="px-4 py-3 text-left font-medium">资源</th>
+                      <th className="px-4 py-3 text-left font-medium">{t('audit.time')}</th>
+                      <th className="px-4 py-3 text-left font-medium">{t('audit.action')}</th>
+                      <th className="px-4 py-3 text-left font-medium">{t('audit.resource')}</th>
                       <th className="px-4 py-3 text-left font-medium">IP</th>
-                      <th className="px-4 py-3 text-left font-medium">详情</th>
+                      <th className="px-4 py-3 text-left font-medium">{t('audit.details')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -128,7 +130,7 @@ export default function AuditPage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">第 {page} / {totalPages} 页</span>
+            <span className="text-sm text-gray-500">{t('audit.pageInfo').replace('{page}', String(page)).replace('{totalPages}', String(totalPages))}</span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
               <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>

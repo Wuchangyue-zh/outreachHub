@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,6 +45,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function TasksPage() {
+  const { t } = useI18n()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -73,11 +75,11 @@ export default function TasksPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">任务中心</h1>
-            <p className="mt-1 text-sm text-gray-500">管理拓客、跟进、培育任务</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('tasks.title')}</h1>
+            <p className="mt-1 text-sm text-gray-500">{t('tasks.subtitle')}</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchTasks}>
-            <RefreshCw className="h-4 w-4 mr-2" /> 刷新
+            <RefreshCw className="h-4 w-4 mr-2" /> {t('tasks.refresh')}
           </Button>
         </div>
 
@@ -88,7 +90,7 @@ export default function TasksPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
           >
-            <option value="">全部状态</option>
+            <option value="">{t('tasks.allStatus')}</option>
             {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
               <option key={key} value={key}>{cfg.label}</option>
             ))}
@@ -98,7 +100,7 @@ export default function TasksPage() {
             onChange={(e) => setTypeFilter(e.target.value)}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
           >
-            <option value="">全部类型</option>
+            <option value="">{t('tasks.allType')}</option>
             {Object.entries(TYPE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
@@ -109,14 +111,14 @@ export default function TasksPage() {
         {loading ? (
           <div className="text-center py-12">
             <RefreshCw className="h-6 w-6 animate-spin mx-auto text-gray-400" />
-            <p className="mt-2 text-sm text-gray-500">加载中...</p>
+            <p className="mt-2 text-sm text-gray-500">{t('tasks.loading')}</p>
           </div>
         ) : tasks.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <ListTodo className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">暂无任务</p>
-              <p className="text-xs text-gray-400 mt-1">OOO 自动跟进等任务会自动出现在这里</p>
+              <p className="text-gray-500">{t('tasks.noTasks')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('tasks.noTasksHint')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -163,20 +165,20 @@ export default function TasksPage() {
                               {scheduledAt && (
                                 <span className={`flex items-center gap-1 ${isOverdue ? 'text-amber-600 font-medium' : 'text-gray-500'}`}>
                                   <Calendar className="h-3 w-3" />
-                                  计划跟进：{scheduledAt.toLocaleDateString('zh-CN')} {scheduledAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                                  {isOverdue && ' (已过期)'}
+                                  {t('tasks.plannedFollowUp')}{scheduledAt.toLocaleDateString('zh-CN')} {scheduledAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                  {isOverdue && ` ${t('tasks.overdue')}`}
                                 </span>
                               )}
                               {task.followUpReason && (
-                                <span className="text-gray-400">原因：{task.followUpReason}</span>
+                                <span className="text-gray-400">{t('tasks.reason')}{task.followUpReason}</span>
                               )}
                             </div>
                           )}
 
                           {/* 时间 */}
                           <p className="text-xs text-gray-400 mt-1.5">
-                            创建于 {new Date(task.createdAt).toLocaleString('zh-CN')}
-                            {task.completedAt && ` · 完成于 ${new Date(task.completedAt).toLocaleString('zh-CN')}`}
+                            {t('tasks.createdAt')} {new Date(task.createdAt).toLocaleString('zh-CN')}
+                            {task.completedAt && ` · ${t('tasks.completedAt')} ${new Date(task.completedAt).toLocaleString('zh-CN')}`}
                           </p>
                         </div>
                       </div>

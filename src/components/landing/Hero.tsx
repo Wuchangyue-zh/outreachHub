@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 import { Users, Globe, Mail, TrendingUp, ArrowRight, Search, UserCheck, Send, MessageSquare, Trophy, Sparkles } from 'lucide-react'
 import { heroData, heroWorkflowData } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
@@ -15,6 +16,7 @@ const workflowIcons: Record<string, React.ElementType> = {
 }
 
 export function Hero() {
+  const { t } = useI18n()
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 pt-24 pb-20 lg:pt-28 lg:pb-28">
       {/* Background decoration */}
@@ -78,10 +80,10 @@ export function Hero() {
               {/* Dashboard header */}
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-400">今日营销数据</p>
+                  <p className="text-xs font-medium text-gray-400">{t('landingComponents.hero.todayData')}</p>
                   <p className="mt-1 text-2xl font-bold text-gray-900">
                     {heroData.mockDashboard.sentToday.toLocaleString()}{' '}
-                    <span className="text-sm font-normal text-gray-400">封已发送</span>
+                    <span className="text-sm font-normal text-gray-400">{t('landingComponents.hero.sent')}</span>
                   </p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50">
@@ -93,21 +95,21 @@ export function Hero() {
               <div className="mb-6 grid grid-cols-3 gap-3">
                 <div className="rounded-xl bg-blue-50 p-3 text-center">
                   <p className="text-lg font-bold text-blue-700">{heroData.mockDashboard.openRate}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-blue-500">打开率</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-blue-500">{t('landingComponents.hero.openRate')}</p>
                 </div>
                 <div className="rounded-xl bg-emerald-50 p-3 text-center">
                   <p className="text-lg font-bold text-emerald-700">{heroData.mockDashboard.replyRate}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-emerald-500">回复率</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-emerald-500">{t('landingComponents.hero.replyRate')}</p>
                 </div>
                 <div className="rounded-xl bg-violet-50 p-3 text-center">
                   <p className="text-lg font-bold text-violet-700">{heroData.mockDashboard.newLeads}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-violet-500">新增线索</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-violet-500">{t('landingComponents.hero.newLeads')}</p>
                 </div>
               </div>
 
               {/* Chart area (CSS bar chart) */}
               <div className="rounded-xl bg-gray-50 p-4">
-                <p className="mb-3 text-xs font-medium text-gray-500">本周发送趋势</p>
+                <p className="mb-3 text-xs font-medium text-gray-500">{t('landingComponents.hero.weeklyTrend')}</p>
                 <div className="flex items-end gap-1.5" style={{ height: '80px' }}>
                   {heroData.mockDashboard.chartData.map((val, i) => (
                     <div
@@ -118,13 +120,13 @@ export function Hero() {
                   ))}
                 </div>
                 <div className="mt-2 flex justify-between text-[10px] text-gray-400">
-                  <span>周一</span>
-                  <span>周二</span>
-                  <span>周三</span>
-                  <span>周四</span>
-                  <span>周五</span>
-                  <span>周六</span>
-                  <span>周日</span>
+                  <span>{t('common.weekdays.mon')}</span>
+                  <span>{t('common.weekdays.tue')}</span>
+                  <span>{t('common.weekdays.wed')}</span>
+                  <span>{t('common.weekdays.thu')}</span>
+                  <span>{t('common.weekdays.fri')}</span>
+                  <span>{t('common.weekdays.sat')}</span>
+                  <span>{t('common.weekdays.sun')}</span>
                 </div>
               </div>
             </div>
@@ -136,8 +138,8 @@ export function Hero() {
                   <Users className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-900">+1 新线索</p>
-                  <p className="text-[10px] text-gray-400">德国 · 汽车零部件</p>
+                  <p className="text-xs font-semibold text-gray-900">+1 {t('landingComponents.hero.newLead')}</p>
+                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.leadDetail')}</p>
                 </div>
               </div>
             </div>
@@ -149,8 +151,8 @@ export function Hero() {
                   <Mail className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-900">邮件已打开</p>
-                  <p className="text-[10px] text-gray-400">采购经理 · Bosch GmbH</p>
+                  <p className="text-xs font-semibold text-gray-900">{t('landingComponents.hero.emailOpened')}</p>
+                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.emailDetail')}</p>
                 </div>
               </div>
             </div>
@@ -166,7 +168,7 @@ export function Hero() {
               How It Works
             </p>
             <h2 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-              从发现线索到成功签约，一站式自动化
+              {t('landingComponents.hero.workflowHeading')}
             </h2>
           </div>
 

@@ -1,6 +1,11 @@
+'use client'
+
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function TermsPage() {
+  const { t } = useI18n()
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -12,8 +17,8 @@ export default function TermsPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-3xl px-4 py-12 prose prose-gray">
-        <h1>服务条款</h1>
-        <p className="text-sm text-gray-500">最后更新日期：2026 年 5 月 31 日</p>
+        <h1>{t('terms.title')}</h1>
+        <p className="text-sm text-gray-500">{t('terms.lastUpdated')}</p>
 
         <p>
           欢迎使用 OutreachHub（以下简称"本平台"）。在使用本平台提供的各项服务之前，请您仔细阅读并充分理解以下服务条款（以下简称"本条款"）。注册或使用本平台即视为您已阅读、理解并同意受本条款约束。
@@ -40,6 +45,7 @@ export default function TermsPage() {
         <p>
           本平台的所有内容、技术、软件、界面设计、商标、标识等知识产权均归 OutreachHub 或其授权方所有。未经书面授权，您不得复制、修改、传播、出售或许可他人使用上述知识产权的任何部分。
         </p>
+
         <p>
           您通过本平台创建、上传或存储的内容（包括但不限于邮件模板、联系人数据、客户信息）的知识产权归您所有。您授予本平台为提供服务所必需的使用许可。
         </p>
@@ -100,9 +106,9 @@ export default function TermsPage() {
 
         <hr />
         <p className="text-sm text-gray-500">
-          <Link href="/" className="text-primary hover:underline">返回首页</Link>
+          <Link href="/" className="text-primary hover:underline">{t('terms.backToHome')}</Link>
           {' | '}
-          <Link href="/privacy" className="text-primary hover:underline">隐私政策</Link>
+          <Link href="/privacy" className="text-primary hover:underline">{t('terms.privacyLink')}</Link>
         </p>
       </main>
     </div>

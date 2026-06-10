@@ -1,4 +1,5 @@
 import { Lock, Shield, UserCheck, Server } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 import { securityData, type SecurityFeature } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
@@ -46,6 +47,7 @@ function SecurityCard({ feature, index }: { feature: SecurityFeature; index: num
 }
 
 export function Security() {
+  const { t } = useI18n()
   return (
     <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -54,7 +56,7 @@ export function Security() {
           <div className="mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               <Shield className="h-3 w-3" />
-              安全合规
+              {t('landingComponents.security.badge')}
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {securityData.title}

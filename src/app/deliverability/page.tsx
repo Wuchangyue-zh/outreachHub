@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -63,15 +64,16 @@ function HealthScoreBadge({ score }: { score: number }) {
 }
 
 function WarmupProgress({ day, target }: { day: number; target: number }) {
+  const { t } = useI18n()
   const maxDay = 21
   const progress = Math.min((day / maxDay) * 100, 100)
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-600">预热进度</span>
+        <span className="text-gray-600">{t('deliverability.warmupProgress')}</span>
         <span className="font-medium text-gray-900">
-          {day > maxDay ? '已完成' : `第 ${day}/${maxDay} 天`}
+          {day > maxDay ? t('deliverability.warmupCompleted') : t('deliverability.warmupDay').replace('{day}', String(day)).replace('{maxDay}', String(maxDay))}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-gray-200">
@@ -85,6 +87,7 @@ function WarmupProgress({ day, target }: { day: number; target: number }) {
 }
 
 export default function DeliverabilityPage() {
+  const { t } = useI18n()
   const [data, setData] = useState<DeliverabilityData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -106,7 +109,7 @@ export default function DeliverabilityPage() {
       const statsJson = await statsRes.json()
 
       if (!accountsJson.success) {
-        setError(accountsJson.error?.message || '获取邮箱账户失败')
+        setError(accountsJson.error?.message || t('deliverability.fetchAccountFailed'))
         return
       }
 
@@ -127,7 +130,7 @@ export default function DeliverabilityPage() {
         activeAccounts: accounts.filter((a) => a.isActive).length,
       })
     } catch {
-      setError('获取数据失败')
+      setError(t('deliverability.fetchDataFailed'))
     } finally {
       setLoading(false)
     }
@@ -138,12 +141,12 @@ export default function DeliverabilityPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">送达率监控</h1>
-            <p className="text-sm text-gray-500">域名健康度、邮箱预热进度、退信率一览</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('deliverability.title')}</h1>
+            <p className="text-sm text-gray-500">{t('deliverability.subtitle')}</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="gap-1">
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-            刷新
+            {t('deliverability.refresh')}
           </Button>
         </div>
 
@@ -170,7 +173,7 @@ export default function DeliverabilityPage() {
                   </div>
                   <div className="mt-3">
                     <p className="text-2xl font-bold text-gray-900">{data.overallHealth.toFixed(0)}</p>
-                    <p className="text-xs text-gray-500">整体健康度</p>
+                    <p className="text-xs text-gray-500">{t('deliverability.overallHealth')}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -184,7 +187,7 @@ export default function DeliverabilityPage() {
                   </div>
                   <div className="mt-3">
                     <p className="text-2xl font-bold text-gray-900">{data.activeAccounts}</p>
-                    <p className="text-xs text-gray-500">活跃发件箱</p>
+                    <p className="text-xs text-gray-500">{t('deliverability.activeAccounts')}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -198,7 +201,7 @@ export default function DeliverabilityPage() {
                   </div>
                   <div className="mt-3">
                     <p className="text-2xl font-bold text-gray-900">{data.warmupAccounts}</p>
-                    <p className="text-xs text-gray-500">预热中账户</p>
+                    <p className="text-xs text-gray-500">{t('deliverability.warmupAccounts')}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -214,7 +217,7 @@ export default function DeliverabilityPage() {
                     <p className="text-2xl font-bold text-gray-900">
                       {data.bounceStats.bounceRate.toFixed(1)}%
                     </p>
-                    <p className="text-xs text-gray-500">退信率</p>
+                    <p className="text-xs text-gray-500">{t('deliverability.bounceRate')}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -225,26 +228,26 @@ export default function DeliverabilityPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Activity className="h-5 w-5 text-primary" />
-                  发件箱健康详情
+                  {t('deliverability.accountHealthDetail')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {data.accounts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                     <Mail className="h-8 w-8 mb-2" />
-                    <p className="text-sm">尚未配置发件邮箱</p>
+                    <p className="text-sm">{t('deliverability.noAccounts')}</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="text-left text-xs text-gray-500 border-b">
                         <tr>
-                          <th className="pb-3 font-medium">邮箱</th>
-                          <th className="pb-3 font-medium">状态</th>
-                          <th className="pb-3 font-medium">健康度</th>
-                          <th className="pb-3 font-medium">今日发送</th>
-                          <th className="pb-3 font-medium">预热状态</th>
-                          <th className="pb-3 font-medium">最近错误</th>
+                          <th className="pb-3 font-medium">{t('deliverability.email')}</th>
+                          <th className="pb-3 font-medium">{t('deliverability.status')}</th>
+                          <th className="pb-3 font-medium">{t('deliverability.health')}</th>
+                          <th className="pb-3 font-medium">{t('deliverability.todaySent')}</th>
+                          <th className="pb-3 font-medium">{t('deliverability.warmupStatus')}</th>
+                          <th className="pb-3 font-medium">{t('deliverability.recentError')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -262,12 +265,12 @@ export default function DeliverabilityPage() {
                               {account.isActive ? (
                                 <Badge className="bg-green-50 text-green-700 border-green-200">
                                   <CheckCircle className="h-3 w-3 mr-1" />
-                                  活跃
+                                  {t('deliverability.active')}
                                 </Badge>
                               ) : (
                                 <Badge className="bg-gray-50 text-gray-500 border-gray-200">
                                   <XCircle className="h-3 w-3 mr-1" />
-                                  停用
+                                  {t('deliverability.inactive')}
                                 </Badge>
                               )}
                             </td>
@@ -303,7 +306,7 @@ export default function DeliverabilityPage() {
                               {account.warmupEnabled ? (
                                 account.warmupDay > 21 ? (
                                   <Badge className="bg-blue-50 text-blue-700 border-blue-200">
-                                    预热完成
+                                    {t('deliverability.warmupDone')}
                                   </Badge>
                                 ) : (
                                   <div className="w-32">
@@ -311,7 +314,7 @@ export default function DeliverabilityPage() {
                                   </div>
                                 )
                               ) : (
-                                <span className="text-xs text-gray-400">未启用</span>
+                                <span className="text-xs text-gray-400">{t('deliverability.notEnabled')}</span>
                               )}
                             </td>
                             <td className="py-3">
@@ -327,7 +330,7 @@ export default function DeliverabilityPage() {
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-xs text-gray-400">无</span>
+                                <span className="text-xs text-gray-400">{t('deliverability.none')}</span>
                               )}
                             </td>
                           </tr>
@@ -344,7 +347,7 @@ export default function DeliverabilityPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Shield className="h-5 w-5 text-primary" />
-                  送达率统计
+                  {t('deliverability.deliveryStats')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -353,13 +356,13 @@ export default function DeliverabilityPage() {
                     <p className="text-3xl font-bold text-gray-900">
                       {data.bounceStats.total.toLocaleString()}
                     </p>
-                    <p className="text-sm text-gray-500">总发送</p>
+                    <p className="text-sm text-gray-500">{t('deliverability.totalSent')}</p>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-4 text-center">
                     <p className="text-3xl font-bold text-red-600">
                       {data.bounceStats.bounced.toLocaleString()}
                     </p>
-                    <p className="text-sm text-gray-500">退信</p>
+                    <p className="text-sm text-gray-500">{t('deliverability.bounced')}</p>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-4 text-center">
                     <p className={cn(
@@ -369,10 +372,10 @@ export default function DeliverabilityPage() {
                     )}>
                       {data.bounceStats.bounceRate.toFixed(1)}%
                     </p>
-                    <p className="text-sm text-gray-500">退信率</p>
+                    <p className="text-sm text-gray-500">{t('deliverability.bounceRate')}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {data.bounceStats.bounceRate <= 2 ? '✓ 优秀' :
-                       data.bounceStats.bounceRate <= 5 ? '⚠ 一般' : '✗ 需改善'}
+                      {data.bounceStats.bounceRate <= 2 ? t('deliverability.excellent') :
+                       data.bounceStats.bounceRate <= 5 ? t('deliverability.average') : t('deliverability.needsImprovement')}
                     </p>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import Link from 'next/link'
 import { Database, Mail, Workflow, Users, CheckCircle2, ArrowRight, BarChart3 } from 'lucide-react'
 import { solutionsData, type SolutionTab } from '@/lib/landing-data'
@@ -13,6 +14,7 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 export function Solutions() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState(0)
   const active = solutionsData.tabs[activeTab]
 
@@ -23,7 +25,7 @@ export function Solutions() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
             <BarChart3 className="h-3 w-3" />
-            解决方案
+            {t('landingComponents.solutions.badge')}
           </div>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             {solutionsData.title}
@@ -138,7 +140,7 @@ export function Solutions() {
 
                 {/* Bottom metric bar */}
                 <div className="mt-6 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
-                  <span className="text-xs font-medium text-blue-700">效果提升</span>
+                  <span className="text-xs font-medium text-blue-700">{t('landingComponents.solutions.improvement')}</span>
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <div

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Paperclip, Loader2, X } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 export interface CampaignAttachmentItem {
   id: string
@@ -20,6 +21,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const { t } = useI18n()
 
   const handleUpload = async (file: File) => {
     setUploading(true)
@@ -30,7 +32,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
       const res = await fetch('/api/upload/attachment', { method: 'POST', body: formData })
       const data = await res.json()
       if (!data.success || !data.data?.id) {
-        setError(data.error?.message || '上传失败')
+        setError(data.error?.message || t('campaignWizard.attachment.uploadFailed'))
         return
       }
       onChange([
@@ -42,7 +44,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
         },
       ])
     } catch {
-      setError('上传失败')
+      setError(t('campaignWizard.attachment.uploadFailed'))
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -69,7 +71,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
       <div className="flex items-center justify-between gap-2">
         <Label className="flex items-center gap-1.5">
           <Paperclip className="h-4 w-4 text-gray-500" />
-          邮件附件（可选）
+          {t('campaignWizard.attachment.title')}
         </Label>
         <Button
           type="button"
@@ -78,7 +80,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : '添加附件'}
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('campaignWizard.attachment.addAttachment')}
         </Button>
         <input
           ref={inputRef}
@@ -105,7 +107,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
                 type="button"
                 onClick={() => handleRemove(att.id)}
                 className="shrink-0 text-gray-400 hover:text-red-600"
-                aria-label="移除附件"
+                aria-label={t('campaignWizard.attachment.removeAttachment')}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -113,7 +115,7 @@ export function CampaignAttachmentPicker({ attachments, onChange }: Props) {
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-gray-500">支持 PDF、Office、图片等，单文件最大 10MB</p>
+        <p className="text-xs text-gray-500">{t('campaignWizard.attachment.hint')}</p>
       )}
     </div>
   )

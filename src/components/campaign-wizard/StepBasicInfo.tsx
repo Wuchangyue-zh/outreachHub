@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { SequenceBuilder } from '@/components/sequence-builder'
 import { validateWizardSequence } from '@/lib/sequence-utils'
 import { LANGUAGES } from '@/lib/i18n/languages'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface EmailAccountOption {
   id: string
@@ -40,6 +41,8 @@ export function StepBasicInfo() {
     windowEnd, setWindowEnd,
     nextStep,
   } = useCampaignWizardStore()
+
+  const { t } = useI18n()
 
   interface ProductOption {
     id: string
@@ -94,22 +97,22 @@ export function StepBasicInfo() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">基础信息</h2>
-        <p className="mt-1 text-sm text-gray-500">设置发信任务的基本参数</p>
+        <h2 className="text-lg font-bold text-gray-900">{t('campaignWizard.basic.title')}</h2>
+        <p className="mt-1 text-sm text-gray-500">{t('campaignWizard.basic.subtitle')}</p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="campaignName">任务名称 *</Label>
+        <Label htmlFor="campaignName">{t('campaignWizard.basic.nameLabel')}</Label>
         <Input
           id="campaignName"
-          placeholder="例：2024 Q4 德国汽车零部件买家开发"
+          placeholder={t('campaignWizard.basic.namePlaceholder')}
           value={campaignName}
           onChange={(e) => setCampaignName(e.target.value)}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="language">目标语言</Label>
+        <Label htmlFor="language">{t('campaignWizard.basic.language')}</Label>
         <select
           id="language"
           value={language}
@@ -122,24 +125,24 @@ export function StepBasicInfo() {
             </option>
           ))}
         </select>
-        <p className="text-xs text-gray-400">AI 生成邮件时将使用此语言</p>
+        <p className="text-xs text-gray-400">{t('campaignWizard.basic.languageHint')}</p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="targetTags">目标买家行业 / 标签</Label>
+        <Label htmlFor="targetTags">{t('campaignWizard.basic.targetTags')}</Label>
         <Input
           id="targetTags"
-          placeholder="例：automotive, machinery, electronics（用逗号分隔）"
+          placeholder={t('campaignWizard.basic.tagsPlaceholder')}
           value={targetTags}
           onChange={(e) => setTargetTags(e.target.value)}
         />
-        <p className="text-xs text-gray-400">用于后续筛选和统计，可留空</p>
+        <p className="text-xs text-gray-400">{t('campaignWizard.basic.tagsHint')}</p>
       </div>
 
       {/* #52: 产品关联（可选） */}
       {products.length > 0 && (
         <div className="space-y-2">
-          <Label>关联产品（可选）</Label>
+          <Label>{t('campaignWizard.basic.product')}</Label>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <button
               type="button"
@@ -154,7 +157,7 @@ export function StepBasicInfo() {
                 <Package className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm text-gray-500">不关联产品</p>
+                <p className="truncate text-sm text-gray-500">{t('campaignWizard.basic.noProduct')}</p>
               </div>
             </button>
             {products.map((p) => (
@@ -189,19 +192,19 @@ export function StepBasicInfo() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400">选择产品后 AI 写信将自动填充产品信息</p>
+          <p className="text-xs text-gray-400">{t('campaignWizard.basic.productHint')}</p>
         </div>
       )}
 
       {/* #7: 活动类型选择 */}
       <div className="space-y-3">
-        <Label>活动类型</Label>
+        <Label>{t('campaignWizard.basic.campaignType')}</Label>
         <div className="grid gap-2 sm:grid-cols-2">
           {(
             [
-              { id: 'SINGLE', label: '单次发送', desc: '一封邮件，一次性发给所有联系人' },
-              { id: 'SEQUENCE', label: '多步序列', desc: '多封邮件按时间间隔逐步发送，提升回复率' },
-              { id: 'AB_TEST', label: 'A/B 测试', desc: '两版本邮件各发 50%，48h 后自动选胜出版本' },
+              { id: 'SINGLE', label: t('campaignWizard.type.single'), desc: t('campaignWizard.type.singleDesc') },
+              { id: 'SEQUENCE', label: t('campaignWizard.type.sequence'), desc: t('campaignWizard.type.sequenceDesc') },
+              { id: 'AB_TEST', label: t('campaignWizard.type.abTest'), desc: t('campaignWizard.type.abTestDesc') },
             ] as const
           ).map((opt) => (
             <button
@@ -226,7 +229,7 @@ export function StepBasicInfo() {
         <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-blue-600" />
-            <Label className="text-sm font-semibold text-blue-800">可视化序列编辑器</Label>
+            <Label className="text-sm font-semibold text-blue-800">{t('campaignWizard.basic.sequenceEditor')}</Label>
           </div>
           <SequenceBuilder />
         </div>
@@ -235,42 +238,44 @@ export function StepBasicInfo() {
       {/* #8: A/B 测试变体 B 编辑器 */}
       {campaignType === 'AB_TEST' && (
         <div className="space-y-3 rounded-xl border border-purple-100 bg-purple-50/30 p-4">
-          <Label>变体 B（变体 A 在第 3 步 AI 写信中编辑）</Label>
+          <Label>{t('campaignWizard.basic.variantBLabel')}</Label>
           <Input
-            placeholder="变体 B 邮件主题"
+            placeholder={t('campaignWizard.basic.variantBSubject')}
             value={variantBSubject}
             onChange={(e) => setVariantBSubject(e.target.value)}
             className="text-sm"
           />
           <Textarea
-            placeholder="变体 B 邮件内容（支持 {{FirstName}} 等变量）"
+            placeholder={t('campaignWizard.basic.variantBContent')}
             value={variantBContent}
             onChange={(e) => setVariantBContent(e.target.value)}
             rows={6}
             className="text-sm font-mono"
           />
-          <p className="text-xs text-gray-500">发送时联系人随机分为 A、B 两组，48 小时后根据打开率自动选出胜出版本。</p>
+          <p className="text-xs text-gray-500">{t('campaignWizard.basic.abTestHint')}</p>
         </div>
       )}
 
       <div className="space-y-3">
-        <Label>发信邮箱账户 *</Label>
+        <Label>{t('campaignWizard.basic.senderAccount')}</Label>
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <Loader2 className="h-4 w-4 animate-spin" />
-            加载邮箱账户...
+            {t('campaignWizard.basic.loadingAccounts')}
           </div>
         ) : accounts.length === 0 ? (
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div className="text-sm">
-              <p className="font-medium text-amber-800">尚未配置发信邮箱</p>
+              <p className="font-medium text-amber-800">{t('campaignWizard.basic.noAccount')}</p>
               <p className="mt-1 text-amber-700">
-                请先在{' '}
-                <Link href="/dashboard/settings" className="underline font-medium">
-                  邮箱设置
-                </Link>{' '}
-                中添加 SMTP 账户后再创建 Campaign。
+                {t('campaignWizard.basic.noAccountHint').includes('邮箱设置')
+                  ? <>
+                      {t('campaignWizard.basic.noAccountHint').split('邮箱设置')[0]}
+                      <Link href="/dashboard/settings" className="underline font-medium">{t('campaignWizard.basic.emailSettings')}</Link>
+                      {t('campaignWizard.basic.noAccountHint').split('邮箱设置')[1]}
+                    </>
+                  : t('campaignWizard.basic.noAccountHint')}
               </p>
             </div>
           </div>
@@ -302,7 +307,7 @@ export function StepBasicInfo() {
                   </p>
                   <p className="truncate text-xs text-gray-500">{sender.email}</p>
                   <p className="text-xs text-gray-400">
-                    今日 {sender.dailySent}/{sender.dailyLimit}
+                    {t('campaignWizard.basic.today')} {sender.dailySent}/{sender.dailyLimit}
                   </p>
                 </div>
               </button>
@@ -312,13 +317,13 @@ export function StepBasicInfo() {
       </div>
 
       <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-        <Label>发送方式</Label>
+        <Label>{t('campaignWizard.basic.scheduleType')}</Label>
         <div className="grid gap-2 sm:grid-cols-3">
           {(
             [
-              { id: 'IMMEDIATE', label: '立即发送', desc: '创建后立即入队' },
-              { id: 'SCHEDULED', label: '定时发送', desc: '指定未来时间启动' },
-              { id: 'RECURRING', label: '重复发送', desc: '按周期自动执行' },
+              { id: 'IMMEDIATE', label: t('campaignWizard.schedule.immediate'), desc: t('campaignWizard.schedule.immediateDesc') },
+              { id: 'SCHEDULED', label: t('campaignWizard.schedule.scheduled'), desc: t('campaignWizard.schedule.scheduledDesc') },
+              { id: 'RECURRING', label: t('campaignWizard.schedule.recurring'), desc: t('campaignWizard.schedule.recurringDesc') },
             ] as const
           ).map((opt) => (
             <button
@@ -339,7 +344,7 @@ export function StepBasicInfo() {
 
         {scheduleType === 'SCHEDULED' && (
           <div className="space-y-2">
-            <Label htmlFor="scheduledAt">计划启动时间 *</Label>
+            <Label htmlFor="scheduledAt">{t('campaignWizard.basic.scheduledAt')}</Label>
             <Input
               id="scheduledAt"
               type="datetime-local"
@@ -352,20 +357,20 @@ export function StepBasicInfo() {
         {scheduleType === 'RECURRING' && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="recurrenceRule">重复频率</Label>
+              <Label htmlFor="recurrenceRule">{t('campaignWizard.basic.recurrence')}</Label>
               <select
                 id="recurrenceRule"
                 value={recurrenceRule}
                 onChange={(e) => setRecurrenceRule(e.target.value as typeof recurrenceRule)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="daily">每天</option>
-                <option value="weekly">每周</option>
-                <option value="monthly">每月</option>
+                <option value="daily">{t('campaignWizard.recurrence.daily')}</option>
+                <option value="weekly">{t('campaignWizard.recurrence.weekly')}</option>
+                <option value="monthly">{t('campaignWizard.recurrence.monthly')}</option>
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="timezone">时区</Label>
+              <Label htmlFor="timezone">{t('campaignWizard.basic.timezone')}</Label>
               <Input
                 id="timezone"
                 value={timezone}
@@ -379,7 +384,7 @@ export function StepBasicInfo() {
         {(scheduleType === 'RECURRING' || scheduleType === 'SCHEDULED') && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="windowStart">发送窗口开始</Label>
+              <Label htmlFor="windowStart">{t('campaignWizard.basic.windowStart')}</Label>
               <Input
                 id="windowStart"
                 type="time"
@@ -388,7 +393,7 @@ export function StepBasicInfo() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="windowEnd">发送窗口结束</Label>
+              <Label htmlFor="windowEnd">{t('campaignWizard.basic.windowEnd')}</Label>
               <Input
                 id="windowEnd"
                 type="time"
@@ -399,13 +404,13 @@ export function StepBasicInfo() {
           </div>
         )}
         {scheduleType === 'RECURRING' && windowStart >= windowEnd && (
-          <p className="text-xs text-red-600">发送窗口开始时间必须早于结束时间</p>
+          <p className="text-xs text-red-600">{t('campaignWizard.basic.windowError')}</p>
         )}
       </div>
 
       <div className="flex justify-end pt-4">
         <Button onClick={nextStep} disabled={!canProceed} className="gap-2">
-          下一步：导入受众
+          {t('campaignWizard.basic.next')}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>

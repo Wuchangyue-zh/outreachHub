@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +38,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  const { t } = useI18n()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -66,7 +68,7 @@ export default function ProductsPage() {
         setProducts(data.data.products)
       }
     } catch (error) {
-      toast.error('加载产品失败')
+      toast.error(t('products.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -115,7 +117,7 @@ export default function ProductsPage() {
     e.preventDefault()
 
     if (!formData.name) {
-      toast.error('请输入产品名称')
+      toast.error(t('products.enterName'))
       return
     }
 
@@ -143,20 +145,20 @@ export default function ProductsPage() {
 
       const data = await res.json()
       if (data.success) {
-        toast.success(editingProduct ? '产品已更新' : '产品已创建')
+        toast.success(editingProduct ? t('products.productUpdated') : t('products.productCreated'))
         resetForm()
         loadProducts()
       } else {
-        toast.error(data.error || '操作失败')
+        toast.error(data.error || t('products.operationFailed'))
       }
     } catch (error) {
-      toast.error('操作失败')
+      toast.error(t('products.operationFailed'))
     }
   }
 
   // 删除产品
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个产品吗？')) return
+    if (!confirm(t('products.deleteConfirm'))) return
 
     try {
       const res = await fetch(`/api/products/${id}`, {
@@ -164,13 +166,13 @@ export default function ProductsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success('产品已删除')
+        toast.success(t('products.deleted'))
         loadProducts()
       } else {
-        toast.error(data.error || '删除失败')
+        toast.error(data.error || t('products.deleteFailed'))
       }
     } catch (error) {
-      toast.error('删除失败')
+      toast.error(t('products.deleteFailed'))
     }
   }
 
@@ -189,14 +191,14 @@ export default function ProductsPage() {
         {/* 页面标题 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">产品管理</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('products.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">
-              管理您的产品和服务，用于邮件营销和拓客
+              {t('products.subtitle')}
             </p>
           </div>
           <Button onClick={() => { resetForm(); setShowAddForm(true) }}>
             <Plus className="mr-2 h-4 w-4" />
-            添加产品
+            {t('products.addProduct')}
           </Button>
         </div>
 
@@ -205,7 +207,7 @@ export default function ProductsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="搜索产品..."
+              placeholder={t('products.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -221,7 +223,7 @@ export default function ProductsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>{editingProduct ? '编辑产品' : '添加新产品'}</CardTitle>
+                <CardTitle>{editingProduct ? t('products.editProduct') : t('products.addNew')}</CardTitle>
                 <Button variant="ghost" size="sm" onClick={resetForm}>
                   <X className="h-4 w-4" />
                 </Button>
@@ -231,28 +233,28 @@ export default function ProductsPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">产品名称 *</Label>
+                    <Label htmlFor="name">{t('products.name')}</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="输入产品名称"
+                      placeholder={t('products.namePlaceholder')}
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="category">分类</Label>
+                    <Label htmlFor="category">{t('products.category')}</Label>
                     <Input
                       id="category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="如：SaaS、硬件、服务"
+                      placeholder={t('products.categoryPlaceholder')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="price">价格</Label>
+                    <Label htmlFor="price">{t('products.price')}</Label>
                     <div className="flex gap-2">
                       <Input
                         id="price"
@@ -275,7 +277,7 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="websiteUrl">产品链接</Label>
+                    <Label htmlFor="websiteUrl">{t('products.websiteUrl')}</Label>
                     <Input
                       id="websiteUrl"
                       value={formData.websiteUrl}
@@ -285,44 +287,44 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="description">产品描述</Label>
+                    <Label htmlFor="description">{t('products.description')}</Label>
                     <textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="描述您的产品..."
+                      placeholder={t('products.descriptionPlaceholder')}
                       rows={3}
                       className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="features">产品特性（逗号分隔）</Label>
+                    <Label htmlFor="features">{t('products.features')}</Label>
                     <Input
                       id="features"
                       value={formData.features}
                       onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                      placeholder="特性1, 特性2, 特性3"
+                      placeholder={t('products.featuresPlaceholder')}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="tags">标签（逗号分隔）</Label>
+                    <Label htmlFor="tags">{t('products.tags')}</Label>
                     <Input
                       id="tags"
                       value={formData.tags}
                       onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                      placeholder="标签1, 标签2"
+                      placeholder={t('products.tagsPlaceholder')}
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={resetForm}>
-                    取消
+                    {t('products.cancel')}
                   </Button>
                   <Button type="submit">
-                    {editingProduct ? '保存修改' : '创建产品'}
+                    {editingProduct ? t('products.saveChanges') : t('products.createProduct')}
                   </Button>
                 </div>
               </form>
@@ -334,15 +336,15 @@ export default function ProductsPage() {
         {loading ? (
           <div className="text-center py-8">
             <RefreshCw className="h-6 w-6 animate-spin mx-auto text-gray-400" />
-            <p className="mt-2 text-sm text-gray-500">加载中...</p>
+            <p className="mt-2 text-sm text-gray-500">{t('products.loading')}</p>
           </div>
         ) : products.length === 0 ? (
           <Card>
             <CardContent className="py-8">
               <div className="text-center">
                 <Package className="h-12 w-12 mx-auto text-gray-300" />
-                <p className="mt-2 text-sm text-gray-500">暂无产品</p>
-                <p className="text-xs text-gray-400">点击上方"添加产品"开始创建</p>
+                <p className="mt-2 text-sm text-gray-500">{t('products.noProducts')}</p>
+                <p className="text-xs text-gray-400">{t('products.noProductsHint')}</p>
               </div>
             </CardContent>
           </Card>
@@ -419,14 +421,14 @@ export default function ProductsPage() {
                         className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                       >
                         <ExternalLink className="h-4 w-4" />
-                        访问产品页
+                        {t('products.visitProductPage')}
                       </a>
                     )}
                   </div>
 
                   {product.features.length > 0 && (
                     <div className="mt-3 pt-3 border-t">
-                      <p className="text-xs font-medium text-gray-500 mb-2">产品特性</p>
+                      <p className="text-xs font-medium text-gray-500 mb-2">{t('products.productFeatures')}</p>
                       <ul className="text-xs text-gray-600 space-y-1">
                         {product.features.slice(0, 3).map((feature, index) => (
                           <li key={index} className="flex items-start gap-1">
@@ -436,7 +438,7 @@ export default function ProductsPage() {
                         ))}
                         {product.features.length > 3 && (
                           <li className="text-gray-400">
-                            +{product.features.length - 3} 更多特性
+                            {t('products.moreFeatures').replace('{n}', String(product.features.length - 3))}
                           </li>
                         )}
                       </ul>

@@ -18,20 +18,21 @@ import {
 } from '@/components/campaign-wizard/CampaignAttachmentPicker'
 import { getFirstEmailStep, serializeSequenceForApi, validateWizardSequence } from '@/lib/sequence-utils'
 import { getLanguageName } from '@/lib/i18n/languages'
+import { useI18n } from '@/hooks/use-i18n'
 
-const TONES: { id: ToneType; label: string; emoji: string }[] = [
-  { id: 'professional', label: '专业', emoji: '💼' },
-  { id: 'warm', label: '热烈', emoji: '🤝' },
-  { id: 'concise', label: '极简', emoji: '⚡' },
-  { id: 'urgent', label: '催款', emoji: '🔥' },
+const TONE_IDS: { id: ToneType; key: string; emoji: string }[] = [
+  { id: 'professional', key: 'campaignWizard.tone.professional', emoji: '💼' },
+  { id: 'warm', key: 'campaignWizard.tone.warm', emoji: '🤝' },
+  { id: 'concise', key: 'campaignWizard.tone.concise', emoji: '⚡' },
+  { id: 'urgent', key: 'campaignWizard.tone.urgent', emoji: '🔥' },
 ]
 
-const VARIABLES = [
-  { token: '{{FirstName}}', label: '名' },
-  { token: '{{LastName}}', label: '姓' },
-  { token: '{{CompanyName}}', label: '公司名' },
-  { token: '{{Country}}', label: '国家' },
-  { token: '{{Industry}}', label: '行业' },
+const VARIABLE_DEFS = [
+  { token: '{{FirstName}}', key: 'campaignWizard.variable.firstName' },
+  { token: '{{LastName}}', key: 'campaignWizard.variable.lastName' },
+  { token: '{{CompanyName}}', key: 'campaignWizard.variable.companyName' },
+  { token: '{{Country}}', key: 'campaignWizard.variable.country' },
+  { token: '{{Industry}}', key: 'campaignWizard.variable.industry' },
 ]
 
 export function StepAiWriter() {
@@ -57,6 +58,7 @@ export function StepAiWriter() {
   const [launchError, setLaunchError] = useState('')
   const [attachments, setAttachments] = useState<CampaignAttachmentItem[]>([])
   const textareaRef = { current: null as HTMLTextAreaElement | null }
+  const { t } = useI18n()
 
   /** 从粘贴邮箱解析或查找/创建联系人，返回 contactIds */
   async function resolveContactIds(): Promise<string[]> {
@@ -125,7 +127,7 @@ export function StepAiWriter() {
     try {
       const contactIds = await resolveContactIds()
       if (contactIds.length === 0) {
-        setLaunchError('没有有效的收件人，请返回上一步添加联系人')
+        setLaunchError(t('campaignWizard.error.noRecipients'))
         return
       }
 
@@ -136,7 +138,7 @@ export function StepAiWriter() {
       if (isSequence) {
         const firstStep = getFirstEmailStep(sequence)
         if (!firstStep) {
-          setLaunchError('序列中至少需要一个邮件步骤')
+          setLaunchError(t('campaignWizard.error.sequenceNeedsEmail'))
           return
         }
         subjectLine = firstStep.subject.trim()
@@ -199,7 +201,7 @@ export function StepAiWriter() {
       })
       const createJson = await createRes.json()
       if (!createRes.ok || !createJson.success) {
-        setLaunchError(createJson.error?.message || createJson.message || '创建活动失败')
+        setLaunchError(createJson.error?.message || createJson.message || t('campaignWizard.error.createFailed'))
         return
       }
 
@@ -215,7 +217,7 @@ export function StepAiWriter() {
       })
       const launchJson = await launchRes.json()
       if (!launchRes.ok || !launchJson.success) {
-        setLaunchError(launchJson.error?.message || launchJson.message || '启动活动失败')
+        setLaunchError(launchJson.error?.message || launchJson.message || t('campaignWizard.error.launchFailed'))
         router.push('/campaigns')
         return
       }
@@ -227,7 +229,7 @@ export function StepAiWriter() {
       router.push('/campaigns')
     } catch (e) {
       console.error('Launch failed:', e)
-      setLaunchError('启动失败，请稍后重试')
+      setLaunchError(t('campaignWizard.error.launchRetry'))
     } finally {
       setLaunching(false)
     }
@@ -249,7 +251,7 @@ export function StepAiWriter() {
         setGeneratedEmail(data.data.email)
       }
     } catch {
-      setGeneratedEmail('生成失败，请重试。')
+      setGeneratedEmail(t('campaignWizard.error.generateFailed'))
     } finally {
       setIsGenerating(false)
     }
@@ -288,24 +290,24 @@ export function StepAiWriter() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-gray-900">
-          {isSequence ? '确认并启动序列' : isAbTest ? '确认 A/B 测试并启动' : 'AI 开发信撰写'}
+          {isSequence ? t('campaignWizard.aiWriter.titleSequence') : isAbTest ? t('campaignWizard.aiWriter.titleAbTest') : t('campaignWizard.aiWriter.titleSingle')}
         </h2>
         <p className="mt-1 text-sm text-gray-500">
           {isSequence
-            ? `已在第一步配置 ${sequence.length} 封邮件序列，可直接启动；也可选用 AI 润色第一封内容`
+            ? t('campaignWizard.aiWriter.descSequence', { count: sequence.length })
             : isAbTest
-              ? '变体 A 使用下方 AI 生成内容，变体 B 已在第一步配置；48 小时后按打开率自动选 winner'
-              : '描述你的产品优势，AI 帮你生成专业的英文开发信'}
+              ? t('campaignWizard.aiWriter.descAbTest')
+              : t('campaignWizard.aiWriter.descSingle')}
         </p>
       </div>
 
       {isSequence && sequenceReady && (
         <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
-          <p className="text-sm font-medium text-gray-800">序列预览</p>
+          <p className="text-sm font-medium text-gray-800">{t('campaignWizard.aiWriter.sequencePreview')}</p>
           {sequence.map((step, idx) => (
             <div key={idx} className="text-sm text-gray-600">
-              <span className="font-medium text-gray-800">第 {idx + 1} 封：</span>
-              {step.subject || '（无主题）'}
+              <span className="font-medium text-gray-800">{t('campaignWizard.aiWriter.emailNumber', { number: idx + 1 })}</span>
+              {step.subject || t('campaignWizard.aiWriter.noSubject')}
               {idx > 0 && (
                 <span className="ml-2 text-xs text-gray-400">（+{step.delayHours}h）</span>
               )}
@@ -318,11 +320,11 @@ export function StepAiWriter() {
 
       {/* Product prompt */}
       <div className="space-y-2">
-        <Label htmlFor="productPrompt">核心产品 / 公司优势 *</Label>
+        <Label htmlFor="productPrompt">{t('campaignWizard.aiWriter.productLabel')}</Label>
         <Textarea
           id="productPrompt"
           rows={4}
-          placeholder="例：我们是一家专业生产汽车轴承的工厂，通过 IATF16949 认证，产品出口 30+ 国家，交期 15 天，支持 OEM 定制..."
+          placeholder={t('campaignWizard.aiWriter.productPlaceholder')}
           value={productPrompt}
           onChange={(e) => setProductPrompt(e.target.value)}
         />
@@ -330,22 +332,22 @@ export function StepAiWriter() {
 
       {/* Tone selector */}
       <div className="space-y-2">
-        <Label>邮件语调</Label>
+        <Label>{t('campaignWizard.aiWriter.toneLabel')}</Label>
         <div className="flex flex-wrap gap-2">
-          {TONES.map((t) => (
+          {TONE_IDS.map((toneItem) => (
             <button
-              key={t.id}
+              key={toneItem.id}
               type="button"
-              onClick={() => setTone(t.id)}
+              onClick={() => setTone(toneItem.id)}
               className={cn(
                 'flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-300',
-                tone === t.id
+                tone === toneItem.id
                   ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                   : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50',
               )}
             >
-              <span>{t.emoji}</span>
-              {t.label}
+              <span>{toneItem.emoji}</span>
+              {t(toneItem.key)}
             </button>
           ))}
         </div>
@@ -362,12 +364,12 @@ export function StepAiWriter() {
         {isGenerating ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            AI 正在撰写中...
+            {t('campaignWizard.aiWriter.generating')}
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            AI 帮我写信
+            {t('campaignWizard.aiWriter.generate')}
           </>
         )}
       </Button>
@@ -380,7 +382,7 @@ export function StepAiWriter() {
             <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:150ms]" />
             <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:300ms]" />
           </div>
-          <span className="text-sm text-blue-700">正在分析您的产品特点并生成个性化开发信...</span>
+          <span className="text-sm text-blue-700">{t('campaignWizard.aiWriter.analyzing')}</span>
         </div>
       )}
 
@@ -388,7 +390,7 @@ export function StepAiWriter() {
       {generatedEmail && !isGenerating && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="generatedEmail">生成的开发信</Label>
+            <Label htmlFor="generatedEmail">{t('campaignWizard.aiWriter.generatedEmail')}</Label>
             <Button
               type="button"
               variant="ghost"
@@ -399,12 +401,12 @@ export function StepAiWriter() {
               {copied ? (
                 <>
                   <Check className="h-3 w-3 text-green-600" />
-                  已复制
+                  {t('campaignWizard.aiWriter.copied')}
                 </>
               ) : (
                 <>
                   <Copy className="h-3 w-3" />
-                  复制
+                  {t('campaignWizard.aiWriter.copy')}
                 </>
               )}
             </Button>
@@ -413,8 +415,8 @@ export function StepAiWriter() {
           {/* Variable insert chips */}
           <div className="flex flex-wrap items-center gap-2">
             <Variable className="h-3.5 w-3.5 text-gray-400" />
-            <span className="text-xs text-gray-500">插入变量：</span>
-            {VARIABLES.map((v) => (
+            <span className="text-xs text-gray-500">{t('campaignWizard.aiWriter.insertVariable')}</span>
+            {VARIABLE_DEFS.map((v) => (
               <button
                 key={v.token}
                 type="button"
@@ -436,7 +438,7 @@ export function StepAiWriter() {
           />
 
           <p className="text-xs text-gray-400">
-            可自由编辑内容，变量将在发送时自动替换为收件人信息
+            {t('campaignWizard.aiWriter.variableHint')}
           </p>
         </div>
       )}
@@ -445,12 +447,12 @@ export function StepAiWriter() {
       <div className="flex items-center justify-between border-t border-gray-100 pt-6">
         <Button type="button" variant="outline" onClick={prevStep} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          上一步
+          {t('campaignWizard.prev')}
         </Button>
         <div className="flex items-center gap-6">
           <div className="text-right text-sm text-gray-500">
-            <p>任务：{campaignName || '未命名'}</p>
-            <p>收件人：{totalAudience} 位</p>
+            <p>{t('campaignWizard.task')}: {campaignName || t('campaignWizard.unnamed')}</p>
+            <p>{t('campaignWizard.recipients')}: {totalAudience} {t('campaignWizard.recipientsSuffix')}</p>
           </div>
           <Button
             type="button"
@@ -462,12 +464,12 @@ export function StepAiWriter() {
             {launching ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                启动中...
+                {t('campaignWizard.launching')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {isSequence ? 'Launch Sequence' : 'Launch Campaign'}
+                {isSequence ? t('campaignWizard.launchSequence') : t('campaignWizard.launchCampaign')}
               </>
             )}
           </Button>

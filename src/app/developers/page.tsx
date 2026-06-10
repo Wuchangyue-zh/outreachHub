@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useI18n } from '@/hooks/use-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { FileText, ExternalLink, Code, Lock, ArrowLeft, BookOpen } from 'lucide-react'
@@ -43,6 +44,7 @@ const methodColors: Record<string, string> = {
 }
 
 export default function DevelopersPage() {
+  const { t } = useI18n()
   const [showRedoc, setShowRedoc] = useState(false)
 
   return (
@@ -51,7 +53,7 @@ export default function DevelopersPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
           <Link href="/" className="text-xl font-bold">OutreachHub</Link>
           <Link href="/" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            <ArrowLeft className="h-4 w-4" /> 返回首页
+            <ArrowLeft className="h-4 w-4" /> {t('developers.backToHome')}
           </Link>
         </div>
       </header>
@@ -59,19 +61,19 @@ export default function DevelopersPage() {
       <main className="mx-auto max-w-4xl px-4 py-12">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">API 文档</h1>
-            <p className="mt-2 text-gray-600">OutreachHub REST API 参考文档</p>
-            <p className="mt-1 text-sm text-amber-600">
-              API 访问需要<a href="/pricing" className="underline font-medium">专业版及以上套餐</a>
-            </p>
+            <h1 className="text-3xl font-bold">{t('developers.apiDoc')}</h1>
+            <p className="mt-2 text-gray-600">{t('developers.apiRef')}</p>
+              <p className="mt-1 text-sm text-amber-600">
+                {t('developers.apiRequiresPlan').split('专业版及以上套餐').length > 1 ? <>{t('developers.apiRequiresPlan').split('专业版及以上套餐')[0]}<a href="/pricing" className="underline font-medium">专业版及以上套餐</a>{t('developers.apiRequiresPlan').split('专业版及以上套餐')[1]}</> : t('developers.apiRequiresPlan')}
+              </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="gap-2" onClick={() => setShowRedoc(!showRedoc)}>
-              <BookOpen className="h-4 w-4" /> {showRedoc ? '关闭' : 'Redoc'} 交互文档
+              <BookOpen className="h-4 w-4" /> {showRedoc ? t('developers.close') : t('developers.redocInteractive')}
             </Button>
             <a href="/docs/openapi.yaml" download>
               <Button variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" /> 下载 OpenAPI Spec
+                <FileText className="h-4 w-4" /> {t('developers.downloadOpenapi')}
               </Button>
             </a>
           </div>
@@ -94,44 +96,44 @@ export default function DevelopersPage() {
         <Card className="mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Lock className="h-4 w-4" /> 认证方式
+              <Lock className="h-4 w-4" /> {t('developers.authMethod')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">方式一：JWT Bearer Token（浏览器端）</h3>
-              <p className="text-sm text-gray-600">适用于浏览器端或需要用户登录态的场景：</p>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('developers.jwtBearer')}</h3>
+              <p className="text-sm text-gray-600">{t('developers.jwtDesc')}</p>
               <pre className="mt-2 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-900">
                 <code>Authorization: Bearer {'<your-jwt-token>'}</code>
               </pre>
               <p className="mt-2 text-sm text-gray-600">
-                Token 通过 <code>POST /api/auth/login</code> 获取，有效期 7 天。
+                {t('developers.tokenValidity')}
               </p>
             </div>
 
             <div className="border-t border-gray-200 pt-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">方式二：API Key（程序化访问）</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('developers.apiKey')}</h3>
               <p className="text-sm text-gray-600">
-                适用于服务器端集成、CI/CD 脚本或第三方应用接入。API Key 无需用户登录，可配置独立权限和速率限制。
+                {t('developers.apiKeyDesc')}
               </p>
-              <p className="text-sm text-gray-600 mt-2">支持两种传递方式：</p>
+              <p className="text-sm text-gray-600 mt-2">{t('developers.twoWays')}</p>
               <pre className="mt-2 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-900 space-y-1">
                 <code>x-api-key: oh_{'<your-api-key>'}</code>
                 <br />
                 <code>Authorization: Bearer oh_{'<your-api-key>'}</code>
               </pre>
               <p className="mt-2 text-sm text-gray-600">
-                API Key 在 <strong>设置 → API Keys</strong> 中创建，以 <code>oh_</code> 为前缀。创建后请立即保存完整密钥，之后将无法再次查看。
+                {t('developers.apiKeyLocation')}
               </p>
               <p className="mt-1 text-sm text-gray-600">
-                每个 Key 可单独配置速率限制（默认 100 次/分钟）和权限范围（contacts:read、contacts:write、campaigns:read、campaigns:write）。
+                {t('developers.apiKeyRateLimit')}
               </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Endpoints */}
-        <h2 className="mt-10 text-xl font-semibold">API 端点</h2>
+        <h2 className="mt-10 text-xl font-semibold">{t('developers.endpoints')}</h2>
         <div className="mt-4 space-y-2">
           {endpoints.map((ep) => (
             <div key={`${ep.method}-${ep.path}`} className="flex items-center gap-3 rounded-lg border px-4 py-3">
@@ -146,26 +148,26 @@ export default function DevelopersPage() {
         {/* Rate Limits */}
         <Card className="mt-10">
           <CardHeader>
-            <CardTitle className="text-base">速率限制</CardTitle>
+            <CardTitle className="text-base">{t('developers.rateLimit')}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-gray-600 space-y-2">
-            <p>• GET 请求：30 次/分钟（API Key 可自定义）</p>
-            <p>• POST/PUT/DELETE 请求：10 次/分钟（API Key 可自定义）</p>
-            <p>• 认证接口：5 次/分钟</p>
-            <p>超出限制将返回 <code>429 Too Many Requests</code></p>
+            <p>{t('developers.rateGet')}</p>
+            <p>{t('developers.ratePost')}</p>
+            <p>{t('developers.rateAuth')}</p>
+            <p>{t('developers.rateExceeded')}</p>
           </CardContent>
         </Card>
 
         {/* SDKs */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="text-base">SDK 与集成</CardTitle>
+            <CardTitle className="text-base">{t('developers.sdkIntegration')}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-gray-600 space-y-2">
-            <p>• REST API 兼容所有 HTTP 客户端（curl, fetch, axios 等）</p>
-            <p>• Webhook 支持实时事件通知，可配置端点订阅联系人创建/更新、活动完成、邮件回复/退信等事件</p>
-            <p>• 在 <strong>设置 → Webhook 端点</strong> 中管理您的 Webhook 配置，并使用测试功能验证连通性</p>
-            <p>• 如需企业级集成支持，请联系 <a href="mailto:support@outreachhub.com" className="text-primary hover:underline">support@outreachhub.com</a></p>
+            <p>{t('developers.sdkCompat')}</p>
+            <p>{t('developers.webhookDesc')}</p>
+            <p>{t('developers.webhookManage')}</p>
+            <p>{t('developers.enterpriseSupport')}</p>
           </CardContent>
         </Card>
       </main>

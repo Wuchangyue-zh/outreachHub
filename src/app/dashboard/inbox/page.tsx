@@ -30,6 +30,7 @@ import {
   Sparkles,
   Wand2,
 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface InboxThread {
   id: string
@@ -56,6 +57,7 @@ interface InboxThread {
 }
 
 export default function InboxPage() {
+  const { t } = useI18n()
   const [threads, setThreads] = useState<InboxThread[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -68,33 +70,30 @@ export default function InboxPage() {
   const [accounts, setAccounts] = useState<Array<{ id: string; email: string }>>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
 
-  // 从 IMAP 同步回信，再加载收件箱线程
   const syncAndLoadThreads = async () => {
     setSyncing(true)
     try {
       const syncRes = await fetch('/api/imap/check-replies', { method: 'POST' })
       const syncData = await syncRes.json()
       if (!syncRes.ok) {
-        toast.error(syncData.error || '同步回信失败，请检查邮箱 IMAP 配置')
+        toast.error(syncData.error || t('dashboardInbox.syncFailed'))
       } else if (syncData.replyCount > 0) {
-        toast.success(`已同步 ${syncData.replyCount} 封新回复`)
+        toast.success(t('dashboardInbox.syncedReplies', { count: syncData.replyCount }))
       }
     } catch {
-      toast.error('同步回信失败')
+      toast.error(t('dashboardInbox.syncFailed'))
     } finally {
       setSyncing(false)
     }
     await loadThreads()
   }
 
-  // 加载收件箱线程
   const loadThreads = async () => {
     try {
       const res = await fetch('/api/inbox/threads')
       const data = await res.json()
       if (data.success) {
         setThreads(data.data)
-        // 如果有选中的线程，更新它
         if (selectedThread) {
           const updated = data.data.find((t: InboxThread) => t.id === selectedThread.id)
           if (updated) {
@@ -103,13 +102,12 @@ export default function InboxPage() {
         }
       }
     } catch (error) {
-      toast.error('加载收件箱失败')
+      toast.error(t('dashboardInbox.loadInboxFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  // 加载邮件账户
   const loadAccounts = async () => {
     try {
       const res = await fetch('/api/email-accounts')
@@ -134,7 +132,6 @@ export default function InboxPage() {
     setReplyContent('')
   }, [selectedThread?.id])
 
-  // 过滤线程
   const filteredThreads = threads.filter((thread) => {
     const matchesSearch =
       searchQuery === '' ||
@@ -148,17 +145,16 @@ export default function InboxPage() {
     return matchesSearch && matchesIntent
   })
 
-  // AI 撰写 / 扩写回复
   const handleAiReply = async (mode: 'draft' | 'expand') => {
     if (!selectedThread) return
 
     if (mode === 'expand' && !replyContent.trim()) {
-      toast.error('请先输入草稿内容再进行 AI 扩写')
+      toast.error(t('dashboardInbox.enterDraftFirst'))
       return
     }
 
     if (!selectedAccountId) {
-      toast.error('请先选择发件账户，以便 AI 带入您的签名信息')
+      toast.error(t('dashboardInbox.selectAccountFirst'))
       return
     }
 
@@ -186,26 +182,25 @@ export default function InboxPage() {
       const data = await res.json()
       if (data.success) {
         setReplyContent(data.data.draft)
-        toast.success(mode === 'expand' ? 'AI 扩写完成' : 'AI 回复已生成')
+        toast.success(mode === 'expand' ? t('dashboardInbox.aiExpandDone') : t('dashboardInbox.aiReplyGenerated'))
       } else {
-        toast.error(data.error || 'AI 生成失败')
+        toast.error(data.error || t('dashboardInbox.aiGenerateFailed'))
       }
     } catch {
-      toast.error('AI 生成失败，请稍后重试')
+      toast.error(t('dashboardInbox.aiGenerateFailed'))
     } finally {
       setAiGenerating(false)
     }
   }
 
-  // 发送回复
   const handleSendReply = async () => {
     if (!selectedThread || !replyContent.trim()) {
-      toast.error('请输入回复内容')
+      toast.error(t('dashboardInbox.enterReplyContent'))
       return
     }
 
     if (!selectedAccountId) {
-      toast.error('请选择发件账户')
+      toast.error(t('dashboardInbox.selectSendAccount'))
       return
     }
 
@@ -216,7 +211,7 @@ export default function InboxPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: selectedThread.contactEmail,
-          subject: `Re: ${selectedThread.messages[0]?.subject || '回复'}`,
+          subject: `Re: ${selectedThread.messages[0]?.subject || t('dashboardInbox.reply')}`,
           content: replyContent,
           emailAccountId: selectedAccountId,
           contactId: selectedThread.contactId,
@@ -225,21 +220,19 @@ export default function InboxPage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success('回复已发送')
+        toast.success(t('dashboardInbox.replySent'))
         setReplyContent('')
-        // 重新加载线程
         loadThreads()
       } else {
-        toast.error(data.error || '发送失败')
+        toast.error(data.error || t('dashboardInbox.sendFailed'))
       }
     } catch (error) {
-      toast.error('发送回复失败')
+      toast.error(t('dashboardInbox.sendReplyFailed'))
     } finally {
       setSending(false)
     }
   }
 
-  // 获取意图图标
   const getIntentIcon = (intent: string) => {
     switch (intent) {
       case 'interested':
@@ -253,35 +246,34 @@ export default function InboxPage() {
     }
   }
 
-  // 获取意图标签
   const getIntentBadge = (intent: string) => {
     switch (intent) {
       case 'interested':
         return (
           <Badge className="bg-green-100 text-green-700 border-green-200">
             <ThumbsUp className="mr-1 h-3 w-3" />
-            感兴趣
+            {t('dashboardInbox.interested')}
           </Badge>
         )
       case 'opt-out':
         return (
           <Badge className="bg-red-100 text-red-700 border-red-200">
             <ThumbsDown className="mr-1 h-3 w-3" />
-            退订
+            {t('dashboardInbox.optOut')}
           </Badge>
         )
       case 'ooo':
         return (
           <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
             <AlertCircle className="mr-1 h-3 w-3" />
-            外出
+            {t('dashboardInbox.outOfOffice')}
           </Badge>
         )
       default:
         return (
           <Badge className="bg-gray-100 text-gray-700">
             <MessageSquare className="mr-1 h-3 w-3" />
-            其他
+            {t('dashboardInbox.other')}
           </Badge>
         )
     }
@@ -298,32 +290,30 @@ export default function InboxPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Inbox className="h-5 w-5" />
-                    收件箱
+                    {t('dashboardInbox.inbox')}
                   </CardTitle>
                   <Button variant="ghost" size="sm" onClick={syncAndLoadThreads} disabled={syncing || loading}>
                     <RefreshCw className={`h-4 w-4 ${syncing || loading ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
 
-                {/* 搜索栏 */}
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="搜索联系人..."
+                    placeholder={t('dashboardInbox.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
                   />
                 </div>
 
-                {/* 过滤器 */}
                 <div className="flex gap-2 mt-2">
                   <Button
                     variant={filterIntent === 'all' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFilterIntent('all')}
                   >
-                    全部
+                    {t('dashboardInbox.all')}
                   </Button>
                   <Button
                     variant={filterIntent === 'interested' ? 'default' : 'outline'}
@@ -332,7 +322,7 @@ export default function InboxPage() {
                     className={filterIntent === 'interested' ? 'bg-green-600' : ''}
                   >
                     <ThumbsUp className="mr-1 h-3 w-3" />
-                    感兴趣
+                    {t('dashboardInbox.interested')}
                   </Button>
                   <Button
                     variant={filterIntent === 'opt-out' ? 'default' : 'outline'}
@@ -341,7 +331,7 @@ export default function InboxPage() {
                     className={filterIntent === 'opt-out' ? 'bg-red-600' : ''}
                   >
                     <ThumbsDown className="mr-1 h-3 w-3" />
-                    退订
+                    {t('dashboardInbox.optOut')}
                   </Button>
                   <Button
                     variant={filterIntent === 'ooo' ? 'default' : 'outline'}
@@ -350,7 +340,7 @@ export default function InboxPage() {
                     className={filterIntent === 'ooo' ? 'bg-yellow-600' : ''}
                   >
                     <AlertCircle className="mr-1 h-3 w-3" />
-                    外出
+                    {t('dashboardInbox.outOfOffice')}
                   </Button>
                 </div>
               </CardHeader>
@@ -360,13 +350,13 @@ export default function InboxPage() {
                   {loading ? (
                     <div className="p-8 text-center">
                       <RefreshCw className="h-6 w-6 animate-spin mx-auto text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-500">加载中...</p>
+                      <p className="mt-2 text-sm text-gray-500">{t('dashboardInbox.loading')}</p>
                     </div>
                   ) : filteredThreads.length === 0 ? (
                     <div className="p-8 text-center">
                       <Inbox className="h-12 w-12 mx-auto text-gray-300" />
-                      <p className="mt-2 text-sm text-gray-500">暂无消息</p>
-                      <p className="text-xs text-gray-400">当有人回复您的邮件时，会显示在这里</p>
+                      <p className="mt-2 text-sm text-gray-500">{t('dashboardInbox.noMessages')}</p>
+                      <p className="text-xs text-gray-400">{t('dashboardInbox.noMessagesDesc')}</p>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -506,14 +496,14 @@ export default function InboxPage() {
                 <div className="p-4 border-t">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="reply-account" className="text-sm">发件账户:</Label>
+                      <Label htmlFor="reply-account" className="text-sm">{t('dashboardInbox.sendAccount')}:</Label>
                       <select
                         id="reply-account"
                         value={selectedAccountId}
                         onChange={(e) => setSelectedAccountId(e.target.value)}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <option value="">选择发件账户</option>
+                        <option value="">{t('dashboardInbox.selectAccount')}</option>
                         {accounts.map((account) => (
                           <option key={account.id} value={account.id}>
                             {account.email}
@@ -523,7 +513,7 @@ export default function InboxPage() {
                     </div>
                     <div className="flex gap-2 items-end">
                       <Textarea
-                        placeholder="输入回复内容，或使用 AI 根据往来记录自动生成..."
+                        placeholder={t('dashboardInbox.replyPlaceholder')}
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
                         rows={3}
@@ -536,7 +526,7 @@ export default function InboxPage() {
                           size="sm"
                           onClick={() => handleAiReply('draft')}
                           disabled={aiGenerating || sending}
-                          title="根据往来记录 AI 撰写回复"
+                          title={t('dashboardInbox.aiReplyTitle')}
                           className="whitespace-nowrap"
                         >
                           {aiGenerating ? (
@@ -544,18 +534,18 @@ export default function InboxPage() {
                           ) : (
                             <Sparkles className="h-4 w-4" />
                           )}
-                          <span className="ml-1 hidden lg:inline">AI 回复</span>
+                          <span className="ml-1 hidden lg:inline">{t('dashboardInbox.aiReply')}</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleAiReply('expand')}
                           disabled={aiGenerating || sending || !replyContent.trim()}
-                          title="扩写润色当前草稿"
+                          title={t('dashboardInbox.aiExpandTitle')}
                           className="whitespace-nowrap"
                         >
                           <Wand2 className="h-4 w-4" />
-                          <span className="ml-1 hidden lg:inline">AI 扩写</span>
+                          <span className="ml-1 hidden lg:inline">{t('dashboardInbox.aiExpand')}</span>
                         </Button>
                         <Button
                           onClick={handleSendReply}
@@ -576,8 +566,8 @@ export default function InboxPage() {
               <Card className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <Mail className="h-16 w-16 mx-auto text-gray-300" />
-                  <p className="mt-4 text-lg font-medium text-gray-500">选择一个对话</p>
-                  <p className="text-sm text-gray-400">从左侧列表中选择一个对话查看详情</p>
+                  <p className="mt-4 text-lg font-medium text-gray-500">{t('dashboardInbox.selectConversation')}</p>
+                  <p className="text-sm text-gray-400">{t('dashboardInbox.selectConversationDesc')}</p>
                 </div>
               </Card>
             )}

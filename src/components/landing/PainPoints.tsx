@@ -1,4 +1,5 @@
 import { Flame, Search, MailX, Database, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 import { painPointsData, type PainPoint } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
@@ -49,6 +50,7 @@ function PainCard({ point, index }: { point: PainPoint; index: number }) {
 }
 
 export function PainPoints() {
+  const { t } = useI18n()
   return (
     <section className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -78,7 +80,7 @@ export function PainPoints() {
               href="#solutions"
               className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition-colors hover:text-blue-700"
             >
-              了解 OutreachHub 如何解决这些问题
+              {t('landingComponents.painPoints.cta')}
               <ArrowRight className="h-4 w-4 transition-transform hover:translate-x-1" />
             </a>
           </div>

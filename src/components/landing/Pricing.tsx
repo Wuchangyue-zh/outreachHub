@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 import { Check, Star, ArrowRight } from 'lucide-react'
 import { pricingData, type PricingPlan } from '@/lib/landing-data'
 import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 function PlanCard({ plan, index }: { plan: PricingPlan; index: number }) {
+  const { t } = useI18n()
   return (
     <ScrollReveal delay={index * 120}>
       <div
@@ -34,7 +36,7 @@ function PlanCard({ plan, index }: { plan: PricingPlan; index: number }) {
             {plan.period && <span className="text-sm text-gray-500">{plan.period}</span>}
           </div>
           {plan.yearlyPrice && (
-            <p className="mt-1 text-xs font-medium text-emerald-600">年付优惠：{plan.yearlyPrice}</p>
+            <p className="mt-1 text-xs font-medium text-emerald-600">{t('landingComponents.pricing.yearlyDiscount')}{plan.yearlyPrice}</p>
           )}
 
           {/* CTA */}
@@ -66,6 +68,7 @@ function PlanCard({ plan, index }: { plan: PricingPlan; index: number }) {
 }
 
 export function Pricing() {
+  const { t } = useI18n()
   return (
     <section id="pricing" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -73,7 +76,7 @@ export function Pricing() {
         <div className="mx-auto max-w-2xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
             <Star className="h-3 w-3" />
-            定价方案
+            {t('landingComponents.pricing.badge')}
           </div>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             {pricingData.title}

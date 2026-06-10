@@ -3,15 +3,17 @@
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCampaignWizardStore, type WizardStep } from '@/store/campaign-wizard-store'
-
-const steps: { id: WizardStep; label: string; description: string }[] = [
-  { id: 1, label: '基础信息', description: '任务名称与发信账户' },
-  { id: 2, label: '受众导入', description: '选择目标联系人' },
-  { id: 3, label: 'AI 写信', description: '智能生成开发信' },
-]
+import { useI18n } from '@/hooks/use-i18n'
 
 export function WizardShell({ children }: { children: React.ReactNode }) {
   const { currentStep, setStep } = useCampaignWizardStore()
+  const { t } = useI18n()
+
+  const steps: { id: WizardStep; label: string; description: string }[] = [
+    { id: 1, label: t('campaignWizard.step1.label'), description: t('campaignWizard.step1.desc') },
+    { id: 2, label: t('campaignWizard.step2.label'), description: t('campaignWizard.step2.desc') },
+    { id: 3, label: t('campaignWizard.step3.label'), description: t('campaignWizard.step3.desc') },
+  ]
 
   return (
     <div className="mx-auto max-w-4xl">

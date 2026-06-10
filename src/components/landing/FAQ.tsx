@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import { ChevronDown, HelpCircle } from 'lucide-react'
 import { faqData, type FAQItem } from '@/lib/landing-data'
 
@@ -35,6 +36,7 @@ function FAQItem({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; o
 }
 
 export function FAQ() {
+  const { t } = useI18n()
   const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   return (
@@ -46,15 +48,15 @@ export function FAQ() {
             <div className="sticky top-24">
               <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
                 <HelpCircle className="h-3 w-3" />
-                常见问题
+                {t('landingComponents.faq.badge')}
               </div>
               <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
                 {faqData.title}
               </h2>
               <p className="mt-4 text-base text-gray-500">{faqData.subtitle}</p>
               <div className="mt-8 rounded-xl bg-blue-50 p-5">
-                <p className="text-sm font-medium text-blue-900">还有其他问题？</p>
-                <p className="mt-1 text-sm text-blue-700">联系我们的客服团队，获取一对一解答</p>
+                <p className="text-sm font-medium text-blue-900">{t('landingComponents.faq.otherQuestions')}</p>
+                <p className="mt-1 text-sm text-blue-700">{t('landingComponents.faq.contactDesc')}</p>
                 <a
                   href="mailto:support@outreachhub.com"
                   className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors duration-300"

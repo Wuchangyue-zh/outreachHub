@@ -1,6 +1,11 @@
+'use client'
+
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function PrivacyPage() {
+  const { t } = useI18n()
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -12,8 +17,8 @@ export default function PrivacyPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-3xl px-4 py-12 prose prose-gray">
-        <h1>隐私政策</h1>
-        <p className="text-sm text-gray-500">最后更新日期：2026 年 5 月 31 日</p>
+        <h1>{t('privacy.title')}</h1>
+        <p className="text-sm text-gray-500">{t('privacy.lastUpdated')}</p>
 
         <p>
           OutreachHub（以下简称"我们"或"本平台"）非常重视您的隐私保护。本隐私政策旨在向您说明我们如何收集、使用、存储、共享和保护您的个人信息。请您在使用我们的服务前仔细阅读本政策。
@@ -145,9 +150,9 @@ export default function PrivacyPage() {
 
         <hr />
         <p className="text-sm text-gray-500">
-          <Link href="/" className="text-primary hover:underline">返回首页</Link>
+          <Link href="/" className="text-primary hover:underline">{t('privacy.backToHome')}</Link>
           {' | '}
-          <Link href="/terms" className="text-primary hover:underline">服务条款</Link>
+          <Link href="/terms" className="text-primary hover:underline">{t('privacy.termsLink')}</Link>
         </p>
       </main>
     </div>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   Brain, ShieldCheck, Languages, Split, Eye, HeartPulse, Repeat, BarChart3,
   ArrowRight,
@@ -29,6 +30,7 @@ const iconBg = [
 ]
 
 function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
+  const { t } = useI18n()
   const Icon = iconMap[feature.icon] || Brain
   const bg = iconBg[index % iconBg.length]
 
@@ -56,7 +58,7 @@ function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
 
       {/* Arrow reveal */}
       <div className="mt-auto pt-4 flex items-center gap-1 text-xs font-semibold text-blue-600 opacity-0 translate-y-1 transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:opacity-100 group-hover:translate-y-0">
-        了解更多
+        {t('landingComponents.features.learnMore')}
         <ArrowRight className="h-3 w-3 transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" />
       </div>
     </Link>
@@ -64,6 +66,7 @@ function FeatureCard({ feature, index }: { feature: Feature; index: number }) {
 }
 
 export function Features() {
+  const { t } = useI18n()
   return (
     <section id="features" className="bg-gray-50/50 py-28 lg:py-36">
       <div className="mx-auto max-w-7xl px-6">
@@ -72,7 +75,7 @@ export function Features() {
           <div className="mx-auto max-w-2xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
               <Brain className="h-3 w-3" />
-              核心功能
+              {t('landingComponents.features.badge')}
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               {featuresData.title}

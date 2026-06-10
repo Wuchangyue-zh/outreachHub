@@ -8,6 +8,7 @@ import {
   Clock, Mail, Phone, Calendar, ArrowRight, ListTodo,
   RefreshCw, AlertCircle,
 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface TodayTask {
   id: string
@@ -21,10 +22,10 @@ interface TodayTask {
   createdAt: string
 }
 
-const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  OUTREACH: { label: '拓客', icon: Mail, color: 'text-blue-600 bg-blue-50' },
-  FOLLOW_UP: { label: '跟进', icon: Phone, color: 'text-amber-600 bg-amber-50' },
-  NURTURE: { label: '培育', icon: Calendar, color: 'text-emerald-600 bg-emerald-50' },
+const TYPE_CONFIG: Record<string, { labelKey: string; icon: React.ElementType; color: string }> = {
+  OUTREACH: { labelKey: 'dashboardTasks.type.outreach', icon: Mail, color: 'text-blue-600 bg-blue-50' },
+  FOLLOW_UP: { labelKey: 'dashboardTasks.type.followUp', icon: Phone, color: 'text-amber-600 bg-amber-50' },
+  NURTURE: { labelKey: 'dashboardTasks.type.nurture', icon: Calendar, color: 'text-emerald-600 bg-emerald-50' },
 }
 
 function getDueDateStatus(dateStr: string): 'overdue' | 'today' | 'upcoming' {
@@ -39,13 +40,14 @@ function getDueDateStatus(dateStr: string): 'overdue' | 'today' | 'upcoming' {
   return 'upcoming'
 }
 
-const DUE_DATE_STYLES: Record<string, { color: string; label: string }> = {
-  overdue: { color: 'text-red-600 bg-red-50', label: '已逾期' },
-  today: { color: 'text-amber-600 bg-amber-50', label: '今天' },
-  upcoming: { color: 'text-gray-500 bg-gray-50', label: '即将' },
+const DUE_DATE_STYLES: Record<string, { color: string; labelKey: string }> = {
+  overdue: { color: 'text-red-600 bg-red-50', labelKey: 'dashboardTasks.overdue' },
+  today: { color: 'text-amber-600 bg-amber-50', labelKey: 'dashboardTasks.today' },
+  upcoming: { color: 'text-gray-500 bg-gray-50', labelKey: 'dashboardTasks.upcoming' },
 }
 
 export default function TodayTasks() {
+  const { t } = useI18n()
   const [tasks, setTasks] = useState<TodayTask[]>([])
   const [loading, setLoading] = useState(true)
   const [overdueCount, setOverdueCount] = useState(0)
@@ -97,7 +99,7 @@ export default function TodayTasks() {
     <Card className="border-gray-100">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div className="flex items-center gap-2">
-          <CardTitle className="text-lg">今日待办</CardTitle>
+          <CardTitle className="text-lg">{t('dashboardTasks.title')}</CardTitle>
           {totalPending > 0 && (
             <Badge className="bg-primary/10 text-primary border-0 text-xs">
               {totalPending}
@@ -106,7 +108,7 @@ export default function TodayTasks() {
           {overdueCount > 0 && (
             <Badge className="bg-red-100 text-red-700 border-0 text-xs gap-1">
               <AlertCircle className="h-3 w-3" />
-              {overdueCount} 逾期
+              {overdueCount} {t('dashboardTasks.overdue')}
             </Badge>
           )}
         </div>
@@ -114,20 +116,20 @@ export default function TodayTasks() {
           href="/dashboard/tasks"
           className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
         >
-          查看全部
+          {t('dashboardTasks.viewAll')}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-sm text-gray-500">
-            <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+            <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> {t('dashboardTasks.loading')}
           </div>
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <ListTodo className="h-10 w-10 text-gray-300 mb-3" />
-            <p className="text-sm text-gray-500 font-medium">暂无待办任务</p>
-            <p className="text-xs text-gray-400 mt-1">所有任务已完成，太棒了！</p>
+            <p className="text-sm text-gray-500 font-medium">{t('dashboardTasks.noTasks')}</p>
+            <p className="text-xs text-gray-400 mt-1">{t('dashboardTasks.allDone')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -161,7 +163,7 @@ export default function TodayTasks() {
                   </div>
                   {dueStyle && (
                     <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${dueStyle.color}`}>
-                      {dueStyle.label}
+                      {t(dueStyle.labelKey)}
                     </span>
                   )}
                 </Link>

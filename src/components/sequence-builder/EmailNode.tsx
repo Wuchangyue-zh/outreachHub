@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Mail, Trash2 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface EmailNodeData {
   label: string
@@ -16,6 +17,7 @@ interface EmailNodeData {
 
 function EmailNodeComponent({ id, data }: NodeProps) {
   const nodeData = data as EmailNodeData
+  const { t } = useI18n()
 
   return (
     <div className="group relative min-w-[200px] rounded-xl border-2 border-blue-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-blue-400">
@@ -27,15 +29,15 @@ function EmailNodeComponent({ id, data }: NodeProps) {
             <Mail className="h-3 w-3 text-blue-600" />
           </div>
           <span className="text-xs font-semibold text-blue-700">
-            第 {nodeData.stepIndex + 1} 封邮件
+            {t('sequenceBuilder.email.emailNumber', { number: nodeData.stepIndex + 1 })}
           </span>
         </div>
 
         <p className="text-sm font-medium text-gray-900 truncate" title={nodeData.subject}>
-          {nodeData.subject || '（未设置主题）'}
+          {nodeData.subject || t('sequenceBuilder.email.noSubject')}
         </p>
         <p className="mt-1 text-xs text-gray-500 line-clamp-2" title={nodeData.content}>
-          {nodeData.content || '（未设置内容）'}
+          {nodeData.content || t('sequenceBuilder.email.noContent')}
         </p>
       </div>
 

@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { ListTree } from 'lucide-react'
 import { useActiveHeading } from '@/hooks/useReadingProgress'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface Heading { id: string; text: string; level: number }
 
 export function TableOfContents({ content: _content }: { content: string }) {
   const [headings, setHeadings] = useState<Heading[]>([])
+  const { t } = useI18n()
 
   // Extract headings from the actual DOM after hydration
   useEffect(() => {
@@ -34,7 +36,7 @@ export function TableOfContents({ content: _content }: { content: string }) {
         {/* Header */}
         <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
           <ListTree className="h-3.5 w-3.5" />
-          目录
+          {t('knowledge.tocTitle')}
         </div>
 
         {/* Headings list */}
@@ -73,7 +75,7 @@ export function TableOfContents({ content: _content }: { content: string }) {
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-100 px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:border-gray-200 hover:text-gray-700"
         >
-          ↑ 回到顶部
+          ↑ {t('knowledge.backToTop')}
         </button>
       </div>
     </nav>

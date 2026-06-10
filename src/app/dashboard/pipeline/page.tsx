@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select'
 import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
 import { toast } from 'sonner'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   Plus,
   RefreshCw,
@@ -54,7 +55,7 @@ interface StageConfig {
 const STAGES: StageConfig[] = [
   {
     key: 'LEAD',
-    label: '线索',
+    label: 'pipeline.stages.lead',
     color: 'text-blue-700',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
@@ -62,7 +63,7 @@ const STAGES: StageConfig[] = [
   },
   {
     key: 'OPPORTUNITY',
-    label: '商机',
+    label: 'pipeline.stages.opportunity',
     color: 'text-yellow-700',
     bgColor: 'bg-yellow-50',
     borderColor: 'border-yellow-200',
@@ -70,7 +71,7 @@ const STAGES: StageConfig[] = [
   },
   {
     key: 'QUOTE',
-    label: '报价',
+    label: 'pipeline.stages.quote',
     color: 'text-purple-700',
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
@@ -78,7 +79,7 @@ const STAGES: StageConfig[] = [
   },
   {
     key: 'WON',
-    label: '成交',
+    label: 'pipeline.stages.won',
     color: 'text-green-700',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
@@ -86,7 +87,7 @@ const STAGES: StageConfig[] = [
   },
   {
     key: 'LOST',
-    label: '流失',
+    label: 'pipeline.stages.lost',
     color: 'text-red-700',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-200',
@@ -207,7 +208,7 @@ function DealCard({ deal, onEdit, onDragStart }: DealCardProps) {
           onEdit(deal)
         }
       }}
-      aria-label={`商机: ${deal.title}`}
+      aria-label={`${t('pipeline.stages.opportunity')}: ${deal.title}`}
     >
       {/* Title row with drag handle */}
       <div className="flex items-start gap-2">
@@ -297,7 +298,7 @@ function KanbanColumn({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, stage.key)}
       role="region"
-      aria-label={`${stage.label}阶段`}
+      aria-label={`${t(stage.label)}`}
     >
       {/* Column header */}
       <div className={`rounded-t-md px-4 py-3 ${stage.headerBg} dark:bg-gray-700`}>
@@ -322,8 +323,8 @@ function KanbanColumn({
       <div className="flex-1 space-y-2 overflow-y-auto p-2" style={{ maxHeight: 'calc(100vh - 380px)', minHeight: '200px' }}>
         {deals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-xs text-gray-400">暂无商机</p>
-            <p className="mt-1 text-[10px] text-gray-300">拖拽商机到此处</p>
+            <p className="text-xs text-gray-400">{t('pipeline.noDeals')}</p>
+            <p className="mt-1 text-[10px] text-gray-300">{t('pipeline.dragHere')}</p>
           </div>
         ) : (
           deals.map((deal) => (
@@ -380,6 +381,7 @@ function ConversionRateDisplay({ stats }: ConversionRateProps) {
 // ─── Main Page Component ──────────────────────────────────────────────────
 
 export default function PipelinePage() {
+  const { t } = useI18n()
   const [deals, setDeals] = useState<Deal[]>([])
   const [stats, setStats] = useState<PipelineStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -406,10 +408,10 @@ export default function PipelinePage() {
       if (data.success) {
         setDeals(data.data)
       } else {
-        toast.error(data.error?.message || '加载商机失败')
+        toast.error(data.error?.message || t('pipeline.loadDealsFailed'))
       }
     } catch {
-      toast.error('加载商机失败')
+      toast.error(t('pipeline.loadDealsFailed'))
     }
   }, [])
 
@@ -467,7 +469,7 @@ export default function PipelinePage() {
 
   const handleQuickCreateContact = async () => {
     if (!contactForm.firstName.trim()) {
-      toast.error('请输入姓')
+      toast.error(t('pipeline.enterLastName'))
       return
     }
     setQuickCreateSaving(true)
@@ -486,14 +488,14 @@ export default function PipelinePage() {
       if (data.success) {
         const newContact = data.data
         setFormData((prev) => ({ ...prev, contactId: newContact.id }))
-        toast.success('联系人已创建')
+        toast.success(t('pipeline.contactCreated'))
         setQuickCreateType(null)
         setContactForm({ firstName: '', lastName: '', email: '', companyId: '' })
       } else {
-        toast.error(data.error?.message || '创建失败')
+        toast.error(data.error?.message || t('pipeline.createFailed'))
       }
     } catch {
-      toast.error('创建联系人失败')
+      toast.error(t('pipeline.createContactFailed'))
     } finally {
       setQuickCreateSaving(false)
     }
@@ -501,7 +503,7 @@ export default function PipelinePage() {
 
   const handleQuickCreateCompany = async () => {
     if (!companyForm.name.trim()) {
-      toast.error('请输入公司名称')
+      toast.error(t('pipeline.enterLastName'))
       return
     }
     setQuickCreateSaving(true)
@@ -518,14 +520,14 @@ export default function PipelinePage() {
       if (data.success) {
         const newCompany = data.data
         setFormData((prev) => ({ ...prev, companyId: newCompany.id }))
-        toast.success('公司已创建')
+        toast.success(t('pipeline.contactCreated'))
         setQuickCreateType(null)
         setCompanyForm({ name: '', domain: '' })
       } else {
-        toast.error(data.error?.message || '创建失败')
+        toast.error(data.error?.message || t('pipeline.createFailed'))
       }
     } catch {
-      toast.error('创建公司失败')
+      toast.error(t('pipeline.createContactFailed'))
     } finally {
       setQuickCreateSaving(false)
     }
@@ -594,16 +596,16 @@ export default function PipelinePage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(`商机已移至「${STAGE_MAP[targetStage].label}」`)
+        toast.success(`商机已移至「${t(STAGE_MAP[targetStage].label)}」`)
         // Refresh to get accurate data
         await Promise.all([fetchDeals(), fetchStats()])
       } else {
-        toast.error(data.error?.message || '更新失败')
+        toast.error(data.error?.message || t('pipeline.createFailed'))
         // Revert optimistic update
         await fetchDeals()
       }
     } catch {
-      toast.error('更新商机阶段失败')
+      toast.error(t('pipeline.createFailed'))
       await fetchDeals()
     }
   }
@@ -645,7 +647,7 @@ export default function PipelinePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title.trim()) {
-      toast.error('请输入商机名称')
+      toast.error(t('pipeline.enterLastName'))
       return
     }
 
@@ -674,14 +676,14 @@ export default function PipelinePage() {
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(isEdit ? '商机已更新' : '商机已创建')
+        toast.success(isEdit ? t('pipeline.contactCreated') : t('pipeline.contactCreated'))
         resetForm()
         await Promise.all([fetchDeals(), fetchStats()])
       } else {
-        toast.error(data.error?.message || '保存失败')
+        toast.error(data.error?.message || t('pipeline.createFailed'))
       }
     } catch {
-      toast.error('保存商机失败')
+      toast.error(t('pipeline.createFailed'))
     } finally {
       setSaving(false)
     }
@@ -696,20 +698,20 @@ export default function PipelinePage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              销售漏斗
+              {t('pipeline.stages.lead')}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              管理您的商机和交易进展
+              {t('pipeline.dragHere')}
               {stats && (
                 <span className="ml-2 text-gray-400">
-                  共 {stats.totalDeals} 个商机
+                  {t('pipeline.noDeals')} {stats.totalDeals}
                 </span>
               )}
             </p>
           </div>
           <Button onClick={openCreateDialog} className="gap-2">
             <Plus className="h-4 w-4" />
-            新建商机
+            {t('pipeline.stages.lead')}
           </Button>
         </div>
 
@@ -731,7 +733,7 @@ export default function PipelinePage() {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <span className={`text-xs font-medium ${stage.color}`}>
-                              {stage.label}
+                              {t(stage.label)}
                             </span>
                             <Badge
                               className={`${stage.headerBg} ${stage.color} text-xs px-1.5 py-0 dark:bg-gray-700 dark:text-gray-300`}
@@ -762,7 +764,7 @@ export default function PipelinePage() {
                         <div className="flex items-center gap-2">
                           <Target className="h-4 w-4 text-gray-400" />
                           <div>
-                            <p className="text-xs text-gray-500">成交数</p>
+                            <p className="text-xs text-gray-500">{t('pipeline.stages.won')}</p>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white">
                               {stats.wonDeals}
                             </p>
@@ -771,7 +773,7 @@ export default function PipelinePage() {
                         <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-gray-400" />
                           <div>
-                            <p className="text-xs text-gray-500">成交金额</p>
+                            <p className="text-xs text-gray-500">{t('pipeline.stages.quote')}</p>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white">
                               {formatCurrency(stats.wonAmount)}
                             </p>
@@ -862,7 +864,7 @@ export default function PipelinePage() {
                   <SelectContent>
                     {STAGES.map((s) => (
                       <SelectItem key={s.key} value={s.key}>
-                        {s.label}
+                        {t(s.label)}
                       </SelectItem>
                     ))}
                   </SelectContent>

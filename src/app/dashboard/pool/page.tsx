@@ -13,6 +13,7 @@ import {
   Users, Search, Building, Mail, Globe, Tag, Hand, ArrowUpRight,
   RefreshCw, Loader2, UserCheck, Database, CalendarDays,
 } from 'lucide-react'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface PoolContact {
   id: string
@@ -41,26 +42,27 @@ interface PoolStats {
   claimedToday: number
 }
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  NEW: { label: '新客户', color: 'bg-blue-100 text-blue-700' },
-  CONTACTED: { label: '已联系', color: 'bg-yellow-100 text-yellow-700' },
-  INTERESTED: { label: '有意向', color: 'bg-green-100 text-green-700' },
-  QUALIFIED: { label: '已确认', color: 'bg-purple-100 text-purple-700' },
-  CONVERTED: { label: '已转化', color: 'bg-emerald-100 text-emerald-700' },
-  NOT_INTERESTED: { label: '无意向', color: 'bg-gray-100 text-gray-600' },
-  UNREACHABLE: { label: '无法联系', color: 'bg-red-100 text-red-600' },
+const STATUS_MAP: Record<string, { labelKey: string; color: string }> = {
+  NEW: { labelKey: 'pool.status.new', color: 'bg-blue-100 text-blue-700' },
+  CONTACTED: { labelKey: 'pool.status.contacted', color: 'bg-yellow-100 text-yellow-700' },
+  INTERESTED: { labelKey: 'pool.status.interested', color: 'bg-green-100 text-green-700' },
+  QUALIFIED: { labelKey: 'pool.status.qualified', color: 'bg-purple-100 text-purple-700' },
+  CONVERTED: { labelKey: 'pool.status.converted', color: 'bg-emerald-100 text-emerald-700' },
+  NOT_INTERESTED: { labelKey: 'pool.status.notInterested', color: 'bg-gray-100 text-gray-600' },
+  UNREACHABLE: { labelKey: 'pool.status.unreachable', color: 'bg-red-100 text-red-600' },
 }
 
 const SOURCE_MAP: Record<string, string> = {
-  IMPORT: '导入',
-  MANUAL: '手动添加',
-  PROSPECTING: '智能拓客',
-  CUSTOMS: '海关数据',
-  WEBSITE: '官网抓取',
+  IMPORT: 'pool.source.import',
+  MANUAL: 'pool.source.manual',
+  PROSPECTING: 'pool.source.prospecting',
+  CUSTOMS: 'pool.source.customs',
+  WEBSITE: 'pool.source.website',
   API: 'API',
 }
 
 export default function PoolPage() {
+  const { t } = useI18n()
   const { addToast } = useToast()
   const [activeTab, setActiveTab] = useState('public')
   const [publicContacts, setPublicContacts] = useState<PoolContact[]>([])
@@ -106,7 +108,7 @@ export default function PoolPage() {
       })
     } catch (e) {
       console.error('Failed to fetch pool data:', e)
-      addToast({ type: 'error', title: '加载失败', description: '无法获取客户公海数据' })
+      addToast({ type: 'error', title: t('pool.loadFailed'), description: t('pool.loadFailedDesc') })
     } finally {
       setLoading(false)
     }
@@ -118,13 +120,13 @@ export default function PoolPage() {
       const res = await fetch(`/api/contacts/${contactId}/claim`, { method: 'POST' })
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: '领取成功', description: '客户已移入您的客户列表' })
+        addToast({ type: 'success', title: t('pool.claimSuccess'), description: t('pool.claimSuccessDesc') })
         fetchPoolData()
       } else {
-        addToast({ type: 'error', title: '领取失败', description: data.error?.message || data.message || '操作失败' })
+        addToast({ type: 'error', title: t('pool.claimFailed'), description: data.error?.message || data.message || t('pool.operationFailed') })
       }
     } catch {
-      addToast({ type: 'error', title: '领取失败', description: '网络错误' })
+      addToast({ type: 'error', title: t('pool.claimFailed'), description: t('pool.networkError') })
     } finally {
       setClaimingId(null)
     }
@@ -136,13 +138,13 @@ export default function PoolPage() {
       const res = await fetch(`/api/contacts/${contactId}/release`, { method: 'POST' })
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: '释放成功', description: '客户已释放回公海' })
+        addToast({ type: 'success', title: t('pool.releaseSuccess'), description: t('pool.releaseSuccessDesc') })
         fetchPoolData()
       } else {
-        addToast({ type: 'error', title: '释放失败', description: data.error?.message || data.message || '操作失败' })
+        addToast({ type: 'error', title: t('pool.releaseFailed'), description: data.error?.message || data.message || t('pool.operationFailed') })
       }
     } catch {
-      addToast({ type: 'error', title: '释放失败', description: '网络错误' })
+      addToast({ type: 'error', title: t('pool.releaseFailed'), description: t('pool.networkError') })
     } finally {
       setReleasingId(null)
     }
@@ -154,11 +156,11 @@ export default function PoolPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">客户公海</h1>
-            <p className="text-sm text-gray-500">管理公海客户资源，领取跟进或释放闲置客户</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('pool.title')}</h1>
+            <p className="text-sm text-gray-500">{t('pool.subtitle')}</p>
           </div>
           <Button variant="outline" size="sm" onClick={fetchPoolData}>
-            <RefreshCw className="h-4 w-4 mr-2" /> 刷新
+            <RefreshCw className="h-4 w-4 mr-2" /> {t('pool.refresh')}
           </Button>
         </div>
 
@@ -171,7 +173,7 @@ export default function PoolPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">{stats.publicTotal}</p>
-                <p className="text-sm text-gray-500">公海总数</p>
+                <p className="text-sm text-gray-500">{t('pool.publicTotal')}</p>
               </div>
             </CardContent>
           </Card>
@@ -182,7 +184,7 @@ export default function PoolPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">{stats.myTotal}</p>
-                <p className="text-sm text-gray-500">我的客户</p>
+                <p className="text-sm text-gray-500">{t('pool.myContacts')}</p>
               </div>
             </CardContent>
           </Card>
@@ -193,7 +195,7 @@ export default function PoolPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-gray-900">{stats.claimedToday}</p>
-                <p className="text-sm text-gray-500">今日领取</p>
+                <p className="text-sm text-gray-500">{t('pool.claimedToday')}</p>
               </div>
             </CardContent>
           </Card>
@@ -205,7 +207,7 @@ export default function PoolPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="搜索姓名、邮箱..."
+                placeholder={t('pool.searchPlaceholder')}
                 className="pl-10"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPublicPage(1); setMyPage(1) }}
@@ -219,14 +221,14 @@ export default function PoolPage() {
           <TabsList>
             <TabsTrigger value="public" className="gap-2">
               <Globe className="h-4 w-4" />
-              公海客户
+              {t('pool.publicContacts')}
               {publicTotal > 0 && (
                 <Badge className="ml-1 bg-gray-200 text-gray-700 border-0 text-xs">{publicTotal}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="mine" className="gap-2">
               <Users className="h-4 w-4" />
-              我的客户
+              {t('pool.myContactsTab')}
               {myTotal > 0 && (
                 <Badge className="ml-1 bg-gray-200 text-gray-700 border-0 text-xs">{myTotal}</Badge>
               )}
@@ -237,15 +239,15 @@ export default function PoolPage() {
           <TabsContent value="public">
             {loading ? (
               <div className="flex items-center justify-center py-16 text-sm text-gray-500">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> 加载中...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t('pool.loading')}
               </div>
             ) : publicContacts.length === 0 ? (
               <Card className="border-gray-100">
                 <CardContent className="py-16 text-center">
                   <Database className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                  <p className="text-gray-500 font-medium">公海暂无客户</p>
+                  <p className="text-gray-500 font-medium">{t('pool.noPublicContacts')}</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    {search ? '没有匹配的客户，请尝试其他搜索条件' : '释放的客户会出现在这里'}
+                    {search ? t('pool.noMatch') : t('pool.releasedAppearHere')}
                   </p>
                 </CardContent>
               </Card>
@@ -259,21 +261,22 @@ export default function PoolPage() {
                       variant="public"
                       onClaim={() => handleClaim(contact.id)}
                       claiming={claimingId === contact.id}
+                      t={t}
                     />
                   ))}
                 </div>
                 {publicTotal > limit && (
                   <div className="flex items-center justify-between pt-4">
-                    <p className="text-sm text-gray-500">共 {publicTotal} 条</p>
+                    <p className="text-sm text-gray-500">{t('pool.total', { count: publicTotal })}</p>
                     <div className="flex gap-1">
                       <Button variant="outline" size="sm" disabled={publicPage === 1} onClick={() => setPublicPage(p => p - 1)}>
-                        上一页
+                        {t('pool.prevPage')}
                       </Button>
                       <span className="flex items-center px-3 text-sm text-gray-500">
                         {publicPage} / {Math.ceil(publicTotal / limit)}
                       </span>
                       <Button variant="outline" size="sm" disabled={publicPage >= Math.ceil(publicTotal / limit)} onClick={() => setPublicPage(p => p + 1)}>
-                        下一页
+                        {t('pool.nextPage')}
                       </Button>
                     </div>
                   </div>
@@ -286,15 +289,15 @@ export default function PoolPage() {
           <TabsContent value="mine">
             {loading ? (
               <div className="flex items-center justify-center py-16 text-sm text-gray-500">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> 加载中...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t('pool.loading')}
               </div>
             ) : myContacts.length === 0 ? (
               <Card className="border-gray-100">
                 <CardContent className="py-16 text-center">
                   <Users className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                  <p className="text-gray-500 font-medium">暂无我的客户</p>
+                  <p className="text-gray-500 font-medium">{t('pool.noMyContacts')}</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    {search ? '没有匹配的客户' : '去公海领取客户开始跟进吧'}
+                    {search ? t('pool.noMatch') : t('pool.claimFromPool')}
                   </p>
                 </CardContent>
               </Card>
@@ -308,21 +311,22 @@ export default function PoolPage() {
                       variant="mine"
                       onRelease={() => handleRelease(contact.id)}
                       releasing={releasingId === contact.id}
+                      t={t}
                     />
                   ))}
                 </div>
                 {myTotal > limit && (
                   <div className="flex items-center justify-between pt-4">
-                    <p className="text-sm text-gray-500">共 {myTotal} 条</p>
+                    <p className="text-sm text-gray-500">{t('pool.total', { count: myTotal })}</p>
                     <div className="flex gap-1">
                       <Button variant="outline" size="sm" disabled={myPage === 1} onClick={() => setMyPage(p => p - 1)}>
-                        上一页
+                        {t('pool.prevPage')}
                       </Button>
                       <span className="flex items-center px-3 text-sm text-gray-500">
                         {myPage} / {Math.ceil(myTotal / limit)}
                       </span>
                       <Button variant="outline" size="sm" disabled={myPage >= Math.ceil(myTotal / limit)} onClick={() => setMyPage(p => p + 1)}>
-                        下一页
+                        {t('pool.nextPage')}
                       </Button>
                     </div>
                   </div>
@@ -345,11 +349,12 @@ interface ContactCardProps {
   claiming?: boolean
   onRelease?: () => void
   releasing?: boolean
+  t: (key: string) => string
 }
 
-function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing }: ContactCardProps) {
-  const status = STATUS_MAP[contact.status] || { label: contact.status, color: 'bg-gray-100 text-gray-600' }
-  const source = SOURCE_MAP[contact.source] || contact.source
+function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing, t }: ContactCardProps) {
+  const status = STATUS_MAP[contact.status] || { labelKey: contact.status, color: 'bg-gray-100 text-gray-600' }
+  const sourceKey = SOURCE_MAP[contact.source] || contact.source
   const primaryEmail = contact.emails.find(e => e.isPrimary)?.address || contact.emails[0]?.address || '-'
   const lastActivity = contact.lastActivityAt
     ? new Date(contact.lastActivityAt).toLocaleDateString('zh-CN')
@@ -369,7 +374,7 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
               <p className="text-xs text-gray-500 truncate">{contact.title || '-'}</p>
             </div>
           </div>
-          <Badge className={`${status.color} border-0 text-xs shrink-0`}>{status.label}</Badge>
+          <Badge className={`${status.color} border-0 text-xs shrink-0`}>{t(status.labelKey)}</Badge>
         </div>
 
         {/* Info */}
@@ -386,12 +391,12 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
           )}
           <div className="flex items-center gap-2">
             <Tag className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-            <span>来源：{source}</span>
+            <span>{t('pool.source')}：{t(sourceKey)}</span>
           </div>
           {variant === 'mine' && lastActivity && (
             <div className="flex items-center gap-2">
               <CalendarDays className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-              <span>最后活跃：{lastActivity}</span>
+              <span>{t('pool.lastActive')}：{lastActivity}</span>
             </div>
           )}
         </div>
@@ -424,7 +429,7 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
               ) : (
                 <Hand className="h-4 w-4" />
               )}
-              领取客户
+              {t('pool.claimContact')}
             </Button>
           )}
           {variant === 'mine' && (
@@ -432,7 +437,7 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
               <Link href={`/contacts?highlight=${contact.id}`} className="flex-1">
                 <Button size="sm" className="w-full gap-2">
                   <ArrowUpRight className="h-4 w-4" />
-                  跟进
+                  {t('pool.followUp')}
                 </Button>
               </Link>
               <Button
@@ -447,7 +452,7 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
                 ) : (
                   <RefreshCw className="h-4 w-4" />
                 )}
-                释放
+                {t('pool.release')}
               </Button>
             </div>
           )}

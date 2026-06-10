@@ -22,6 +22,7 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface SupplierSummary {
   name: string
@@ -128,6 +129,7 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
 }
 
 export default function CustomsPage() {
+  const { t } = useI18n()
   const [searchResults, setSearchResults] = useState<CustomsBuyer[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerDetail | null>(null)
@@ -148,7 +150,7 @@ export default function CustomsPage() {
 
   const handleSearch = async () => {
     if (!formData.hsCode && !formData.country && !formData.keyword) {
-      setMessage('请至少填写 HS 编码、国家或关键词之一')
+      setMessage(t('customs.fillAtLeastOne'))
       return
     }
     setSearching(true)
@@ -171,14 +173,14 @@ export default function CustomsPage() {
         setProvider(data.provider || '')
         setMessage(
           data.data?.length
-            ? `找到 ${data.data.length} 个买家（数据源：${data.provider || '未知'}）`
-            : '未找到符合条件的买家，请调整搜索条件'
+            ? t('customs.foundBuyers', { count: data.data.length, provider: data.provider || t('customs.unknown') })
+            : t('customs.noBuyersFound')
         )
       } else {
-        setMessage(data.error?.message || data.message || '搜索失败')
+        setMessage(data.error?.message || data.message || t('customs.searchFailed'))
       }
     } catch {
-      setMessage('搜索请求失败')
+      setMessage(t('customs.searchRequestFailed'))
     } finally {
       setSearching(false)
     }
@@ -194,10 +196,10 @@ export default function CustomsPage() {
       if (data.success) {
         setSelectedBuyer(data.data)
       } else {
-        setMessage(data.error?.message || '获取买家详情失败')
+        setMessage(data.error?.message || t('customs.getDetailFailed'))
       }
     } catch {
-      setMessage('获取买家详情失败')
+      setMessage(t('customs.getDetailFailed'))
     } finally {
       setDetailLoading(false)
     }
@@ -224,7 +226,7 @@ export default function CustomsPage() {
   const handleImport = async () => {
     const ids = [...selectedIds]
     if (ids.length === 0) {
-      setMessage('请先勾选要导入的买家')
+      setMessage(t('customs.selectBuyersToImport'))
       return
     }
     setImporting(true)
@@ -237,17 +239,16 @@ export default function CustomsPage() {
       })
       const data = await res.json()
       if (data.success) {
-        setMessage(`导入完成：成功 ${data.data.imported}，失败 ${data.data.failed}`)
-        // 更新本地状态
+        setMessage(t('customs.importComplete', { imported: data.data.imported, failed: data.data.failed }))
         setSearchResults((prev) =>
           prev.map((b) => (selectedIds.has(b.profileId || b.id) ? { ...b, importedAsContact: true } : b))
         )
         setSelectedIds(new Set())
       } else {
-        setMessage(data.error?.message || '导入失败')
+        setMessage(data.error?.message || t('customs.importFailed'))
       }
     } catch {
-      setMessage('导入请求失败')
+      setMessage(t('customs.importRequestFailed'))
     } finally {
       setImporting(false)
     }
@@ -281,8 +282,8 @@ export default function CustomsPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">海关数据获客</h1>
-          <p className="text-sm text-gray-500">搜索全球贸易记录，发现高意向采购商，一键导入客户库</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('customs.title')}</h1>
+          <p className="text-sm text-gray-500">{t('customs.subtitle')}</p>
         </div>
 
         {message && (
@@ -297,21 +298,21 @@ export default function CustomsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5 text-primary" />
-                海关数据搜索
+                {t('customs.searchTitle')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>HS 编码</Label>
+                  <Label>{t('customs.hsCode')}</Label>
                   <Input
-                    placeholder="例如：8471.30 — 笔记本电脑"
+                    placeholder={t('customs.hsCodePlaceholder')}
                     value={formData.hsCode}
                     onChange={(e) => setFormData({ ...formData, hsCode: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>进口国</Label>
+                  <Label>{t('customs.importCountry')}</Label>
                   <Input
                     placeholder="例如：United States"
                     value={formData.country}
@@ -319,7 +320,7 @@ export default function CustomsPage() {
                   />
                 </div>
                 <div>
-                  <Label>关键词（产品/公司名）</Label>
+                  <Label>{t('customs.keyword')}</Label>
                   <Input
                     placeholder="例如：LED lighting"
                     value={formData.keyword}
@@ -327,7 +328,7 @@ export default function CustomsPage() {
                   />
                 </div>
                 <div>
-                  <Label>日期范围（可选）</Label>
+                  <Label>{t('customs.dateRange')}</Label>
                   <div className="flex gap-2">
                     <Input
                       type="date"
@@ -345,9 +346,9 @@ export default function CustomsPage() {
 
               <Button onClick={handleSearch} disabled={searching} className="w-full">
                 {searching ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 搜索中...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('customs.searching')}</>
                 ) : (
-                  <><Search className="mr-2 h-4 w-4" /> 搜索海关数据</>
+                  <><Search className="mr-2 h-4 w-4" /> {t('customs.searchButton')}</>
                 )}
               </Button>
 
@@ -356,11 +357,11 @@ export default function CustomsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <p className="text-sm font-medium text-gray-900">
-                        搜索结果（{searchResults.length}）
+                        {t('customs.searchResults', { count: searchResults.length })}
                       </p>
                       {provider && (
                         <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                          {provider === 'mock' ? 'Demo 数据' : provider}
+                          {provider === 'mock' ? t('customs.demoData') : provider}
                         </span>
                       )}
                     </div>
@@ -374,7 +375,7 @@ export default function CustomsPage() {
                       ) : (
                         <Download className="mr-1 h-4 w-4" />
                       )}
-                      导入选中（{selectedIds.size}）
+                      {t('customs.importSelected', { count: selectedIds.size })}
                     </Button>
                   </div>
 
@@ -394,19 +395,19 @@ export default function CustomsPage() {
                               onChange={toggleSelectAll}
                             />
                           </th>
-                          <th className="p-2">公司名称</th>
-                          <th className="p-2">国家</th>
+                          <th className="p-2">{t('customs.companyName')}</th>
+                          <th className="p-2">{t('customs.country')}</th>
                           <th className="p-2 cursor-pointer hover:text-gray-700" onClick={() => handleSort('totalShipments')}>
-                            装运次数 <SortIcon field="totalShipments" />
+                            {t('customs.shipmentCount')} <SortIcon field="totalShipments" />
                           </th>
                           <th className="p-2 cursor-pointer hover:text-gray-700" onClick={() => handleSort('totalAmountUsd')}>
-                            总金额 <SortIcon field="totalAmountUsd" />
+                            {t('customs.totalAmount')} <SortIcon field="totalAmountUsd" />
                           </th>
                           <th className="p-2 cursor-pointer hover:text-gray-700" onClick={() => handleSort('purchaseIntentScore')}>
-                            意向评分 <SortIcon field="purchaseIntentScore" />
+                            {t('customs.intentScore')} <SortIcon field="purchaseIntentScore" />
                           </th>
                           <th className="p-2 cursor-pointer hover:text-gray-700" onClick={() => handleSort('lastShipmentDate')}>
-                            最近装运 <SortIcon field="lastShipmentDate" />
+                            {t('customs.lastShipment')} <SortIcon field="lastShipmentDate" />
                           </th>
                         </tr>
                       </thead>
@@ -438,7 +439,7 @@ export default function CustomsPage() {
                                 )}
                                 {buyer.importedAsContact && (
                                   <span className="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-600 mt-0.5">
-                                    已导入
+                                    {t('customs.imported')}
                                   </span>
                                 )}
                               </td>
@@ -470,7 +471,7 @@ export default function CustomsPage() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-primary" />
-                  买家详情
+                  {t('customs.buyerDetail')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -480,35 +481,32 @@ export default function CustomsPage() {
                   </div>
                 ) : selectedBuyer ? (
                   <div className="space-y-4">
-                    {/* 基本信息 */}
                     <div>
                       <h3 className="font-semibold text-gray-900">{selectedBuyer.companyName}</h3>
                       <p className="text-sm text-gray-500 flex items-center gap-1">
                         <CountryFlag code={selectedBuyer.countryCode} />
-                        {selectedBuyer.country || '未知国家'}
+                        {selectedBuyer.country || t('customs.unknownCountry')}
                         {selectedBuyer.domain && ` · ${selectedBuyer.domain}`}
                       </p>
                     </div>
 
-                    {/* 评分 */}
                     {selectedBuyer.purchaseIntentScore != null && (
                       <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-700">采购意向评分</span>
+                          <span className="text-sm font-medium text-gray-700">{t('customs.purchaseIntentScore')}</span>
                           <span className="text-2xl font-bold text-primary">{selectedBuyer.purchaseIntentScore}</span>
                         </div>
                         {selectedBuyer.scoreBreakdown && (
                           <div className="space-y-2">
-                            <ScoreBar label="采购频次" value={selectedBuyer.scoreBreakdown.frequency} color="bg-blue-500" />
-                            <ScoreBar label="金额趋势" value={selectedBuyer.scoreBreakdown.trend} color="bg-green-500" />
-                            <ScoreBar label="供应商分散度" value={selectedBuyer.scoreBreakdown.diversification} color="bg-purple-500" />
-                            <ScoreBar label="最近采购" value={selectedBuyer.scoreBreakdown.recency} color="bg-orange-500" />
+                            <ScoreBar label={t('customs.frequency')} value={selectedBuyer.scoreBreakdown.frequency} color="bg-blue-500" />
+                            <ScoreBar label={t('customs.amountTrend')} value={selectedBuyer.scoreBreakdown.trend} color="bg-green-500" />
+                            <ScoreBar label={t('customs.supplierDiversity')} value={selectedBuyer.scoreBreakdown.diversification} color="bg-purple-500" />
+                            <ScoreBar label={t('customs.recency')} value={selectedBuyer.scoreBreakdown.recency} color="bg-orange-500" />
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* AI 摘要 */}
                     {selectedBuyer.aiSummary && (
                       <div className="rounded-lg bg-amber-50 border border-amber-100 p-3">
                         <p className="text-xs text-amber-800">
@@ -518,38 +516,36 @@ export default function CustomsPage() {
                       </div>
                     )}
 
-                    {/* 关键指标 */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-lg bg-gray-50 p-3 text-center">
                         <Package className="h-4 w-4 mx-auto text-gray-400 mb-1" />
                         <p className="text-lg font-bold text-gray-900">{selectedBuyer.totalShipments}</p>
-                        <p className="text-[10px] text-gray-500">装运次数</p>
+                        <p className="text-[10px] text-gray-500">{t('customs.shipmentCount')}</p>
                       </div>
                       <div className="rounded-lg bg-gray-50 p-3 text-center">
                         <DollarSign className="h-4 w-4 mx-auto text-gray-400 mb-1" />
                         <p className="text-lg font-bold text-gray-900">{formatUsd(selectedBuyer.totalAmountUsd)}</p>
-                        <p className="text-[10px] text-gray-500">总金额</p>
+                        <p className="text-[10px] text-gray-500">{t('customs.totalAmount')}</p>
                       </div>
                       <div className="rounded-lg bg-gray-50 p-3 text-center">
                         <Users className="h-4 w-4 mx-auto text-gray-400 mb-1" />
                         <p className="text-lg font-bold text-gray-900">{selectedBuyer.supplierCount}</p>
-                        <p className="text-[10px] text-gray-500">供应商数</p>
+                        <p className="text-[10px] text-gray-500">{t('customs.supplierCount')}</p>
                       </div>
                       <div className="rounded-lg bg-gray-50 p-3 text-center">
                         <TrendingUp className="h-4 w-4 mx-auto text-gray-400 mb-1" />
                         <p className="text-lg font-bold text-gray-900">
                           {selectedBuyer.avgShipmentAmount ? formatUsd(selectedBuyer.avgShipmentAmount) : '—'}
                         </p>
-                        <p className="text-[10px] text-gray-500">平均单笔</p>
+                        <p className="text-[10px] text-gray-500">{t('customs.avgAmount')}</p>
                       </div>
                     </div>
 
-                    {/* Top 供应商 */}
                     {selectedBuyer.topSuppliers?.length > 0 && (
                       <div>
                         <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
                           <Globe className="h-3 w-3" />
-                          主要供应商
+                          {t('customs.topSuppliers')}
                         </h4>
                         <div className="space-y-1.5">
                           {selectedBuyer.topSuppliers.slice(0, 5).map((s, i) => (
@@ -557,24 +553,23 @@ export default function CustomsPage() {
                               <span className="text-gray-700 truncate max-w-[140px]" title={s.name}>
                                 <CountryFlag code={s.countryCode} /> {s.name}
                               </span>
-                              <span className="text-gray-400 shrink-0">{s.shipmentCount} 次</span>
+                              <span className="text-gray-400 shrink-0">{s.shipmentCount} {t('customs.times')}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Top HS 编码 */}
                     {selectedBuyer.topHsCodes?.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-700 mb-2">主要 HS 编码</h4>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2">{t('customs.topHsCodes')}</h4>
                         <div className="space-y-1.5">
                           {selectedBuyer.topHsCodes.slice(0, 5).map((h, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-gray-700">
-                                {h.code} — {h.description || '未知'}
+                                {h.code} — {h.description || t('customs.unknown')}
                               </span>
-                              <span className="text-gray-400">{h.count} 次</span>
+                              <span className="text-gray-400">{h.count} {t('customs.times')}</span>
                             </div>
                           ))}
                         </div>
@@ -584,7 +579,7 @@ export default function CustomsPage() {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                     <BarChart3 className="h-8 w-8 mb-2" />
-                    <p className="text-sm">点击搜索结果查看买家详情</p>
+                    <p className="text-sm">{t('customs.clickToViewDetail')}</p>
                   </div>
                 )}
               </CardContent>
@@ -593,14 +588,14 @@ export default function CustomsPage() {
             {/* 搜索技巧 */}
             <Card className="border-gray-100">
               <CardHeader>
-                <CardTitle className="text-base">搜索技巧</CardTitle>
+                <CardTitle className="text-base">{t('customs.searchTips')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-gray-600">
-                <p>💡 <strong>HS 编码</strong>：使用 4-6 位前缀可匹配整个品类</p>
-                <p>💡 <strong>国家</strong>：输入进口国（买家所在国），如 United States</p>
-                <p>💡 <strong>关键词</strong>：产品英文名或公司名均可</p>
-                <p>💡 <strong>评分越高</strong>，采购意向越强（≥70 为高意向）</p>
-                <p>💡 点击表格列标题可排序</p>
+                <p>💡 <strong>{t('customs.hsCode')}</strong>：{t('customs.tipHsCode')}</p>
+                <p>💡 <strong>{t('customs.country')}</strong>：{t('customs.tipCountry')}</p>
+                <p>💡 <strong>{t('customs.keyword')}</strong>：{t('customs.tipKeyword')}</p>
+                <p>💡 {t('customs.tipScore')}</p>
+                <p>💡 {t('customs.tipSort')}</p>
               </CardContent>
             </Card>
 
@@ -609,7 +604,7 @@ export default function CustomsPage() {
               <Card className="border-amber-200 bg-amber-50">
                 <CardContent className="p-4">
                   <p className="text-xs text-amber-800">
-                    ⚠️ 当前展示的是 <strong>Demo 数据</strong>。配置 <code>CUSTOMS_API_KEY</code> 环境变量后将使用真实海关数据。
+                    ⚠️ {t('customs.mockWarning')}
                   </p>
                 </CardContent>
               </Card>
