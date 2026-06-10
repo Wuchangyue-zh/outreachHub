@@ -22,23 +22,25 @@ import {
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
-
-const navigation = [
-  { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
-  { name: '智能拓客', href: '/prospecting', icon: Search },
-  { name: '客户管理', href: '/contacts', icon: Users },
-  { name: '公司库', href: '/companies', icon: Building2 },
-  { name: '邮件营销', href: '/campaigns', icon: Send },
-  { name: '邮件模板', href: '/templates', icon: FileText },
-  { name: '邮箱设置', href: '/settings', icon: Mail },
-  { name: '队列监控', href: '/email-queue', icon: BarChart3 },
-]
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const { t } = useI18n()
+
+  const navigation = [
+    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('nav.prospecting'), href: '/prospecting', icon: Search },
+    { name: t('nav.contacts'), href: '/contacts', icon: Users },
+    { name: t('nav.companies'), href: '/companies', icon: Building2 },
+    { name: t('nav.campaigns'), href: '/campaigns', icon: Send },
+    { name: t('nav.templates'), href: '/templates', icon: FileText },
+    { name: t('nav.settings'), href: '/settings', icon: Mail },
+    { name: t('nav.emailQueue'), href: '/email-queue', icon: BarChart3 },
+  ]
 
   const handleLogout = async () => {
     try {
@@ -89,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {navigation.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
-                <li key={item.name}>
+                <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
@@ -118,7 +120,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
-            {!collapsed && <span>退出登录</span>}
+            {!collapsed && <span>{t('auth.logout')}</span>}
           </button>
         </div>
       </aside>

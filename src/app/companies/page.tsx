@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   Building2, Search, Plus, Edit, Trash2, X, Loader2, Globe, Users, ExternalLink
 } from 'lucide-react'
@@ -30,6 +31,7 @@ interface Company {
 
 export default function CompaniesPage() {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -68,6 +70,7 @@ export default function CompaniesPage() {
       }
     } catch (e) {
       console.error(e)
+      addToast({ type: 'error', title: t('common.loadFailed') })
     } finally {
       setLoading(false)
     }
@@ -101,7 +104,7 @@ export default function CompaniesPage() {
 
   const handleSave = async () => {
     if (!form.name) {
-      addToast({ type: 'error', title: '请填写公司名称' })
+      addToast({ type: 'error', title: t('companies.fillName') })
       return
     }
 
@@ -118,31 +121,31 @@ export default function CompaniesPage() {
 
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: currentCompany ? '更新成功' : '创建成功' })
+        addToast({ type: 'success', title: currentCompany ? t('companies.updateSuccess') : t('companies.createSuccess') })
         setShowDialog(false)
         fetchCompanies()
       } else {
-        addToast({ type: 'error', title: '操作失败', description: data.error })
+        addToast({ type: 'error', title: t('common.operationFailed'), description: data.error })
       }
     } catch (e) {
-      addToast({ type: 'error', title: '操作失败' })
+      addToast({ type: 'error', title: t('common.operationFailed') })
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此公司吗？关联的客户不会被删除。')) return
+    if (!confirm(t('companies.confirmDelete'))) return
 
     try {
       const res = await fetch(`/api/companies/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: '删除成功' })
+        addToast({ type: 'success', title: t('common.deleteSuccess') })
         fetchCompanies()
       }
     } catch (e) {
-      addToast({ type: 'error', title: '删除失败' })
+      addToast({ type: 'error', title: t('common.deleteFailed') })
     }
   }
 
@@ -152,11 +155,11 @@ export default function CompaniesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">公司库</h1>
-            <p className="text-sm text-gray-500">管理和搜索全球公司信息</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('companies.title')}</h1>
+            <p className="text-sm text-gray-500">{t('companies.subtitle')}</p>
           </div>
           <Button className="gap-2" onClick={openAddDialog}>
-            <Plus className="h-4 w-4" /> 添加公司
+            <Plus className="h-4 w-4" /> {t('companies.addCompany')}
           </Button>
         </div>
 
@@ -166,7 +169,7 @@ export default function CompaniesPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="搜索公司名称、域名、网站..."
+                placeholder={t('companies.searchPlaceholder')}
                 className="pl-10"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
@@ -194,10 +197,10 @@ export default function CompaniesPage() {
           <Card className="border-gray-100">
             <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
               <Building2 className="mb-4 h-16 w-16 text-gray-300" />
-              <p className="text-lg font-medium">暂无公司数据</p>
-              <p className="text-sm mt-1">请先创建拓客任务，或手动添加公司</p>
+              <p className="text-lg font-medium">{t('companies.noData')}</p>
+              <p className="text-sm mt-1">{t('companies.noDataHint')}</p>
               <Button className="mt-4 gap-2" onClick={openAddDialog}>
-                <Plus className="h-4 w-4" /> 添加公司
+                <Plus className="h-4 w-4" /> {t('companies.addCompany')}
               </Button>
             </CardContent>
           </Card>
@@ -229,12 +232,12 @@ export default function CompaniesPage() {
                   <div className="space-y-2 text-sm text-gray-600">
                     {company.industry && (
                       <p className="flex items-center gap-2">
-                        <span className="text-gray-400">行业：</span> {company.industry}
+                        <span className="text-gray-400">{t('companies.industry')}：</span> {company.industry}
                       </p>
                     )}
                     {company.size && (
                       <p className="flex items-center gap-2">
-                        <Users className="h-3.5 w-3.5 text-gray-400" /> {company.size} 人
+                        <Users className="h-3.5 w-3.5 text-gray-400" /> {company.size} {t('companies.people')}
                       </p>
                     )}
                     {(company.country || company.city) && (
@@ -283,13 +286,13 @@ export default function CompaniesPage() {
         {total > 20 && (
           <div className="flex justify-center gap-2">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-              上一页
+              {t('common.prevPage')}
             </Button>
             <span className="flex items-center px-3 text-sm text-gray-500">
-              第 {page} 页，共 {Math.ceil(total / 20)} 页
+              {t('common.pagination').replace('{page}', page.toString()).replace('{total}', Math.ceil(total / 20).toString())}
             </span>
             <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(p => p + 1)}>
-              下一页
+              {t('common.nextPage')}
             </Button>
           </div>
         )}
@@ -300,23 +303,23 @@ export default function CompaniesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold">{currentCompany ? '编辑公司' : '添加公司'}</h2>
+              <h2 className="text-lg font-semibold">{currentCompany ? t('companies.editCompany') : t('companies.addCompany')}</h2>
               <button onClick={() => setShowDialog(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <Label>公司名称 *</Label>
+                <Label>{t('companies.form.name')} *</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="公司名称"
+                  placeholder={t('companies.form.namePlaceholder')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>域名</Label>
+                  <Label>{t('companies.form.domain')}</Label>
                   <Input
                     value={form.domain}
                     onChange={(e) => setForm({ ...form, domain: e.target.value })}
@@ -324,7 +327,7 @@ export default function CompaniesPage() {
                   />
                 </div>
                 <div>
-                  <Label>网站</Label>
+                  <Label>{t('companies.form.website')}</Label>
                   <Input
                     value={form.website}
                     onChange={(e) => setForm({ ...form, website: e.target.value })}
@@ -334,33 +337,33 @@ export default function CompaniesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>行业</Label>
+                  <Label>{t('companies.form.industry')}</Label>
                   <Input
                     value={form.industry}
                     onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                    placeholder="如：Technology, Manufacturing"
+                    placeholder={t('companies.form.industryPlaceholder')}
                   />
                 </div>
                 <div>
-                  <Label>公司规模</Label>
+                  <Label>{t('companies.form.size')}</Label>
                   <select
                     value={form.size}
                     onChange={(e) => setForm({ ...form, size: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="">请选择</option>
-                    <option value="1-10">1-10人</option>
-                    <option value="11-50">11-50人</option>
-                    <option value="51-200">51-200人</option>
-                    <option value="201-500">201-500人</option>
-                    <option value="501-1000">501-1000人</option>
-                    <option value="1000+">1000+人</option>
+                    <option value="">{t('companies.form.sizePlaceholder')}</option>
+                    <option value="1-10">1-10</option>
+                    <option value="11-50">11-50</option>
+                    <option value="51-200">51-200</option>
+                    <option value="201-500">201-500</option>
+                    <option value="501-1000">501-1000</option>
+                    <option value="1000+">1000+</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>国家</Label>
+                  <Label>{t('companies.form.country')}</Label>
                   <Input
                     value={form.country}
                     onChange={(e) => setForm({ ...form, country: e.target.value })}
@@ -368,7 +371,7 @@ export default function CompaniesPage() {
                   />
                 </div>
                 <div>
-                  <Label>城市</Label>
+                  <Label>{t('companies.form.city')}</Label>
                   <Input
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
@@ -385,21 +388,21 @@ export default function CompaniesPage() {
                 />
               </div>
               <div>
-                <Label>公司描述</Label>
+                <Label>{t('companies.form.description')}</Label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="公司简介..."
+                  placeholder={t('companies.form.descriptionPlaceholder')}
                   rows={3}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>{t('common.cancel')}</Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {currentCompany ? '保存修改' : '添加公司'}
+                {currentCompany ? t('common.save') : t('companies.addCompany')}
               </Button>
             </div>
           </div>

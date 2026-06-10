@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Camera, Upload, XCircle, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 
 interface AvatarUploadProps {
   currentAvatar?: string | null
@@ -12,6 +13,7 @@ interface AvatarUploadProps {
 
 export function AvatarUpload({ currentAvatar, onUpload, size = 'md' }: AvatarUploadProps) {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -28,13 +30,13 @@ export function AvatarUpload({ currentAvatar, onUpload, size = 'md' }: AvatarUpl
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      addToast({ type: 'error', title: '文件过大', description: '头像大小不能超过 5MB' })
+      addToast({ type: 'error', title: t('avatar.fileTooLarge'), description: t('avatar.maxSize') })
       return
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      addToast({ type: 'error', title: '文件类型错误', description: '请上传图片文件' })
+      addToast({ type: 'error', title: t('avatar.invalidType'), description: t('avatar.imageOnly') })
       return
     }
 
@@ -55,14 +57,14 @@ export function AvatarUpload({ currentAvatar, onUpload, size = 'md' }: AvatarUpl
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: '上传成功', description: '头像已更新' })
+        addToast({ type: 'success', title: t('avatar.uploadSuccess'), description: t('avatar.updated') })
         onUpload?.(data.data.url)
       } else {
-        addToast({ type: 'error', title: '上传失败', description: data.error })
+        addToast({ type: 'error', title: t('avatar.uploadFailed'), description: data.error })
         setPreviewUrl(currentAvatar || null)
       }
     } catch (e) {
-      addToast({ type: 'error', title: '上传失败', description: '网络错误，请重试' })
+      addToast({ type: 'error', title: t('avatar.uploadFailed'), description: t('common.networkError') })
       setPreviewUrl(currentAvatar || null)
     } finally {
       setUploading(false)
@@ -75,7 +77,7 @@ export function AvatarUpload({ currentAvatar, onUpload, size = 'md' }: AvatarUpl
       fileInputRef.current.value = ''
     }
     onUpload?.('')
-    addToast({ type: 'info', title: '已移除头像' })
+    addToast({ type: 'info', title: t('avatar.removed') })
   }
 
   return (
@@ -130,7 +132,7 @@ export function AvatarUpload({ currentAvatar, onUpload, size = 'md' }: AvatarUpl
       />
 
       <p className="text-xs text-gray-500">
-        {uploading ? '上传中...' : '点击更换头像'}
+        {uploading ? t('avatar.uploading') : t('avatar.changeAvatar')}
       </p>
     </div>
   )

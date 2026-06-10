@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { FileText, Upload, X, Loader2, Paperclip } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 
 export interface UploadedFile {
   name: string
@@ -25,6 +26,7 @@ export function FileUpload({
   onFilesUploaded,
 }: FileUploadProps) {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [uploading, setUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [dragOver, setDragOver] = useState(false)
@@ -34,7 +36,7 @@ export function FileUpload({
     if (!files || files.length === 0) return
 
     if (uploadedFiles.length + files.length > maxFiles) {
-      addToast({ type: 'error', title: '文件过多', description: `最多只能上传 ${maxFiles} 个文件` })
+      addToast({ type: 'error', title: t('fileUpload.tooMany'), description: t('fileUpload.maxFiles').replace('{n}', String(maxFiles)) })
       return
     }
 
@@ -44,7 +46,7 @@ export function FileUpload({
     for (const file of Array.from(files)) {
       // Validate size
       if (file.size > maxSize) {
-        addToast({ type: 'error', title: '文件过大', description: `${file.name} 超过 ${maxSize / 1024 / 1024}MB 限制` })
+        addToast({ type: 'error', title: t('fileUpload.tooLarge'), description: t('fileUpload.sizeExceeded').replace('{name}', file.name).replace('{size}', String(maxSize / 1024 / 1024)) })
         continue
       }
 
@@ -68,10 +70,10 @@ export function FileUpload({
           }
           newFiles.push(uploadedFile)
         } else {
-          addToast({ type: 'error', title: '上传失败', description: `${file.name}: ${data.error}` })
+          addToast({ type: 'error', title: t('fileUpload.uploadFailed'), description: `${file.name}: ${data.error}` })
         }
       } catch (e) {
-        addToast({ type: 'error', title: '上传失败', description: file.name })
+        addToast({ type: 'error', title: t('fileUpload.uploadFailed'), description: file.name })
       }
     }
 
@@ -82,7 +84,7 @@ export function FileUpload({
     }
 
     setUploading(false)
-  }, [uploadedFiles, maxFiles, maxSize, onFilesUploaded, addToast])
+  }, [uploadedFiles, maxFiles, maxSize, onFilesUploaded, addToast, t])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFiles(e.target.files)
@@ -135,10 +137,10 @@ export function FileUpload({
       >
         <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
         <p className="text-sm text-gray-600">
-          拖放文件到此处，或 <span className="text-primary">点击选择</span>
+          {t('fileUpload.dropHint')}
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          最多 {maxFiles} 个文件，每个不超过 {formatSize(maxSize)}
+          {t('fileUpload.maxFilesHint').replace('{n}', String(maxFiles)).replace('{size}', formatSize(maxSize))}
         </p>
         <input
           ref={fileInputRef}
@@ -178,7 +180,7 @@ export function FileUpload({
       {uploading && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>上传中...</span>
+          <span>{t('fileUpload.uploading')}</span>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Campaign {
@@ -14,6 +15,7 @@ interface Campaign {
 }
 
 export default function RecentCampaigns() {
+  const { t } = useI18n()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -36,19 +38,19 @@ export default function RecentCampaigns() {
   }
 
   const statusMap: Record<string, { label: string; color: string }> = {
-    RUNNING: { label: '进行中', color: 'bg-green-100 text-green-700' },
-    COMPLETED: { label: '已完成', color: 'bg-blue-100 text-blue-700' },
-    SCHEDULED: { label: '已排期', color: 'bg-yellow-100 text-yellow-700' },
-    DRAFT: { label: '草稿', color: 'bg-gray-100 text-gray-700' },
-    PAUSED: { label: '已暂停', color: 'bg-orange-100 text-orange-700' },
-    FAILED: { label: '失败', color: 'bg-red-100 text-red-700' },
+    RUNNING: { label: t('campaigns.status.running'), color: 'bg-green-100 text-green-700' },
+    COMPLETED: { label: t('campaigns.status.completed'), color: 'bg-blue-100 text-blue-700' },
+    SCHEDULED: { label: t('campaigns.status.scheduled'), color: 'bg-yellow-100 text-yellow-700' },
+    DRAFT: { label: t('campaigns.status.draft'), color: 'bg-gray-100 text-gray-700' },
+    PAUSED: { label: t('campaigns.status.paused'), color: 'bg-orange-100 text-orange-700' },
+    FAILED: { label: t('campaigns.status.failed'), color: 'bg-red-100 text-red-700' },
   }
 
   if (loading) {
     return (
       <Card className="border-gray-100">
         <CardHeader>
-          <CardTitle className="text-lg">近期邮件活动</CardTitle>
+          <CardTitle className="text-lg">{t('dashboard.recentCampaigns')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -64,25 +66,25 @@ export default function RecentCampaigns() {
   return (
     <Card className="border-gray-100">
       <CardHeader>
-        <CardTitle className="text-lg">近期邮件活动</CardTitle>
+        <CardTitle className="text-lg">{t('dashboard.recentCampaigns')}</CardTitle>
       </CardHeader>
       <CardContent>
         {campaigns.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
-            <p>暂无邮件活动</p>
-            <p className="text-sm mt-1">创建您的第一个邮件营销活动</p>
+            <p>{t('common.noData')}</p>
+            <p className="text-sm mt-1">{t('dashboard.recentCampaignsEmpty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="pb-3 text-left font-medium text-gray-500">活动名称</th>
-                  <th className="pb-3 text-left font-medium text-gray-500">状态</th>
-                  <th className="pb-3 text-right font-medium text-gray-500">已发送</th>
-                  <th className="pb-3 text-right font-medium text-gray-500">打开率</th>
-                  <th className="pb-3 text-right font-medium text-gray-500">回复率</th>
-                  <th className="pb-3 text-right font-medium text-gray-500">日期</th>
+                  <th className="pb-3 text-left font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.name')}</th>
+                  <th className="pb-3 text-left font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.status')}</th>
+                  <th className="pb-3 text-right font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.sent')}</th>
+                  <th className="pb-3 text-right font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.openRate')}</th>
+                  <th className="pb-3 text-right font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.replyRate')}</th>
+                  <th className="pb-3 text-right font-medium text-gray-500">{t('dashboard.recentCampaignsHeaders.date')}</th>
                 </tr>
               </thead>
               <tbody>

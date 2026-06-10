@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Users, Building2, Send, MailOpen, TrendingUp, Reply } from 'lucide-react'
 
@@ -14,6 +15,7 @@ interface Stats {
 }
 
 export default function StatsOverview() {
+  const { t } = useI18n()
   const [stats, setStats] = useState<Stats>({
     totalContacts: 0,
     totalCompanies: 0,
@@ -52,42 +54,42 @@ export default function StatsOverview() {
 
   const statItems = [
     {
-      title: '总客户数',
+      title: t('dashboard.totalContacts'),
       value: stats.totalContacts.toLocaleString(),
       icon: Users,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
-      title: '公司库',
+      title: t('dashboard.totalCompanies'),
       value: stats.totalCompanies.toLocaleString(),
       icon: Building2,
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
     },
     {
-      title: '已发送邮件',
+      title: t('dashboard.emailsSent'),
       value: stats.emails_SENT.toLocaleString(),
       icon: Send,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
-      title: '邮件打开率',
+      title: t('dashboard.openRate'),
       value: `${openRate}%`,
       icon: MailOpen,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
     },
     {
-      title: '回复率',
+      title: t('dashboard.replyRate'),
       value: `${replyRate}%`,
       icon: Reply,
       color: 'text-pink-600',
       bgColor: 'bg-pink-50',
     },
     {
-      title: '营销活动',
+      title: t('dashboard.campaigns'),
       value: stats.totalCampaigns.toLocaleString(),
       icon: TrendingUp,
       color: 'text-indigo-600',

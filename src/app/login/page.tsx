@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Mail, Loader2, AlertCircle } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function LoginPage() {
   const router = useRouter()
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +21,7 @@ export default function LoginPage() {
     setError('')
 
     if (!email || !password) {
-      setError('请输入邮箱和密码')
+      setError(t('auth.enterEmailPassword'))
       return
     }
 
@@ -34,14 +36,14 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: '登录成功', description: `欢迎回来，${data.user.name}` })
+        addToast({ type: 'success', title: t('auth.loginSuccess'), description: t('auth.welcomeBack').replace('{name}', data.user.name) })
         router.push('/dashboard')
       } else {
-        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || '登录失败'
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('auth.loginFailed')
         setError(errorMsg)
       }
     } catch (e) {
-      setError('网络错误，请稍后重试')
+      setError(t('common.networkError'))
     } finally {
       setLoading(false)
     }
@@ -58,8 +60,8 @@ export default function LoginPage() {
           </Link>
 
           <div className="mt-12">
-            <h1 className="text-2xl font-bold text-gray-900">欢迎回来</h1>
-            <p className="mt-2 text-sm text-gray-500">登录您的账户以继续</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('auth.welcomeBack')}</h1>
+            <p className="mt-2 text-sm text-gray-500">{t('auth.loginSubtitle')}</p>
           </div>
 
           {error && (
@@ -70,7 +72,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">邮箱地址</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('auth.email')}</label>
               <input
                 id="email"
                 type="email"
@@ -84,7 +86,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">密码</label>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">{t('auth.password')}</label>
               <input
                 id="password"
                 type="password"
@@ -92,7 +94,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="输入密码"
+                placeholder={t('auth.passwordPlaceholder')}
                 disabled={loading}
               />
             </div>
@@ -103,17 +105,17 @@ export default function LoginPage() {
               className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {loading ? '登录中...' : '登录'}
+              {loading ? t('auth.loggingIn') : t('auth.login')}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <p className="text-gray-500">演示账户：admin@outreachhub.com / admin123</p>
+            <p className="text-gray-500">{t('auth.demoAccount')}</p>
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            还没有账户？{' '}
-            <Link href="/register" className="font-medium text-primary hover:text-primary/80">免费注册</Link>
+            {t('auth.noAccount')}{' '}
+            <Link href="/register" className="font-medium text-primary hover:text-primary/80">{t('auth.freeRegister')}</Link>
           </p>
         </div>
       </div>
@@ -121,30 +123,30 @@ export default function LoginPage() {
       {/* Right side - branding */}
       <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
         <div className="mx-auto max-w-md text-white">
-          <h2 className="text-3xl font-bold">智能海外拓客与邮件营销</h2>
+          <h2 className="text-3xl font-bold">{t('login.branding.title')}</h2>
           <p className="mt-4 text-lg text-blue-100">
-            帮助中国出海企业高效拓展海外客户，通过AI驱动的邮件营销提升转化率
+            {t('login.branding.subtitle')}
           </p>
           <div className="mt-10 space-y-4">
             <div className="flex items-start gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold">1</div>
               <div>
-                <p className="font-semibold">AI智能拓客</p>
-                <p className="text-sm text-blue-200">精准定位目标客户，自动挖掘有效邮箱</p>
+                <p className="font-semibold">{t('login.branding.feature1')}</p>
+                <p className="text-sm text-blue-200">{t('login.branding.feature1Desc')}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold">2</div>
               <div>
-                <p className="font-semibold">个性化邮件</p>
-                <p className="text-sm text-blue-200">AI生成个性化内容，提升打开率和回复率</p>
+                <p className="font-semibold">{t('login.branding.feature2')}</p>
+                <p className="text-sm text-blue-200">{t('login.branding.feature2Desc')}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold">3</div>
               <div>
-                <p className="font-semibold">数据驱动</p>
-                <p className="text-sm text-blue-200">全链路数据追踪，持续优化营销策略</p>
+                <p className="font-semibold">{t('login.branding.feature3')}</p>
+                <p className="text-sm text-blue-200">{t('login.branding.feature3Desc')}</p>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   FileText, Plus, Edit, Trash2, X, Loader2, Wand2, Copy, Eye
 } from 'lucide-react'
@@ -28,6 +29,7 @@ interface Template {
 
 export default function TemplatesPage() {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
@@ -60,6 +62,7 @@ export default function TemplatesPage() {
       }
     } catch (e) {
       console.error(e)
+      addToast({ type: 'error', title: t('common.loadFailed') })
     } finally {
       setLoading(false)
     }
@@ -95,7 +98,7 @@ export default function TemplatesPage() {
 
   const handleSave = async () => {
     if (!form.name || !form.subject || !form.content) {
-      addToast({ type: 'error', title: '请填写必填项' })
+      addToast({ type: 'error', title: t('common.fillRequired') })
       return
     }
 
@@ -115,37 +118,37 @@ export default function TemplatesPage() {
 
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: currentTemplate ? '更新成功' : '创建成功' })
+        addToast({ type: 'success', title: currentTemplate ? t('templates.updateSuccess') : t('templates.createSuccess') })
         setShowDialog(false)
         fetchTemplates()
       } else {
-        addToast({ type: 'error', title: '操作失败', description: data.error })
+        addToast({ type: 'error', title: t('common.operationFailed'), description: data.error })
       }
     } catch (e) {
-      addToast({ type: 'error', title: '操作失败' })
+      addToast({ type: 'error', title: t('common.operationFailed') })
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此模板吗？')) return
+    if (!confirm(t('templates.confirmDelete'))) return
 
     try {
       const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: '删除成功' })
+        addToast({ type: 'success', title: t('common.deleteSuccess') })
         fetchTemplates()
       }
     } catch (e) {
-      addToast({ type: 'error', title: '删除失败' })
+      addToast({ type: 'error', title: t('common.deleteFailed') })
     }
   }
 
   const handleAIGenerate = async () => {
     if (!form.name) {
-      addToast({ type: 'error', title: '请先填写模板名称' })
+      addToast({ type: 'error', title: t('templates.fillNameFirst') })
       return
     }
 
@@ -174,12 +177,12 @@ export default function TemplatesPage() {
           subject: data.data.subject,
           content: data.data.content,
         })
-        addToast({ type: 'success', title: 'AI生成成功' })
+        addToast({ type: 'success', title: t('templates.aiSuccess') })
       } else {
-        addToast({ type: 'error', title: 'AI生成失败', description: data.error })
+        addToast({ type: 'error', title: t('templates.aiFailed'), description: data.error })
       }
     } catch (e) {
-      addToast({ type: 'error', title: 'AI生成失败' })
+      addToast({ type: 'error', title: t('templates.aiFailed') })
     } finally {
       setAiGenerating(false)
     }
@@ -187,15 +190,15 @@ export default function TemplatesPage() {
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content)
-    addToast({ type: 'success', title: '已复制到剪贴板' })
+    addToast({ type: 'success', title: t('templates.copied') })
   }
 
   const categoryLabels: Record<string, string> = {
-    'cold-outreach': '冷邮件',
-    'follow-up': '跟进',
-    'introduction': '介绍',
-    'promotion': '促销',
-    'meeting-request': '会议邀请',
+    'cold-outreach': t('templates.category.coldOutreach'),
+    'follow-up': t('templates.category.followUp'),
+    'introduction': t('templates.category.introduction'),
+    'promotion': t('templates.category.promotion'),
+    'meeting-request': t('templates.category.meetingRequest'),
   }
 
   return (
@@ -204,8 +207,8 @@ export default function TemplatesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">邮件模板</h1>
-            <p className="text-sm text-gray-500">管理邮件模板，支持AI生成</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('templates.title')}</h1>
+            <p className="text-sm text-gray-500">{t('templates.subtitle')}</p>
           </div>
           <div className="flex gap-2">
             <select
@@ -220,7 +223,7 @@ export default function TemplatesPage() {
               <option value="es">Español</option>
             </select>
             <Button className="gap-2" onClick={openAddDialog}>
-              <Plus className="h-4 w-4" /> 新建模板
+              <Plus className="h-4 w-4" /> {t('templates.create')}
             </Button>
           </div>
         </div>
@@ -244,10 +247,10 @@ export default function TemplatesPage() {
           <Card className="border-gray-100">
             <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
               <FileText className="mb-4 h-16 w-16 text-gray-300" />
-              <p className="text-lg font-medium">暂无模板</p>
-              <p className="text-sm mt-1">创建您的第一个邮件模板，或使用AI生成</p>
+              <p className="text-lg font-medium">{t('templates.noData')}</p>
+              <p className="text-sm mt-1">{t('templates.noDataHint')}</p>
               <Button className="mt-4 gap-2" onClick={openAddDialog}>
-                <Plus className="h-4 w-4" /> 新建模板
+                <Plus className="h-4 w-4" /> {t('templates.create')}
               </Button>
             </CardContent>
           </Card>
@@ -269,12 +272,12 @@ export default function TemplatesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">主题：{template.subject}</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">{t('templates.subjectLabel')}{template.subject}</p>
                   <p className="text-sm text-gray-500 line-clamp-3">{template.content}</p>
                   <div className="flex items-center justify-between mt-4 pt-4 border-t">
                     <div className="text-xs text-gray-400">
-                      使用 {template.usageCount} 次
-                      {template.successRate !== null && ` | 打开率 ${(template.successRate * 100).toFixed(1)}%`}
+                      {t('templates.usageCount').replace('{n}', template.usageCount.toString())}
+                      {template.successRate !== null && ` | ${t('templates.openRate').replace('{n}', (template.successRate * 100).toFixed(1))}`}
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openPreview(template)}>
@@ -300,7 +303,7 @@ export default function TemplatesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold">{currentTemplate ? '编辑模板' : '新建模板'}</h2>
+              <h2 className="text-lg font-semibold">{currentTemplate ? t('templates.editTemplate') : t('templates.create')}</h2>
               <button onClick={() => setShowDialog(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
@@ -308,39 +311,39 @@ export default function TemplatesPage() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>模板名称 *</Label>
+                  <Label>{t('templates.form.name')} *</Label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="如：冷邮件 - 产品介绍"
+                    placeholder={t('templates.form.namePlaceholder')}
                   />
                 </div>
                 <div>
-                  <Label>分类</Label>
+                  <Label>{t('templates.form.category')}</Label>
                   <select
                     value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="cold-outreach">冷邮件</option>
-                    <option value="follow-up">跟进</option>
-                    <option value="introduction">介绍</option>
-                    <option value="promotion">促销</option>
-                    <option value="meeting-request">会议邀请</option>
+                    <option value="cold-outreach">{t('templates.category.coldOutreach')}</option>
+                    <option value="follow-up">{t('templates.category.followUp')}</option>
+                    <option value="introduction">{t('templates.category.introduction')}</option>
+                    <option value="promotion">{t('templates.category.promotion')}</option>
+                    <option value="meeting-request">{t('templates.category.meetingRequest')}</option>
                   </select>
                 </div>
               </div>
               <div>
-                <Label>邮件主题 *</Label>
+                <Label>{t('templates.form.subject')} *</Label>
                 <Input
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  placeholder="如：Quick question about {{companyName}}"
+                  placeholder={t('templates.form.subjectPlaceholder')}
                 />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label>邮件内容 *</Label>
+                  <Label>{t('templates.form.content')} *</Label>
                   <Button
                     variant="outline"
                     size="sm"
@@ -353,34 +356,34 @@ export default function TemplatesPage() {
                     ) : (
                       <Wand2 className="h-3 w-3" />
                     )}
-                    AI生成
+                    {t('templates.aiGenerate')}
                   </Button>
                 </div>
                 <Textarea
                   value={form.content}
                   onChange={(e) => setForm({ ...form, content: e.target.value })}
-                  placeholder="输入邮件内容，支持变量如 {{firstName}}, {{companyName}}"
+                  placeholder={t('templates.form.contentPlaceholder')}
                   rows={12}
                   className="font-mono text-sm"
                 />
               </div>
               <div>
-                <Label>可用变量（逗号分隔）</Label>
+                <Label>{t('templates.form.variables')}</Label>
                 <Input
                   value={form.variables}
                   onChange={(e) => setForm({ ...form, variables: e.target.value })}
-                  placeholder="如：firstName, companyName, title"
+                  placeholder={t('templates.form.variablesPlaceholder')}
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  在邮件内容中使用 {'{{变量名}}'} 格式插入变量
+                  {t('templates.form.variablesHint')}
                 </p>
               </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>{t('common.cancel')}</Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {currentTemplate ? '保存修改' : '创建模板'}
+                {currentTemplate ? t('common.save') : t('templates.create')}
               </Button>
             </div>
           </div>
@@ -392,7 +395,7 @@ export default function TemplatesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold">模板预览</h2>
+              <h2 className="text-lg font-semibold">{t('templates.preview')}</h2>
               <button onClick={() => setShowPreview(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
@@ -400,7 +403,7 @@ export default function TemplatesPage() {
             <div className="p-6">
               <div className="border rounded-lg p-6 bg-gray-50">
                 <div className="mb-4 pb-4 border-b">
-                  <p className="text-sm text-gray-500">主题</p>
+                  <p className="text-sm text-gray-500">{t('templates.subject')}</p>
                   <p className="font-medium">{currentTemplate.subject}</p>
                 </div>
                 <div className="whitespace-pre-wrap text-sm text-gray-700">
@@ -409,7 +412,7 @@ export default function TemplatesPage() {
               </div>
               {currentTemplate.variables.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">可用变量：</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">{t('templates.availableVariables')}</p>
                   <div className="flex flex-wrap gap-2">
                     {currentTemplate.variables.map((v, i) => (
                       <code key={i} className="text-xs bg-gray-100 px-2 py-1 rounded">
@@ -422,10 +425,10 @@ export default function TemplatesPage() {
             </div>
             <div className="flex justify-end gap-3 p-6 border-t">
               <Button variant="outline" onClick={() => handleCopy(currentTemplate.content)}>
-                <Copy className="h-4 w-4 mr-2" /> 复制内容
+                <Copy className="h-4 w-4 mr-2" /> {t('templates.copyContent')}
               </Button>
               <Button onClick={() => { setShowPreview(false); openEditDialog(currentTemplate) }}>
-                <Edit className="h-4 w-4 mr-2" /> 编辑
+                <Edit className="h-4 w-4 mr-2" /> {t('common.edit')}
               </Button>
             </div>
           </div>

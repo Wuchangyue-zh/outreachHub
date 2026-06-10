@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,7 @@ interface EmailJob {
 }
 
 export default function EmailQueuePage() {
+  const { t } = useI18n()
   const [stats, setStats] = useState<QueueStats | null>(null)
   const [recentJobs, setRecentJobs] = useState<EmailJob[]>([])
   const [failedJobs, setFailedJobs] = useState<EmailJob[]>([])
@@ -98,11 +100,11 @@ export default function EmailQueuePage() {
   }
 
   const stateLabels: Record<string, string> = {
-    waiting: '等待中',
-    active: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    delayed: '延迟',
+    waiting: t('emailQueue.state.waiting'),
+    active: t('emailQueue.state.active'),
+    completed: t('emailQueue.state.completed'),
+    failed: t('emailQueue.state.failed'),
+    delayed: t('emailQueue.state.delayed'),
   }
 
   return (
@@ -111,20 +113,20 @@ export default function EmailQueuePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">邮件队列监控</h1>
-            <p className="text-sm text-gray-500">管理邮件发送队列和任务状态</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('emailQueue.title')}</h1>
+            <p className="text-sm text-gray-500">{t('emailQueue.subtitle')}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={fetchStats}>
-              <RefreshCw className="h-4 w-4 mr-2" /> 刷新
+              <RefreshCw className="h-4 w-4 mr-2" /> {t('common.refresh')}
             </Button>
             <Button variant="outline" size="sm" onClick={retryFailedJobs} disabled={retrying || !stats?.failed}>
               {retrying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-              重试失败任务
+              {t('emailQueue.retryFailed')}
             </Button>
             <Button variant="outline" size="sm" onClick={cleanOldJobs} disabled={cleaning}>
               {cleaning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-              清理旧任务
+              {t('emailQueue.cleanOld')}
             </Button>
           </div>
         </div>
@@ -151,7 +153,7 @@ export default function EmailQueuePage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.waiting}</p>
-                      <p className="text-xs text-gray-500">等待中</p>
+                      <p className="text-xs text-gray-500">{t('emailQueue.state.waiting')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -165,7 +167,7 @@ export default function EmailQueuePage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.active}</p>
-                      <p className="text-xs text-gray-500">处理中</p>
+                      <p className="text-xs text-gray-500">{t('emailQueue.state.active')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -179,7 +181,7 @@ export default function EmailQueuePage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.completed}</p>
-                      <p className="text-xs text-gray-500">已完成</p>
+                      <p className="text-xs text-gray-500">{t('emailQueue.state.completed')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -193,7 +195,7 @@ export default function EmailQueuePage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.failed}</p>
-                      <p className="text-xs text-gray-500">失败</p>
+                      <p className="text-xs text-gray-500">{t('emailQueue.state.failed')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -207,7 +209,7 @@ export default function EmailQueuePage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.delayed}</p>
-                      <p className="text-xs text-gray-500">延迟</p>
+                      <p className="text-xs text-gray-500">{t('emailQueue.state.delayed')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -219,18 +221,18 @@ export default function EmailQueuePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
-                  队列状态
+                  {t('emailQueue.queueStatus')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4">
                   <Badge className={stats.queueAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                    {stats.queueAvailable ? '队列可用' : '队列不可用（直接发送模式）'}
+                    {stats.queueAvailable ? t('emailQueue.available') : t('emailQueue.unavailable')}
                   </Badge>
                   {!stats.queueAvailable && (
                     <div className="flex items-center gap-2 text-amber-600">
                       <AlertTriangle className="h-4 w-4" />
-                      <span className="text-sm">Redis 不可用，邮件将直接发送</span>
+                      <span className="text-sm">{t('emailQueue.redisUnavailable')}</span>
                     </div>
                   )}
                 </div>
@@ -242,24 +244,24 @@ export default function EmailQueuePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  最近任务
+                  {t('emailQueue.recentJobs')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {recentJobs.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
                     <Mail className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p>暂无任务记录</p>
+                    <p>{t('emailQueue.noJobs')}</p>
                   </div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="border-b border-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">任务ID</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">进度</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">重试次数</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500">时间</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('emailQueue.tableHeaders.id')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('emailQueue.tableHeaders.status')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('emailQueue.tableHeaders.progress')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('emailQueue.tableHeaders.retries')}</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">{t('emailQueue.tableHeaders.time')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -296,7 +298,7 @@ export default function EmailQueuePage() {
           <Card className="border-gray-100">
             <CardContent className="py-12 text-center text-gray-400">
               <Mail className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p>无法获取队列状态</p>
+              <p>{t('emailQueue.fetchError')}</p>
             </CardContent>
           </Card>
         )}

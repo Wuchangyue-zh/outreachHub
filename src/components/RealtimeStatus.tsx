@@ -1,6 +1,7 @@
 'use client'
 
 import { useSSE } from '@/hooks/use-sse'
+import { useI18n } from '@/hooks/use-i18n'
 import { Bell, Wifi, WifiOff, Loader2, Mail, Eye, MousePointer, Reply, AlertTriangle, X } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toast'
@@ -43,15 +44,6 @@ const eventIcons: Record<string, typeof Mail> = {
   'email:failed': AlertTriangle,
 }
 
-const eventLabels: Record<string, string> = {
-  'email:sent': '已发送',
-  'email:opened': '已打开',
-  'email:clicked': '已点击',
-  'email:replied': '已回复',
-  'email:bounced': '退信',
-  'email:failed': '发送失败',
-}
-
 const eventColors: Record<string, string> = {
   'email:sent': 'text-blue-600 bg-blue-50',
   'email:opened': 'text-green-600 bg-green-50',
@@ -63,6 +55,7 @@ const eventColors: Record<string, string> = {
 
 export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const { data, connected, error } = useSSE('/api/sse/stats', {
     enabled: true,
     reconnectInterval: 10000,
@@ -71,6 +64,18 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
   const [notifications, setNotifications] = useState<EmailEvent[]>([])
   const [showPanel, setShowPanel] = useState(false)
   const [lastEventTimestamp, setLastEventTimestamp] = useState(0)
+
+  const getEventLabel = useCallback((type: string): string => {
+    const eventKey: Record<string, string> = {
+      'email:sent': 'realtime.events.sent',
+      'email:opened': 'realtime.events.opened',
+      'email:clicked': 'realtime.events.clicked',
+      'email:replied': 'realtime.events.replied',
+      'email:bounced': 'realtime.events.bounced',
+      'email:failed': 'realtime.events.failed',
+    }
+    return eventKey[type] ? t(eventKey[type]) : type
+  }, [t])
 
   // Process SSE data
   useEffect(() => {
@@ -97,19 +102,19 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
         if (event.type === 'email:replied') {
           addToast({
             type: 'success',
-            title: '收到回复',
-            description: `${event.toEmail} 回复了 "${event.subject}"`,
+            title: t('realtime.receivedReply'),
+            description: `${event.toEmail}: "${event.subject}"`,
           })
         } else if (event.type === 'email:bounced' || event.type === 'email:failed') {
           addToast({
             type: 'error',
-            title: eventLabels[event.type] || '邮件事件',
+            title: t('realtime.emailEvent'),
             description: `${event.toEmail}: ${event.subject}`,
           })
         }
       }
     }
-  }, [data, lastEventTimestamp, onNewData, addToast])
+  }, [data, lastEventTimestamp, onNewData, addToast, t])
 
   const clearNotifications = useCallback(() => {
     setNotifications([])
@@ -122,17 +127,17 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
         {connected ? (
           <>
             <Wifi className="h-3.5 w-3.5 text-green-500" />
-            <span className="text-green-600">实时</span>
+            <span className="text-green-600">{t('realtime.connected')}</span>
           </>
         ) : error ? (
           <>
             <WifiOff className="h-3.5 w-3.5 text-red-500" />
-            <span className="text-red-500">断开</span>
+            <span className="text-red-500">{t('realtime.disconnected')}</span>
           </>
         ) : (
           <>
             <Loader2 className="h-3.5 w-3.5 text-gray-400 animate-spin" />
-            <span className="text-gray-400">连接中</span>
+            <span className="text-gray-400">{t('realtime.connecting')}</span>
           </>
         )}
       </div>
@@ -155,14 +160,14 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
         {showPanel && (
           <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden">
             <div className="flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="font-medium text-sm">实时通知</h3>
+              <h3 className="font-medium text-sm">{t('realtime.notifications')}</h3>
               <div className="flex items-center gap-2">
                 {notifications.length > 0 && (
                   <button
                     onClick={clearNotifications}
                     className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                   >
-                    清除全部
+                    {t('realtime.clearAll')}
                   </button>
                 )}
                 <button
@@ -177,7 +182,7 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
             <div className="overflow-y-auto max-h-72">
               {notifications.length === 0 ? (
                 <div className="p-4 text-center text-sm text-gray-500">
-                  暂无新通知
+                  {t('realtime.noNotifications')}
                 </div>
               ) : (
                 notifications.map((event, index) => {
@@ -193,7 +198,7 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {eventLabels[event.type] || event.type}
+                          {getEventLabel(event.type)}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {event.toEmail}

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 import { CampaignStats } from '@/components/CampaignStats'
 import { ABTestConfig } from '@/components/ABTestConfig'
 import {
@@ -35,6 +36,7 @@ interface Campaign {
 
 export default function CampaignsPage() {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [showDialog, setShowDialog] = useState(false)
@@ -69,6 +71,7 @@ export default function CampaignsPage() {
       }
     } catch (e) {
       console.error(e)
+      addToast({ type: 'error', title: t('common.loadFailed') })
     } finally {
       setLoading(false)
     }
@@ -99,7 +102,7 @@ export default function CampaignsPage() {
 
   const handleSave = async () => {
     if (!form.name || !form.subject || !form.content) {
-      addToast({ type: 'error', title: '请填写必填项' })
+      addToast({ type: 'error', title: t('common.fillRequired') })
       return
     }
 
@@ -116,31 +119,31 @@ export default function CampaignsPage() {
 
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: currentCampaign ? '更新成功' : '创建成功' })
+        addToast({ type: 'success', title: currentCampaign ? t('campaigns.updateSuccess') : t('campaigns.createSuccess') })
         setShowDialog(false)
         fetchCampaigns()
       } else {
-        addToast({ type: 'error', title: '操作失败', description: data.error })
+        addToast({ type: 'error', title: t('common.operationFailed'), description: data.error })
       }
     } catch (e) {
-      addToast({ type: 'error', title: '操作失败' })
+      addToast({ type: 'error', title: t('common.operationFailed') })
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此活动吗？')) return
+    if (!confirm(t('campaigns.confirmDelete'))) return
 
     try {
       const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (data.success) {
-        addToast({ type: 'success', title: '删除成功' })
+        addToast({ type: 'success', title: t('common.deleteSuccess') })
         fetchCampaigns()
       }
     } catch (e) {
-      addToast({ type: 'error', title: '删除失败' })
+      addToast({ type: 'error', title: t('common.deleteFailed') })
     }
   }
 
@@ -158,21 +161,21 @@ export default function CampaignsPage() {
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
-      DRAFT: '草稿',
-      SCHEDULED: '已排期',
-      RUNNING: '进行中',
-      PAUSED: '已暂停',
-      COMPLETED: '已完成',
-      FAILED: '失败',
+      DRAFT: t('campaigns.status.draft'),
+      SCHEDULED: t('campaigns.status.scheduled'),
+      RUNNING: t('campaigns.status.running'),
+      PAUSED: t('campaigns.status.paused'),
+      COMPLETED: t('campaigns.status.completed'),
+      FAILED: t('campaigns.status.failed'),
     }
     return map[status] || status
   }
 
   const getTypeLabel = (type: string) => {
     const map: Record<string, string> = {
-      SINGLE: '单次发送',
-      SEQUENCE: '序列邮件',
-      AB_TEST: 'A/B测试',
+      SINGLE: t('campaigns.type.single'),
+      SEQUENCE: t('campaigns.type.sequence'),
+      AB_TEST: t('campaigns.type.abTest'),
     }
     return map[type] || type
   }
@@ -191,8 +194,8 @@ export default function CampaignsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">邮件营销</h1>
-            <p className="text-sm text-gray-500">创建和管理邮件营销活动</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('campaigns.title')}</h1>
+            <p className="text-sm text-gray-500">{t('campaigns.subtitle')}</p>
           </div>
           <div className="flex gap-2">
             <div className="flex border border-gray-300 rounded-lg overflow-hidden">
@@ -202,7 +205,7 @@ export default function CampaignsPage() {
                 onClick={() => setViewMode('list')}
                 className="gap-2 rounded-none"
               >
-                <List className="h-4 w-4" /> 列表
+                <List className="h-4 w-4" /> {t('campaigns.listView')}
               </Button>
               <Button
                 variant={viewMode === 'stats' ? 'default' : 'ghost'}
@@ -210,7 +213,7 @@ export default function CampaignsPage() {
                 onClick={() => setViewMode('stats')}
                 className="gap-2 rounded-none"
               >
-                <BarChart3 className="h-4 w-4" /> 统计
+                <BarChart3 className="h-4 w-4" /> {t('campaigns.statsView')}
               </Button>
               <Button
                 variant={viewMode === 'abtest' ? 'default' : 'ghost'}
@@ -218,11 +221,11 @@ export default function CampaignsPage() {
                 onClick={() => setViewMode('abtest')}
                 className="gap-2 rounded-none"
               >
-                <Beaker className="h-4 w-4" /> A/B测试
+                <Beaker className="h-4 w-4" /> {t('campaigns.abTestView')}
               </Button>
             </div>
             <Button className="gap-2" onClick={openAddDialog}>
-              <Plus className="h-4 w-4" /> 创建活动
+              <Plus className="h-4 w-4" /> {t('campaigns.createCampaign')}
             </Button>
           </div>
         </div>
@@ -250,7 +253,7 @@ export default function CampaignsPage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.running}</p>
-                      <p className="text-xs text-gray-500">进行中活动</p>
+                      <p className="text-xs text-gray-500">{t('campaigns.runningCampaigns')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -263,7 +266,7 @@ export default function CampaignsPage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.totalSent.toLocaleString()}</p>
-                      <p className="text-xs text-gray-500">总发送邮件</p>
+                      <p className="text-xs text-gray-500">{t('campaigns.totalSent')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -276,7 +279,7 @@ export default function CampaignsPage() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{stats.avgOpenRate}%</p>
-                      <p className="text-xs text-gray-500">平均打开率</p>
+                      <p className="text-xs text-gray-500">{t('campaigns.avgOpenRate')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -289,14 +292,14 @@ export default function CampaignsPage() {
                 <table className="w-full text-sm">
                   <thead className="border-b border-gray-100 bg-gray-50">
                     <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">活动名称</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">类型</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">已发送</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">打开率</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">回复率</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">创建时间</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500">操作</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaigns.tableHeaders.name')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaigns.tableHeaders.type')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">{t('campaigns.tableHeaders.status')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">{t('campaigns.tableHeaders.sent')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">{t('campaigns.tableHeaders.openRate')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">{t('campaigns.tableHeaders.replyRate')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">{t('campaigns.tableHeaders.createdAt')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -317,10 +320,10 @@ export default function CampaignsPage() {
                   <tr>
                     <td colSpan={8} className="py-16 text-center">
                       <Mail className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                      <p className="text-gray-500 font-medium">暂无邮件活动</p>
-                      <p className="text-sm text-gray-400 mt-1">创建您的第一个邮件营销活动</p>
+                      <p className="text-gray-500 font-medium">{t('campaigns.noData')}</p>
+                      <p className="text-sm text-gray-400 mt-1">{t('campaigns.noDataHint')}</p>
                       <Button className="mt-4 gap-2" onClick={openAddDialog}>
-                        <Plus className="h-4 w-4" /> 创建活动
+                        <Plus className="h-4 w-4" /> {t('campaigns.createCampaign')}
                       </Button>
                     </td>
                   </tr>
@@ -360,7 +363,7 @@ export default function CampaignsPage() {
                                 setSelectedCampaignId(campaign.id)
                                 setViewMode('stats')
                               }}
-                              title="查看统计"
+                              title={t('campaigns.viewStats')}
                             >
                               <BarChart3 className="h-4 w-4" />
                             </Button>
@@ -382,13 +385,13 @@ export default function CampaignsPage() {
             {/* Pagination */}
             {total > 10 && (
               <div className="flex items-center justify-between px-4 py-3 border-t">
-                <p className="text-sm text-gray-500">共 {total} 个活动</p>
+                <p className="text-sm text-gray-500">{t('campaigns.totalCount').replace('{n}', total.toString())}</p>
                 <div className="flex gap-1">
                   <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                    上一页
+                    {t('common.prevPage')}
                   </Button>
                   <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(p => p + 1)}>
-                    下一页
+                    {t('common.nextPage')}
                   </Button>
                 </div>
               </div>
@@ -404,48 +407,48 @@ export default function CampaignsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold">{currentCampaign ? '编辑活动' : '创建活动'}</h2>
+              <h2 className="text-lg font-semibold">{currentCampaign ? t('campaigns.editCampaign') : t('campaigns.createCampaign')}</h2>
               <button onClick={() => setShowDialog(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <Label>活动名称 *</Label>
+                <Label>{t('campaigns.form.name')} *</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="如：北美科技公司拓客活动"
+                  placeholder={t('campaigns.form.namePlaceholder')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>活动类型</Label>
+                  <Label>{t('campaigns.form.type')}</Label>
                   <select
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="SINGLE">单次发送</option>
-                    <option value="SEQUENCE">序列邮件</option>
-                    <option value="AB_TEST">A/B测试</option>
+                    <option value="SINGLE">{t('campaigns.type.single')}</option>
+                    <option value="SEQUENCE">{t('campaigns.type.sequence')}</option>
+                    <option value="AB_TEST">{t('campaigns.type.abTest')}</option>
                   </select>
                 </div>
                 <div>
-                  <Label>发送方式</Label>
+                  <Label>{t('campaigns.form.scheduleType')}</Label>
                   <select
                     value={form.scheduleType}
                     onChange={(e) => setForm({ ...form, scheduleType: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
-                    <option value="IMMEDIATE">立即发送</option>
-                    <option value="SCHEDULED">定时发送</option>
+                    <option value="IMMEDIATE">{t('campaigns.schedule.immediate')}</option>
+                    <option value="SCHEDULED">{t('campaigns.schedule.scheduled')}</option>
                   </select>
                 </div>
               </div>
               {form.scheduleType === 'SCHEDULED' && (
                 <div>
-                  <Label>发送时间</Label>
+                  <Label>{t('campaigns.form.scheduledAt')}</Label>
                   <Input
                     type="datetime-local"
                     value={form.scheduledAt}
@@ -454,28 +457,28 @@ export default function CampaignsPage() {
                 </div>
               )}
               <div>
-                <Label>邮件主题 *</Label>
+                <Label>{t('campaigns.form.subject')} *</Label>
                 <Input
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  placeholder="支持变量如 {{firstName}}, {{companyName}}"
+                  placeholder={t('campaigns.form.subjectPlaceholder')}
                 />
               </div>
               <div>
-                <Label>邮件内容 *</Label>
+                <Label>{t('campaigns.form.content')} *</Label>
                 <Textarea
                   value={form.content}
                   onChange={(e) => setForm({ ...form, content: e.target.value })}
-                  placeholder="输入邮件内容..."
+                  placeholder={t('campaigns.form.contentPlaceholder')}
                   rows={10}
                 />
               </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>{t('common.cancel')}</Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {currentCampaign ? '保存修改' : '创建活动'}
+                {currentCampaign ? t('common.save') : t('campaigns.createCampaign')}
               </Button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { useI18n } from '@/hooks/use-i18n'
 import { Beaker, Plus, Trash2, ArrowRight, Trophy } from 'lucide-react'
 
 interface ABVariant {
@@ -32,6 +33,7 @@ interface ABTestConfig {
 
 export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) {
   const { addToast } = useToast()
+  const { t } = useI18n()
   const [config, setConfig] = useState<ABTestConfig>({
     enabled: false,
     variants: [
@@ -53,7 +55,7 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
 
   const addVariant = () => {
     if (config.variants.length >= 4) {
-      addToast({ type: 'error', title: '最多支持4个变体' })
+      addToast({ type: 'error', title: t('abTest.maxVariants') })
       return
     }
 
@@ -79,7 +81,7 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
 
   const removeVariant = (id: string) => {
     if (config.variants.length <= 2) {
-      addToast({ type: 'error', title: '至少需要2个变体' })
+      addToast({ type: 'error', title: t('abTest.minVariants') })
       return
     }
 
@@ -118,8 +120,8 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
 
     addToast({
       type: 'success',
-      title: 'A/B测试完成',
-      description: `获胜变体: ${randomVariant.name}`,
+      title: t('abTest.completed'),
+      description: t('abTest.winnerVariant').replace('{variant}', randomVariant.name),
     })
   }
 
@@ -130,15 +132,15 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Beaker className="h-5 w-5" />
-            A/B 测试配置
+            {t('abTest.config')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">启用 A/B 测试</p>
+              <p className="font-medium">{t('abTest.enable')}</p>
               <p className="text-sm text-gray-500">
-                测试不同的邮件主题和内容，找到最佳版本
+                {t('abTest.enableDesc')}
               </p>
             </div>
             <button
@@ -177,24 +179,24 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label>邮件主题</Label>
+                  <Label>{t('abTest.subject')}</Label>
                   <Input
                     value={variant.subject}
                     onChange={(e) => updateVariant(variant.id, { subject: e.target.value })}
-                    placeholder="输入邮件主题..."
+                    placeholder={t('abTest.subjectPlaceholder')}
                   />
                 </div>
                 <div>
-                  <Label>邮件内容</Label>
+                  <Label>{t('abTest.content')}</Label>
                   <Textarea
                     value={variant.content}
                     onChange={(e) => updateVariant(variant.id, { content: e.target.value })}
-                    placeholder="输入邮件内容..."
+                    placeholder={t('abTest.contentPlaceholder')}
                     rows={4}
                   />
                 </div>
                 <div>
-                  <Label>流量分配: {variant.percentage}%</Label>
+                  <Label>{t('abTest.trafficSplit')}: {variant.percentage}%</Label>
                   <input
                     type="range"
                     min={10}
@@ -212,30 +214,30 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
           {config.variants.length < 4 && (
             <Button variant="outline" onClick={addVariant} className="w-full">
               <Plus className="h-4 w-4 mr-2" />
-              添加变体
+              {t('abTest.addVariant')}
             </Button>
           )}
 
           {/* Test Settings */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">测试设置</CardTitle>
+              <CardTitle className="text-base">{t('abTest.settings')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>获胜指标</Label>
+                <Label>{t('abTest.winnerMetric')}</Label>
                 <select
                   value={config.winnerMetric}
                   onChange={(e) => updateConfig({ winnerMetric: e.target.value as any })}
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
                 >
-                  <option value="open_rate">打开率</option>
-                  <option value="click_rate">点击率</option>
-                  <option value="reply_rate">回复率</option>
+                  <option value="open_rate">{t('abTest.metrics.openRate')}</option>
+                  <option value="click_rate">{t('abTest.metrics.clickRate')}</option>
+                  <option value="reply_rate">{t('abTest.metrics.replyRate')}</option>
                 </select>
               </div>
               <div>
-                <Label>样本大小</Label>
+                <Label>{t('abTest.sampleSize')}</Label>
                 <Input
                   type="number"
                   value={config.sampleSize}
@@ -244,7 +246,7 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
                 />
               </div>
               <div>
-                <Label>测试时长（小时）</Label>
+                <Label>{t('abTest.duration')}</Label>
                 <Input
                   type="number"
                   value={config.duration}
@@ -258,7 +260,7 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
           {/* Simulate Winner */}
           <Button onClick={simulateWinner} className="w-full">
             <Trophy className="h-4 w-4 mr-2" />
-            模拟测试结果
+            {t('abTest.simulate')}
           </Button>
 
           {/* Winner Display */}
@@ -268,7 +270,7 @@ export function ABTestConfig({ campaignId, onConfigChange }: ABTestConfigProps) 
                 <div className="flex items-center gap-3">
                   <Trophy className="h-8 w-8 text-green-600" />
                   <div>
-                    <p className="font-semibold text-green-800">获胜变体: {winner.variant}</p>
+                    <p className="font-semibold text-green-800">{t('abTest.winner')}: {winner.variant}</p>
                     <p className="text-sm text-green-600">
                       {winner.metric}: {winner.value.toFixed(1)}%
                     </p>

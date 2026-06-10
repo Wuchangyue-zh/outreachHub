@@ -1,8 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function NotFound() {
+  const { t } = useI18n()
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8 text-center">
@@ -22,17 +25,17 @@ export default function NotFound() {
           </svg>
         </div>
         <h2 className="mt-4 text-2xl font-bold text-gray-900">
-          404 - 页面未找到
+          {t('notFound.title')}
         </h2>
         <p className="mt-2 text-gray-600">
-          您访问的页面不存在或已被移除
+          {t('notFound.description')}
         </p>
         <div className="mt-6">
           <Link
             href="/"
             className="inline-block px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
           >
-            返回首页
+            {t('notFound.goHome')}
           </Link>
         </div>
       </div>

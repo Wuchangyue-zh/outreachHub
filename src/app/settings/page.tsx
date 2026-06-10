@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ interface EmailAccount {
 }
 
 export default function SettingsPage() {
+  const { t } = useI18n()
   const [accounts, setAccounts] = useState<EmailAccount[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
@@ -55,31 +57,31 @@ export default function SettingsPage() {
         {/* Profile section */}
         <Card className="border-gray-100">
           <CardHeader>
-            <CardTitle className="text-base">个人资料</CardTitle>
+            <CardTitle className="text-base">{t('settings.profile')}</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center gap-6">
             <AvatarUpload size="lg" onUpload={(url) => console.log('Avatar uploaded:', url)} />
             <div className="flex-1 space-y-4">
               <div>
-                <Label>显示名称</Label>
+                <Label>{t('settings.displayName')}</Label>
                 <Input placeholder="Your Name" />
               </div>
               <div>
-                <Label>邮箱</Label>
+                <Label>{t('settings.email')}</Label>
                 <Input value="admin@outreachhub.com" disabled />
               </div>
-              <Button>保存修改</Button>
+              <Button>{t('common.save')}</Button>
             </div>
           </CardContent>
         </Card>
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">邮箱设置</h1>
-            <p className="text-sm text-gray-500">配置用于发送邮件的邮箱账户</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
+            <p className="text-sm text-gray-500">{t('settings.subtitle')}</p>
           </div>
           <Button onClick={() => setShowForm(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> 添加邮箱
+            <Plus className="h-4 w-4" /> {t('settings.addEmail')}
           </Button>
         </div>
 
@@ -87,12 +89,12 @@ export default function SettingsPage() {
         {showForm && (
           <Card className="border-gray-100">
             <CardHeader>
-              <CardTitle className="text-base">添加邮箱账户</CardTitle>
+              <CardTitle className="text-base">{t('settings.addEmailAccount')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>邮箱地址</Label>
+                  <Label>{t('settings.emailAddress')}</Label>
                   <Input
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -100,17 +102,17 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <Label>显示名称</Label>
+                  <Label>{t('settings.displayName')}</Label>
                   <Input
                     value={form.displayName}
                     onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                    placeholder="发件人名称"
+                    placeholder={t('settings.senderNamePlaceholder')}
                   />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>SMTP服务器</Label>
+                  <Label>{t('settings.smtpHost')}</Label>
                   <Input
                     value={form.smtpHost}
                     onChange={(e) => setForm({ ...form, smtpHost: e.target.value })}
@@ -118,14 +120,14 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <Label>端口</Label>
+                  <Label>{t('settings.smtpPort')}</Label>
                   <Input
                     value={form.smtpPort}
                     onChange={(e) => setForm({ ...form, smtpPort: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>SMTP用户名</Label>
+                  <Label>{t('settings.smtpUser')}</Label>
                   <Input
                     value={form.smtpUser}
                     onChange={(e) => setForm({ ...form, smtpUser: e.target.value })}
@@ -133,17 +135,17 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <Label>SMTP密码 / 应用专用密码</Label>
+                <Label>{t('settings.smtpPassword')}</Label>
                 <Input
                   type="password"
                   value={form.smtpPassword}
                   onChange={(e) => setForm({ ...form, smtpPassword: e.target.value })}
-                  placeholder="输入密码或应用专用密码"
+                  placeholder={t('settings.smtpPasswordPlaceholder')}
                 />
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowForm(false)}>取消</Button>
-                <Button onClick={addAccount}>保存</Button>
+                <Button variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
+                <Button onClick={addAccount}>{t('common.save')}</Button>
               </div>
             </CardContent>
           </Card>
@@ -154,8 +156,8 @@ export default function SettingsPage() {
           <Card className="border-gray-100">
             <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
               <Mail className="mb-4 h-16 w-16 text-gray-300" />
-              <p className="text-lg font-medium">暂无邮箱账户</p>
-              <p className="text-sm">添加用于发送邮件的邮箱账户</p>
+              <p className="text-lg font-medium">{t('settings.noEmailAccounts')}</p>
+              <p className="text-sm">{t('settings.noEmailAccountsHint')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -170,14 +172,14 @@ export default function SettingsPage() {
                     <div>
                       <p className="font-medium">{account.email}</p>
                       <p className="text-xs text-gray-500">
-                        今日发送 {account.dailySent}/{account.dailyLimit} | 健康度 {account.healthScore}%
+                        {t('settings.dailyUsage').replace('{sent}', String(account.dailySent)).replace('{limit}', String(account.dailyLimit)).replace('{health}', String(account.healthScore))}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                       {account.isActive ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                      {account.isActive ? '启用' : '禁用'}
+                      {account.isActive ? t('common.enabled') : t('common.disabled')}
                     </span>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400">
                       <Trash2 className="h-4 w-4" />
@@ -192,12 +194,12 @@ export default function SettingsPage() {
         {/* Tips */}
         <Card className="border-gray-100 bg-amber-50">
           <CardContent className="p-4">
-            <h3 className="font-medium text-amber-800">邮箱配置提示</h3>
+            <h3 className="font-medium text-amber-800">{t('settings.tips.title')}</h3>
             <ul className="mt-2 space-y-1 text-sm text-amber-700">
-              <li>• Gmail 用户需要使用"应用专用密码"而非登录密码</li>
-              <li>• 建议每日发送不超过50封/邮箱，避免被标记为垃圾邮件</li>
-              <li>• 可以添加多个邮箱账户，系统会自动轮换使用</li>
-              <li>• 定期检查邮箱健康度，低于80分建议暂停发送</li>
+              <li>• {t('settings.tips.tip1')}</li>
+              <li>• {t('settings.tips.tip2')}</li>
+              <li>• {t('settings.tips.tip3')}</li>
+              <li>• {t('settings.tips.tip4')}</li>
             </ul>
           </CardContent>
         </Card>

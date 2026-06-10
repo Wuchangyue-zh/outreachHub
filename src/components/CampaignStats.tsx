@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useI18n } from '@/hooks/use-i18n'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
@@ -42,6 +43,7 @@ interface CampaignComparison {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 export function CampaignStats({ campaignId }: CampaignStatsProps) {
+  const { t } = useI18n()
   const [stats, setStats] = useState<StatsData | null>(null)
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [campaignComparison, setCampaignComparison] = useState<CampaignComparison[]>([])
@@ -74,7 +76,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
       <Card>
         <CardContent className="py-12 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading statistics...</p>
+          <p className="text-gray-600">{t('campaignStats.loading')}</p>
         </CardContent>
       </Card>
     )
@@ -85,18 +87,18 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
       <Card>
         <CardContent className="py-12 text-center">
           <Mail className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">No statistics available</p>
+          <p className="text-gray-600">{t('campaignStats.noData')}</p>
         </CardContent>
       </Card>
     )
   }
 
   const pieData = [
-    { name: 'Opened', value: stats.totalOpened },
-    { name: 'Clicked', value: stats.totalClicked },
-    { name: 'Replied', value: stats.totalReplied },
-    { name: 'Bounced', value: stats.totalBounced },
-    { name: 'No Action', value: stats.totalSent - stats.totalOpened - stats.totalBounced },
+    { name: t('campaignStats.pieLabels.opened'), value: stats.totalOpened },
+    { name: t('campaignStats.pieLabels.clicked'), value: stats.totalClicked },
+    { name: t('campaignStats.pieLabels.replied'), value: stats.totalReplied },
+    { name: t('campaignStats.pieLabels.bounced'), value: stats.totalBounced },
+    { name: t('campaignStats.pieLabels.noAction'), value: stats.totalSent - stats.totalOpened - stats.totalBounced },
   ]
 
   return (
@@ -107,7 +109,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Sent</p>
+                <p className="text-sm text-gray-600 mb-1">{t('campaignStats.totalSent')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.totalSent.toLocaleString()}</p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -121,9 +123,9 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Open Rate</p>
+                <p className="text-sm text-gray-600 mb-1">{t('campaignStats.openRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.openRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalOpened.toLocaleString()} opened</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.totalOpened.toLocaleString()} {t('campaignStats.opened')}</p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <Eye className="h-6 w-6 text-green-600" />
@@ -136,9 +138,9 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Click Rate</p>
+                <p className="text-sm text-gray-600 mb-1">{t('campaignStats.clickRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.clickRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalClicked.toLocaleString()} clicked</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.totalClicked.toLocaleString()} {t('campaignStats.clicked')}</p>
               </div>
               <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <MousePointer className="h-6 w-6 text-yellow-600" />
@@ -151,9 +153,9 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Reply Rate</p>
+                <p className="text-sm text-gray-600 mb-1">{t('campaignStats.replyRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.replyRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalReplied.toLocaleString()} replied</p>
+                <p className="text-xs text-gray-500 mt-1">{stats.totalReplied.toLocaleString()} {t('campaignStats.replied')}</p>
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Reply className="h-6 w-6 text-purple-600" />
@@ -169,7 +171,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Daily Performance
+              {t('campaignStats.dailyPerformance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -180,10 +182,10 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="sent" stroke="#3b82f6" name="Sent" strokeWidth={2} />
-                <Line type="monotone" dataKey="opened" stroke="#10b981" name="Opened" strokeWidth={2} />
-                <Line type="monotone" dataKey="clicked" stroke="#f59e0b" name="Clicked" strokeWidth={2} />
-                <Line type="monotone" dataKey="replied" stroke="#8b5cf6" name="Replied" strokeWidth={2} />
+                <Line type="monotone" dataKey="sent" stroke="#3b82f6" name={t('campaignStats.legend.sent')} strokeWidth={2} />
+                <Line type="monotone" dataKey="opened" stroke="#10b981" name={t('campaignStats.legend.opened')} strokeWidth={2} />
+                <Line type="monotone" dataKey="clicked" stroke="#f59e0b" name={t('campaignStats.legend.clicked')} strokeWidth={2} />
+                <Line type="monotone" dataKey="replied" stroke="#8b5cf6" name={t('campaignStats.legend.replied')} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -196,7 +198,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart className="h-5 w-5" />
-              Campaign Comparison
+              {t('campaignStats.comparison')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -207,9 +209,9 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="openRate" fill="#10b981" name="Open Rate %" />
-                <Bar dataKey="clickRate" fill="#f59e0b" name="Click Rate %" />
-                <Bar dataKey="replyRate" fill="#8b5cf6" name="Reply Rate %" />
+                <Bar dataKey="openRate" fill="#10b981" name={t('campaignStats.legendPercent.openRate')} />
+                <Bar dataKey="clickRate" fill="#f59e0b" name={t('campaignStats.legendPercent.clickRate')} />
+                <Bar dataKey="replyRate" fill="#8b5cf6" name={t('campaignStats.legendPercent.replyRate')} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -221,7 +223,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PieChart className="h-5 w-5" />
-            Engagement Breakdown
+            {t('campaignStats.engagementBreakdown')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -252,13 +254,13 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Bounce Rate</CardTitle>
+            <CardTitle className="text-base">{t('campaignStats.bounceRate')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
               <p className="text-4xl font-bold text-red-600">{stats.bounceRate.toFixed(1)}%</p>
               <p className="text-sm text-gray-600 mt-2">
-                {stats.totalBounced.toLocaleString()} emails bounced
+                {t('campaignStats.bounced').replace('{n}', stats.totalBounced.toLocaleString())}
               </p>
             </div>
           </CardContent>
@@ -266,7 +268,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Engagement Score</CardTitle>
+            <CardTitle className="text-base">{t('campaignStats.engagementScore')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
@@ -274,7 +276,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                 {((stats.openRate + stats.clickRate + stats.replyRate) / 3).toFixed(1)}
               </p>
               <p className="text-sm text-gray-600 mt-2">
-                Average of open, click, and reply rates
+                {t('campaignStats.engagementDesc')}
               </p>
             </div>
           </CardContent>

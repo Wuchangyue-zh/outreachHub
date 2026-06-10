@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Search, Building, Globe, Users, Send, Loader2 } from 'lucide-react'
 
 export default function ProspectingPage() {
+  const { t } = useI18n()
   const [searching, setSearching] = useState(false)
   const [formData, setFormData] = useState({
     keywords: '',
@@ -28,7 +30,7 @@ export default function ProspectingPage() {
         body: JSON.stringify({
           type: 'create-prospecting-task',
           taskData: {
-            name: `拓客任务 - ${new Date().toLocaleDateString()}`,
+            name: `${t('prospecting.taskPrefix')} - ${new Date().toLocaleDateString()}`,
             keywords: formData.keywords.split(',').map(s => s.trim()).filter(Boolean),
             positions: formData.positions.split(',').map(s => s.trim()).filter(Boolean),
             locations: formData.locations.split(',').map(s => s.trim()).filter(Boolean),
@@ -40,10 +42,10 @@ export default function ProspectingPage() {
       })
       const data = await res.json()
       if (data.success) {
-        alert('拓客任务已创建，等待执行')
+        alert(t('prospecting.taskCreated'))
       }
     } catch (e) {
-      alert('创建任务失败')
+      alert(t('prospecting.taskFailed'))
     } finally {
       setSearching(false)
     }
@@ -53,8 +55,8 @@ export default function ProspectingPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">智能拓客</h1>
-          <p className="text-sm text-gray-500">通过AI技术精准定位和挖掘海外目标客户</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('prospecting.title')}</h1>
+          <p className="text-sm text-gray-500">{t('prospecting.subtitle')}</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -63,55 +65,55 @@ export default function ProspectingPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5 text-primary" />
-                搜索条件
+                {t('prospecting.searchCriteria')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>行业关键词（逗号分隔）</Label>
+                <Label>{t('prospecting.keywords')}</Label>
                 <Input
-                  placeholder="例如：Software, Technology, SaaS"
+                  placeholder={t('prospecting.keywordsPlaceholder')}
                   value={formData.keywords}
                   onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
                 />
               </div>
               <div>
-                <Label>目标职位（逗号分隔）</Label>
+                <Label>{t('prospecting.positions')}</Label>
                 <Input
-                  placeholder="例如：CTO, VP Engineering, Director"
+                  placeholder={t('prospecting.positionsPlaceholder')}
                   value={formData.positions}
                   onChange={(e) => setFormData({ ...formData, positions: e.target.value })}
                 />
               </div>
               <div>
-                <Label>目标地区（逗号分隔）</Label>
+                <Label>{t('prospecting.locations')}</Label>
                 <Input
-                  placeholder="例如：United States, Germany, Singapore"
+                  placeholder={t('prospecting.locationsPlaceholder')}
                   value={formData.locations}
                   onChange={(e) => setFormData({ ...formData, locations: e.target.value })}
                 />
               </div>
               <div>
-                <Label>行业类别（逗号分隔）</Label>
+                <Label>{t('prospecting.industries')}</Label>
                 <Input
-                  placeholder="例如：Technology, Manufacturing, Retail"
+                  placeholder={t('prospecting.industriesPlaceholder')}
                   value={formData.industries}
                   onChange={(e) => setFormData({ ...formData, industries: e.target.value })}
                 />
               </div>
               <div>
-                <Label>公司规模</Label>
+                <Label>{t('prospecting.companySize')}</Label>
                 <Input
-                  placeholder="例如：51-200, 201-500, 501-1000"
+                  placeholder={t('prospecting.companySizePlaceholder')}
                   value={formData.companySizes}
                   onChange={(e) => setFormData({ ...formData, companySizes: e.target.value })}
                 />
               </div>
               <Button onClick={handleSearch} disabled={searching} className="w-full">
                 {searching ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 创建任务中...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('prospecting.creating')}</>
                 ) : (
-                  <><Search className="mr-2 h-4 w-4" /> 创建拓客任务</>
+                  <><Search className="mr-2 h-4 w-4" /> {t('prospecting.createTask')}</>
                 )}
               </Button>
             </CardContent>
@@ -121,35 +123,35 @@ export default function ProspectingPage() {
           <div className="space-y-6">
             <Card className="border-gray-100">
               <CardHeader>
-                <CardTitle className="text-base">拓客技巧</CardTitle>
+                <CardTitle className="text-base">{t('prospecting.tips.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-gray-600">
-                <p>💡 使用英文关键词搜索，结果更准确</p>
-                <p>💡 职位使用英文标准名称，如 CTO、VP of Sales</p>
-                <p>💡 地区使用国家英文名，如 United States、Germany</p>
-                <p>💡 建议每次搜索限定1-2个行业，结果更精准</p>
+                <p>💡 {t('prospecting.tips.tip1')}</p>
+                <p>💡 {t('prospecting.tips.tip2')}</p>
+                <p>💡 {t('prospecting.tips.tip3')}</p>
+                <p>💡 {t('prospecting.tips.tip4')}</p>
               </CardContent>
             </Card>
 
             <Card className="border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50">
               <CardContent className="p-6">
-                <h3 className="font-semibold text-gray-900">获取邮箱方案</h3>
+                <h3 className="font-semibold text-gray-900">{t('prospecting.emailSolutions')}</h3>
                 <ul className="mt-3 space-y-2 text-sm text-gray-600">
                   <li className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-primary" />
-                    API数据源：RocketReach覆盖9亿+联系人
+                    {t('prospecting.solutions.api')}
                   </li>
                   <li className="flex items-center gap-2">
                     <Building className="h-4 w-4 text-primary" />
-                    智能推测：基于域名+AI推测邮箱格式
+                    {t('prospecting.solutions.ai')}
                   </li>
                   <li className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-primary" />
-                    爬虫采集：自动化采集公开联系方式
+                    {t('prospecting.solutions.scraper')}
                   </li>
                   <li className="flex items-center gap-2">
                     <Send className="h-4 w-4 text-primary" />
-                    验证清洗：MillionVerifier确保有效送达
+                    {t('prospecting.solutions.verify')}
                   </li>
                 </ul>
               </CardContent>

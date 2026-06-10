@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useI18n } from '@/hooks/use-i18n'
 
 export default function Error({
   error,
@@ -9,6 +10,8 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const { t } = useI18n()
+
   useEffect(() => {
     console.error('Application error:', error)
   }, [error])
@@ -32,14 +35,14 @@ export default function Error({
           </svg>
         </div>
         <h2 className="mt-4 text-2xl font-bold text-center text-gray-900">
-          出错了
+          {t('errorBoundary.title')}
         </h2>
         <p className="mt-2 text-center text-gray-600">
-          应用程序遇到了意外错误
+          {t('errorBoundary.description')}
         </p>
         {error.digest && (
           <p className="mt-2 text-sm text-center text-gray-500 font-mono">
-            错误代码: {error.digest}
+            {t('errorBoundary.errorCode').replace('{n}', error.digest)}
           </p>
         )}
         <div className="mt-6 flex gap-3">
@@ -47,13 +50,13 @@ export default function Error({
             onClick={reset}
             className="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
           >
-            重试
+            {t('errorBoundary.retry')}
           </button>
           <button
             onClick={() => (window.location.href = '/')}
             className="flex-1 px-4 py-2 bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 transition-colors"
           >
-            返回首页
+            {t('errorBoundary.goHome')}
           </button>
         </div>
       </div>
