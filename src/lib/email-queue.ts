@@ -1,7 +1,20 @@
+/**
+ * 邮件发送队列（BullMQ queue: email-queue）
+ *
+ * - 生产者：Campaign launch、Cron、Inbox 等
+ * - 消费者：npm run worker:email → src/lib/email-worker.ts
+ * - 无 Redis 时降级 API 内同步发信（仅开发）
+ * - 架构规则：见 CLAUDE.md
+ */
 import { Queue } from 'bullmq'
-import { redisConnection } from './redis'
-import { sendMail } from './email'
+import { getRedisConnection } from './redis'
+import { sendPlatformMail } from './email'
+import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
+import { addEmailTracking } from './email-tracking'
+import { maybeMarkCampaignCompleted } from './campaign-completion'
+import { fetchFileBuffer } from './storage'
+import { resolvePublicUrls } from './email-html'
 
 export interface EmailJobData {
   to: string
@@ -10,19 +23,27 @@ export interface EmailJobData {
   text?: string
   contactId?: string
   campaignId?: string
+  emailAccountId?: string  // 用户 EmailAccount ID
   fromEmail?: string
   fromName?: string
-  trackingPixel?: string
+  trackingPixel?: string | boolean
   trackingLinks?: boolean
+  attachmentIds?: string[] // H1: 附件 ID 列表
 }
 
 let _emailQueue: Queue<EmailJobData> | null = null
+let _queueDisabled = false
 
 export function getEmailQueue(): Queue<EmailJobData> | null {
+  if (_queueDisabled) return null
+
+  const connection = getRedisConnection()
+  if (!connection) return null
+
   if (!_emailQueue) {
     try {
       _emailQueue = new Queue<EmailJobData>('email-queue', {
-        connection: redisConnection,
+        connection,
         defaultJobOptions: {
           removeOnComplete: {
             age: 3600, // keep completed jobs for 1 hour
@@ -40,7 +61,12 @@ export function getEmailQueue(): Queue<EmailJobData> | null {
       })
 
       _emailQueue.on('error', (error) => {
-        console.error('[EmailQueue] Queue error:', error.message)
+        if (_queueDisabled) return
+        _queueDisabled = true
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn('[EmailQueue] Redis unavailable, falling back to direct send:', message || 'connection failed')
+        void _emailQueue?.close().catch(() => {})
+        _emailQueue = null
       })
     } catch (error) {
       console.warn('[EmailQueue] Failed to initialize queue, falling back to direct send:', (error as Error).message)
@@ -119,35 +145,113 @@ export async function addBulkEmailJobs(emails: EmailJobData[], options?: { delay
  */
 async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined> {
   try {
-    const result = await sendMail({
-      to: data.to,
-      subject: data.subject,
-      html: data.html,
-      text: data.text,
-      from: data.fromName ? `${data.fromName} <${data.fromEmail || process.env.SMTP_USER}>` : data.fromEmail,
-    })
+    // 确定发件人邮箱
+    let fromEmail = data.fromEmail || process.env.SMTP_USER || ''
 
-    // Create email log entry
+    // 如果指定了 EmailAccount，检查发送限额
+    if (data.emailAccountId) {
+      const canSend = await checkDailyLimit(data.emailAccountId)
+      if (!canSend) {
+        console.warn(`[EmailQueue] EmailAccount ${data.emailAccountId} reached daily limit, skipping`)
+        return undefined
+      }
+      // 从 EmailAccount 获取发件人邮箱
+      const account = await prisma.emailAccount.findUnique({
+        where: { id: data.emailAccountId },
+        select: { email: true },
+      })
+      if (account) {
+        fromEmail = account.email
+      }
+    }
+
     const logData: any = {
       contactId: data.contactId || '',
-      messageId: result.messageId,
+      messageId: '',
       toEmail: data.to,
-      fromEmail: data.fromEmail || process.env.SMTP_USER || '',
+      fromEmail,
       subject: data.subject,
-      status: 'SENT',
+      status: 'PENDING',
       sentAt: new Date(),
       htmlContent: data.html,
+      content: data.text || data.html || '',
+      tracked: false,
     }
 
     if (data.campaignId) {
       logData.campaignId = data.campaignId
     }
 
-    const emailLog = await prisma.emailLog.create({
-      data: logData,
-    })
+    const emailLog = await prisma.emailLog.create({ data: logData })
 
-    // Update contact stats
+    let emailHtml = data.html || ''
+    if (data.contactId) {
+      emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId, data.campaignId)
+    }
+
+    // H2: 将本地路径图片 URL 转为公网可访问 URL
+    emailHtml = resolvePublicUrls(emailHtml)
+
+    // H1: 加载附件 Buffer
+    let emailAttachments: Array<{ filename: string; content: Buffer }> | undefined
+    if (data.attachmentIds && data.attachmentIds.length > 0) {
+      try {
+        const attRecords = await prisma.attachment.findMany({
+          where: { id: { in: data.attachmentIds } },
+        })
+        const loaded: Array<{ filename: string; content: Buffer }> = []
+        for (const att of attRecords) {
+          try {
+            const { buffer, filename } = await fetchFileBuffer(att.url)
+            loaded.push({ filename: att.originalName || filename, content: buffer })
+          } catch (err) {
+            console.warn(`[EmailQueue] Failed to load attachment ${att.id}:`, err)
+          }
+        }
+        if (loaded.length > 0) emailAttachments = loaded
+      } catch (err) {
+        console.warn(`[EmailQueue] Failed to fetch attachments:`, err)
+      }
+    }
+
+    // 根据是否有 EmailAccount 选择发送方式
+    let result: { success: boolean; messageId?: string }
+
+    if (data.emailAccountId) {
+      // 使用用户 EmailAccount 发送
+      result = await sendAccountMail({
+        emailAccountId: data.emailAccountId,
+        to: data.to,
+        subject: data.subject,
+        html: emailHtml,
+        text: data.text,
+        from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+        attachments: emailAttachments,
+      })
+    } else {
+      // 使用平台 SMTP 发送（降级）
+      if (data.campaignId) {
+        console.warn(`[email-queue] Campaign ${data.campaignId} email to ${data.to} falling back to platform SMTP (no emailAccountId)`)
+      }
+      result = await sendPlatformMail({
+        to: data.to,
+        subject: data.subject,
+        html: emailHtml,
+        text: data.text,
+        from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
+        attachments: emailAttachments,
+      })
+    }
+
+    await prisma.emailLog.update({
+      where: { id: emailLog.id },
+      data: {
+        status: 'SENT',
+        messageId: result.messageId,
+        htmlContent: emailHtml,
+        tracked: !!data.contactId,
+      },
+    })
     if (data.contactId) {
       await prisma.contact.update({
         where: { id: data.contactId },
@@ -158,14 +262,9 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       })
     }
 
-    // Update campaign stats
+    // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (data.campaignId) {
-      await prisma.campaign.update({
-        where: { id: data.campaignId },
-        data: {
-          totalSent: { increment: 1 },
-        },
-      })
+      await maybeMarkCampaignCompleted(data.campaignId)
     }
 
     return emailLog.id
@@ -251,16 +350,55 @@ export async function getQueueStats() {
   }
 }
 
-export async function retryFailedJobs() {
+/**
+ * I5: 获取失败任务列表（含错误原因）
+ */
+export async function getFailedJobs(limit = 20) {
+  const queue = getEmailQueue()
+  if (!queue) return []
+
+  try {
+    const failedJobs = await queue.getFailed(0, limit - 1)
+    return failedJobs.map((job) => ({
+      id: job.id,
+      name: job.name,
+      data: { to: job.data.to, subject: job.data.subject, campaignId: job.data.campaignId },
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      timestamp: job.timestamp,
+      processedOn: job.processedOn,
+      finishedOn: job.finishedOn,
+    }))
+  } catch (error) {
+    console.error('[EmailQueue] Failed to get failed jobs:', (error as Error).message)
+    return []
+  }
+}
+
+export async function retryFailedJobs(options?: { limit?: number; maxAgeMs?: number }) {
   const queue = getEmailQueue()
   if (!queue) {
     return 0
   }
 
   try {
-    const failedJobs = await queue.getFailed()
-    const retryPromises = failedJobs.map((job) => job.retry())
-    await Promise.all(retryPromises)
+    const fetchEnd = Math.max((options?.limit ?? 100) - 1, 0)
+    let failedJobs = await queue.getFailed(0, fetchEnd)
+
+    if (options?.maxAgeMs) {
+      const cutoff = Date.now() - options.maxAgeMs
+      failedJobs = failedJobs.filter(
+        (job) => (job.finishedOn ?? job.processedOn ?? job.timestamp) >= cutoff
+      )
+    }
+
+    if (options?.limit) {
+      failedJobs = failedJobs.slice(0, options.limit)
+    }
+
+    if (failedJobs.length === 0) return 0
+
+    await Promise.all(failedJobs.map((job) => job.retry()))
     return failedJobs.length
   } catch (error) {
     console.error('[EmailQueue] Failed to retry failed jobs:', (error as Error).message)

@@ -16,18 +16,26 @@ export function generateTrackingPixel(): Buffer {
 export function addEmailTracking(
   htmlContent: string,
   emailLogId: string,
-  contactId: string
+  contactId: string,
+  campaignId?: string
 ): string {
   // Generate tracking pixel
   const pixelUrl = `${TRACKING_BASE_URL}/api/email/track/open?e=${emailLogId}&c=${contactId}&t=${Date.now()}`
   const trackingPixel = `<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`
 
+  // Generate unsubscribe link
+  const unsubscribeUrl = `${TRACKING_BASE_URL}/api/unsubscribe?cid=${contactId}&lid=${emailLogId}${campaignId ? `&camp=${campaignId}` : ''}`
+  const unsubscribeFooter = `
+<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
+  <p>如果您不想再收到此类邮件，可以 <a href="${unsubscribeUrl}" style="color: #6366f1; text-decoration: underline;">退订</a></p>
+</div>`
+
   // Replace all links with tracking URLs
   let trackedContent = htmlContent.replace(
     /href="([^"]+)"/g,
     (match, url) => {
-      // Skip internal links and mailto/tel links
-      if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:')) {
+      // Skip internal links, mailto/tel links, and unsubscribe links
+      if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:') || url.includes('/unsubscribe')) {
         return match
       }
 
@@ -36,18 +44,22 @@ export function addEmailTracking(
     }
   )
 
-  // Append tracking pixel before closing body tag
+  // Append unsubscribe footer and tracking pixel before closing body tag
   if (trackedContent.includes('</body>')) {
-    trackedContent = trackedContent.replace('</body>', `${trackingPixel}</body>`)
+    trackedContent = trackedContent.replace('</body>', `${unsubscribeFooter}${trackingPixel}</body>`)
   } else {
-    trackedContent += trackingPixel
+    trackedContent += unsubscribeFooter + trackingPixel
   }
 
   return trackedContent
 }
 
 // Record email open event
-export async function recordEmailOpen(emailLogId: string, contactId: string) {
+export async function recordEmailOpen(
+  emailLogId: string,
+  contactId: string,
+  geo?: { ip?: string; country?: string; city?: string }
+) {
   try {
     const emailLog = await prisma.emailLog.findUnique({
       where: { id: emailLogId },
@@ -58,6 +70,12 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
       return
     }
 
+    // K2: 仅首次打开记录 IP/国家
+    const geoData: Record<string, unknown> = {}
+    if (!emailLog.openedAt && geo?.ip) geoData.openIp = geo.ip
+    if (!emailLog.openedAt && geo?.country) geoData.openCountry = geo.country.toUpperCase()
+    if (!emailLog.openedAt && geo?.city) geoData.openCity = geo.city
+
     // Update email log
     await prisma.emailLog.update({
       where: { id: emailLogId },
@@ -65,6 +83,7 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
         status: emailLog.status === 'SENT' || emailLog.status === 'DELIVERED' ? 'OPENED' : emailLog.status,
         openedAt: emailLog.openedAt || new Date(),
         openedCount: { increment: 1 },
+        ...geoData,
       },
     })
 
@@ -77,6 +96,8 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
       },
     })
 
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
+
     console.log(`Email open recorded: ${emailLogId}`)
   } catch (error) {
     console.error('Error recording email open:', error)
@@ -84,7 +105,12 @@ export async function recordEmailOpen(emailLogId: string, contactId: string) {
 }
 
 // Record email click event
-export async function recordEmailClick(emailLogId: string, contactId: string, url: string) {
+export async function recordEmailClick(
+  emailLogId: string,
+  contactId: string,
+  url: string,
+  geo?: { ip?: string; country?: string }
+) {
   try {
     const emailLog = await prisma.emailLog.findUnique({
       where: { id: emailLogId },
@@ -95,12 +121,19 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
       return
     }
 
+    // L3: 点击也记录 geo（仅当打开时未记录过）
+    const geoData: Record<string, unknown> = {}
+    if (!emailLog.openIp && geo?.ip) geoData.openIp = geo.ip
+    if (!emailLog.openCountry && geo?.country) geoData.openCountry = geo.country.toUpperCase()
+
     // Update email log
     await prisma.emailLog.update({
       where: { id: emailLogId },
       data: {
+        status: emailLog.status !== 'REPLIED' ? 'CLICKED' : emailLog.status,
         clickedAt: emailLog.clickedAt || new Date(),
         clickedCount: { increment: 1 },
+        ...geoData,
       },
     })
 
@@ -111,6 +144,8 @@ export async function recordEmailClick(emailLogId: string, contactId: string, ur
         lastEmailOpenedAt: new Date(),
       },
     })
+
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
     console.log(`Email click recorded: ${emailLogId} -> ${url}`)
   } catch (error) {

@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { withCache } from '@/lib/redis'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes } from '@/lib/api-errors'
+import {
+  aggregateCampaignStatsFromLogs,
+  syncCampaignStatsFromLogs,
+} from '@/lib/campaign-stats-sync'
+import { localizeGeoStats } from '@/lib/geo'
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +26,8 @@ export async function GET(req: NextRequest) {
     const stats = await withCache(
       cacheKey,
       async () => {
-        const where = campaignId ? { id: campaignId } : {}
+        const where: any = { tenantId: authResult.tenantId }
+        if (campaignId) where.id = campaignId
 
         // Fetch campaigns with email logs
         const campaigns = await prisma.campaign.findMany({
@@ -38,6 +44,13 @@ export async function GET(req: NextRequest) {
             },
           },
         })
+
+        // #9: 同步每个 Campaign 的聚合统计到模型字段
+        for (const campaign of campaigns) {
+          if (campaign.emailLogs.length > 0) {
+            await syncCampaignStatsFromLogs(campaign.id, campaign.emailLogs)
+          }
+        }
 
         // Calculate overall stats
         let totalSent = 0
@@ -56,8 +69,7 @@ export async function GET(req: NextRequest) {
 
         campaigns.forEach((campaign) => {
           campaign.emailLogs.forEach((log) => {
-            if (log.status === 'SENT' || log.status === 'OPENED' ||
-                log.status === 'CLICKED' || log.status === 'REPLIED') {
+            if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'].includes(log.status)) {
               totalSent++
 
               const sentDate = log.sentAt?.toISOString().split('T')[0]
@@ -123,23 +135,12 @@ export async function GET(req: NextRequest) {
         let comparison: any[] = []
         if (!campaignId) {
           const campaignStats = campaigns.map((campaign) => {
-            const sent = campaign.emailLogs.filter(
-              (l) => l.status === 'SENT' || l.status === 'OPENED' ||
-                      l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const opened = campaign.emailLogs.filter(
-              (l) => l.status === 'OPENED' || l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const clicked = campaign.emailLogs.filter(
-              (l) => l.status === 'CLICKED' || l.status === 'REPLIED'
-            ).length
-            const replied = campaign.emailLogs.filter((l) => l.status === 'REPLIED').length
-
+            const agg = aggregateCampaignStatsFromLogs(campaign.emailLogs)
             return {
               name: campaign.name,
-              openRate: sent > 0 ? (opened / sent) * 100 : 0,
-              clickRate: sent > 0 ? (clicked / sent) * 100 : 0,
-              replyRate: sent > 0 ? (replied / sent) * 100 : 0,
+              openRate: agg.totalSent > 0 ? (agg.totalOpened / agg.totalSent) * 100 : 0,
+              clickRate: agg.totalSent > 0 ? (agg.totalClicked / agg.totalSent) * 100 : 0,
+              replyRate: agg.totalSent > 0 ? (agg.totalReplied / agg.totalSent) * 100 : 0,
             }
           })
 
@@ -148,6 +149,39 @@ export async function GET(req: NextRequest) {
             .sort((a, b) => b.openRate - a.openRate)
             .slice(0, 10)
         }
+
+        // K2: 地理分析 — 按国家聚合打开数
+        const geoWhere: any = { tenantId: authResult.tenantId, openCountry: { not: null } }
+        if (campaignId) geoWhere.campaignId = campaignId
+        const geoStats = await prisma.emailLog.groupBy({
+          by: ['openCountry'],
+          where: geoWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 20,
+        })
+
+        const geo = localizeGeoStats(
+          geoStats
+            .filter((g) => g.openCountry)
+            .map((g) => ({ country: g.openCountry, count: g._count.id })),
+          'zh'
+        )
+
+        // Q2b: 城市 Top 10 — 按 openCity 聚合打开数
+        const cityWhere: any = { tenantId: authResult.tenantId, openCity: { not: null } }
+        if (campaignId) cityWhere.campaignId = campaignId
+        const cityStats = await prisma.emailLog.groupBy({
+          by: ['openCity'],
+          where: cityWhere,
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 10,
+        })
+
+        const cities = cityStats
+          .filter((s) => s.openCity && s.openCity !== '')
+          .map((s) => ({ city: s.openCity, count: s._count.id }))
 
         return {
           overall: {
@@ -163,6 +197,8 @@ export async function GET(req: NextRequest) {
           },
           daily: dailyStats,
           comparison,
+          geo,
+          cities,
         }
       },
       { ttl: 300 } // Cache for 5 minutes

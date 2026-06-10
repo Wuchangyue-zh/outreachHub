@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
 import { useI18n } from '@/hooks/use-i18n'
 import {
-  Building2, Search, Plus, Edit, Trash2, X, Loader2, Globe, Users, ExternalLink
+  Building2, Search, Plus, Edit, Trash2, X, Loader2, Globe, Users, ExternalLink, Mail
 } from 'lucide-react'
 
 interface Company {
@@ -29,6 +29,15 @@ interface Company {
   createdAt: string
 }
 
+interface FoundEmail {
+  email: string
+  firstName?: string
+  lastName?: string
+  position?: string
+  confidence?: number
+  source: 'hunter' | 'pattern-guess'
+}
+
 export default function CompaniesPage() {
   const { addToast } = useToast()
   const { t } = useI18n()
@@ -40,6 +49,10 @@ export default function CompaniesPage() {
   const [showDialog, setShowDialog] = useState(false)
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null)
   const [saving, setSaving] = useState(false)
+  const [findingEmailsId, setFindingEmailsId] = useState<string | null>(null)
+  const [emailDialogCompany, setEmailDialogCompany] = useState<Company | null>(null)
+  const [foundEmails, setFoundEmails] = useState<FoundEmail[]>([])
+  const [emailSearchMessage, setEmailSearchMessage] = useState('')
 
   const [form, setForm] = useState({
     name: '',
@@ -67,10 +80,17 @@ export default function CompaniesPage() {
       if (data.success) {
         setCompanies(data.data)
         setTotal(data.pagination.total)
+      } else {
+        addToast({ type: 'error', title: '加载失败', description: data.error?.message || '无法加载公司列表' })
       }
+<<<<<<< HEAD
     } catch (e) {
       console.error(e)
       addToast({ type: 'error', title: t('common.loadFailed') })
+=======
+    } catch {
+      addToast({ type: 'error', title: '加载失败', description: '无法加载公司列表，请稍后重试' })
+>>>>>>> feat/landing-page
     } finally {
       setLoading(false)
     }
@@ -146,6 +166,36 @@ export default function CompaniesPage() {
       }
     } catch (e) {
       addToast({ type: 'error', title: t('common.deleteFailed') })
+    }
+  }
+
+  const handleFindEmails = async (company: Company) => {
+    if (!company.domain && !company.website) {
+      addToast({ type: 'warning', title: '无法搜索', description: '请先填写公司域名或网站' })
+      return
+    }
+    setFindingEmailsId(company.id)
+    setEmailDialogCompany(company)
+    setFoundEmails([])
+    setEmailSearchMessage('')
+    try {
+      const res = await fetch(`/api/companies/${company.id}/find-emails`)
+      const data = await res.json()
+      if (data.success) {
+        setFoundEmails(data.data.emails || [])
+        setEmailSearchMessage(data.data.message || '')
+        if (!data.data.mxValid) {
+          addToast({ type: 'warning', title: 'MX 无效', description: data.data.message })
+        }
+      } else {
+        addToast({ type: 'error', title: '搜索失败', description: data.error?.message || data.message })
+        setEmailDialogCompany(null)
+      }
+    } catch {
+      addToast({ type: 'error', title: '搜索失败', description: '网络错误' })
+      setEmailDialogCompany(null)
+    } finally {
+      setFindingEmailsId(null)
     }
   }
 
@@ -261,6 +311,22 @@ export default function CompaniesPage() {
                       {new Date(company.createdAt).toLocaleDateString('zh-CN')}
                     </span>
                     <div className="flex gap-1">
+                      {(company.domain || company.website) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="查找邮箱"
+                          disabled={findingEmailsId === company.id}
+                          onClick={() => handleFindEmails(company)}
+                        >
+                          {findingEmailsId === company.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Mail className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                       {company.linkedinUrl && (
                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                           <a href={company.linkedinUrl} target="_blank" rel="noopener noreferrer">
@@ -404,6 +470,57 @@ export default function CompaniesPage() {
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 {currentCompany ? t('common.save') : t('companies.addCompany')}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {emailDialogCompany && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">邮箱搜索结果</h2>
+                <p className="text-sm text-gray-500">{emailDialogCompany.name}</p>
+              </div>
+              <button
+                onClick={() => setEmailDialogCompany(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {emailSearchMessage && (
+                <p className="text-sm text-gray-600">{emailSearchMessage}</p>
+              )}
+              {foundEmails.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">未找到邮箱</p>
+              ) : (
+                <div className="space-y-2">
+                  {foundEmails.map((hit) => (
+                    <div
+                      key={hit.email}
+                      className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-900">{hit.email}</p>
+                        <p className="text-xs text-gray-500">
+                          {[hit.firstName, hit.lastName].filter(Boolean).join(' ')}
+                          {hit.position ? ` · ${hit.position}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {hit.source === 'hunter' ? 'Hunter' : '格式推测'}
+                        {hit.confidence ? ` · ${hit.confidence}%` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end p-6 border-t">
+              <Button variant="outline" onClick={() => setEmailDialogCompany(null)}>关闭</Button>
             </div>
           </div>
         </div>

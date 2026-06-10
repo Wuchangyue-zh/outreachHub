@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyEmail, verifyBatchEmails } from '@/lib/email-verify'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const body = await req.json()
     const { emails, customerIds } = body
 
@@ -22,24 +27,27 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ error: '请提供邮箱列表' }, { status: 400 })
+    return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请提供邮箱列表', 400)
   } catch (error) {
-    return NextResponse.json({ error: '邮箱验证失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const { searchParams } = new URL(req.url)
     const email = searchParams.get('email')
 
     if (!email) {
-      return NextResponse.json({ error: '请提供邮箱地址' }, { status: 400 })
+      return errorResponse(ErrorCodes.MISSING_REQUIRED_FIELD, '请提供邮箱地址', 400)
     }
 
     const result = await verifyEmail(email)
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
-    return NextResponse.json({ error: '邮箱验证失败' }, { status: 500 })
+    return handleApiError(error)
   }
 }

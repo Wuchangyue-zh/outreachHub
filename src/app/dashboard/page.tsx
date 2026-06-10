@@ -1,15 +1,12 @@
 import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
-import StatsOverview from '@/components/dashboard/stats-overview'
-import RecentCampaigns from '@/components/dashboard/recent-campaigns'
-import ActivityChart from '@/components/dashboard/activity-chart'
-import QuickActions from '@/components/dashboard/quick-actions'
-import { RealtimeStatus } from '@/components/RealtimeStatus'
+import DashboardContent from '@/components/dashboard/dashboard-content'
 
 export default function DashboardPage() {
   const { t } = useI18n()
   return (
     <DashboardLayout>
+<<<<<<< HEAD
       <div className="space-y-6">
         {/* Page header */}
         <div className="flex items-center justify-between">
@@ -37,6 +34,9 @@ export default function DashboardPage() {
 
         <RecentCampaigns />
       </div>
+=======
+      <DashboardContent />
+>>>>>>> feat/landing-page
     </DashboardLayout>
   )
 }

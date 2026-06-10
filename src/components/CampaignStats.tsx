@@ -7,7 +7,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
-import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe } from 'lucide-react'
+import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe, MapPin } from 'lucide-react'
 
 interface CampaignStatsProps {
   campaignId?: string
@@ -40,6 +40,17 @@ interface CampaignComparison {
   replyRate: number
 }
 
+interface GeoStats {
+  country: string
+  code?: string
+  count: number
+}
+
+interface CityStats {
+  city: string
+  count: number
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 export function CampaignStats({ campaignId }: CampaignStatsProps) {
@@ -47,6 +58,8 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [campaignComparison, setCampaignComparison] = useState<CampaignComparison[]>([])
+  const [geoStats, setGeoStats] = useState<GeoStats[]>([])
+  const [cityStats, setCityStats] = useState<CityStats[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -63,6 +76,8 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
         setStats(statsData.data.overall)
         setDailyStats(statsData.data.daily || [])
         setCampaignComparison(statsData.data.comparison || [])
+        setGeoStats(statsData.data.geo || [])
+        setCityStats(statsData.data.cities || [])
       }
     } catch (e) {
       console.error('Failed to fetch campaign stats:', e)
@@ -212,6 +227,61 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
                 <Bar dataKey="openRate" fill="#10b981" name={t('campaignStats.legendPercent.openRate')} />
                 <Bar dataKey="clickRate" fill="#f59e0b" name={t('campaignStats.legendPercent.clickRate')} />
                 <Bar dataKey="replyRate" fill="#8b5cf6" name={t('campaignStats.legendPercent.replyRate')} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* K2: 打开地理分布 */}
+      {geoStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Opens by Country
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(200, geoStats.length * 32)}>
+              <BarChart data={geoStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="country" width={72} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => [value, 'Opens']}
+                  labelFormatter={(_, payload) => {
+                    const item = payload?.[0]?.payload as GeoStats | undefined
+                    return item?.code ? `${item.country} (${item.code})` : item?.country
+                  }}
+                />
+                <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Q2b: 城市分布 Top 10 */}
+      {cityStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              城市分布 Top 10
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(200, cityStats.length * 32)}>
+              <BarChart data={cityStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="city" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value) => [value, 'Opens']}
+                  labelFormatter={(label) => label}
+                />
+                <Bar dataKey="count" fill="#10b981" name="Opens" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

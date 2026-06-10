@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,12 +9,56 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+<<<<<<< HEAD
 import { useI18n } from '@/hooks/use-i18n'
+=======
+import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
+>>>>>>> feat/landing-page
 import { CSVImport } from '@/components/CSVImport'
 import {
   Users, Plus, Download, Upload, Search, Mail, Building, Tag,
-  ChevronRight, Edit, Trash2, X, Loader2, UserPlus, Send, Check
+  ChevronRight, Edit, Trash2, X, Loader2, UserPlus, Send, Check,
+  Eye, MousePointer, MessageSquare, AlertCircle, ShieldCheck,
+  Hand, RefreshCw, Briefcase, ListTodo, Calendar, Clock,
 } from 'lucide-react'
+
+interface TimelineEvent {
+  id: string
+  type: 'sent' | 'opened' | 'clicked' | 'replied' | 'bounced' | 'failed'
+  timestamp: string
+  campaign?: { id: string; name: string }
+  details: {
+    subject?: string
+    replyCategory?: string
+    error?: string
+  }
+}
+
+interface TimelineSummary {
+  totalEmailsSent: number
+  totalOpened: number
+  totalReplied: number
+}
+
+interface Deal {
+  id: string
+  name: string
+  stage: string
+  amount: number | null
+  currency: string
+  expectedCloseDate: string | null
+  probability: number | null
+  createdAt: string
+}
+
+interface ContactTask {
+  id: string
+  name: string
+  type: string
+  status: string
+  dueDate: string | null
+  createdAt: string
+}
 
 interface ContactEmail {
   id: string
@@ -38,6 +83,9 @@ interface Contact {
   tags: string[]
   status: string
   notes: string
+  pool: string
+  ownerId: string | null
+  ownerName: string | null
   createdAt: string
   updatedAt: string
 }
@@ -51,12 +99,32 @@ export default function ContactsPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [verifying, setVerifying] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showDetailDrawer, setShowDetailDrawer] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [currentContact, setCurrentContact] = useState<Contact | null>(null)
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([])
+  const [timelineSummary, setTimelineSummary] = useState<TimelineSummary | null>(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState(false)
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [dealsLoading, setDealsLoading] = useState(false)
+  const [deals360Error, setDeals360Error] = useState(false)
+  const [contactTasks, setContactTasks] = useState<ContactTask[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
+  const [customsProfile, setCustomsProfile] = useState<{
+    companyName: string
+    purchaseIntentScore?: number | null
+    totalShipments?: number
+    totalAmountUsd?: number
+    aiSummary?: string | null
+  } | null>(null)
+  const [drawerTab, setDrawerTab] = useState<'timeline' | 'deals' | 'tasks' | 'customs'>('timeline')
+  const [claimingContact, setClaimingContact] = useState(false)
+  const [releasingContact, setReleasingContact] = useState(false)
   const [saving, setSaving] = useState(false)
   const limit = 20
 
@@ -66,7 +134,7 @@ export default function ContactsPage() {
     lastName: '',
     title: '',
     department: '',
-    company: '',
+    companyId: '',
     email: '',
     phone: '',
     country: '',
@@ -74,6 +142,23 @@ export default function ContactsPage() {
     tags: '',
     notes: '',
   })
+  const [editCompanyLabel, setEditCompanyLabel] = useState('')
+  const [showQuickCompany, setShowQuickCompany] = useState(false)
+  const [quickCompanyName, setQuickCompanyName] = useState('')
+  const [quickCompanyDomain, setQuickCompanyDomain] = useState('')
+
+  const fetchCompanyOptions = useCallback(async (query: string): Promise<SearchableOption[]> => {
+    const params = new URLSearchParams({ limit: '20' })
+    if (query) params.set('search', query)
+    const res = await fetch(`/api/companies?${params}`)
+    const data = await res.json()
+    if (!data.success) return []
+    return (data.data || []).map((c: { id: string; name: string; domain?: string }) => ({
+      id: c.id,
+      label: c.name,
+      sublabel: c.domain || undefined,
+    }))
+  }, [])
 
   useEffect(() => {
     fetchContacts()
@@ -101,8 +186,9 @@ export default function ContactsPage() {
   const resetForm = () => {
     setForm({
       firstName: '', lastName: '', title: '', department: '',
-      company: '', email: '', phone: '', country: '', city: '', tags: '', notes: '',
+      companyId: '', email: '', phone: '', country: '', city: '', tags: '', notes: '',
     })
+    setEditCompanyLabel('')
   }
 
   const openAddDialog = () => {
@@ -117,7 +203,7 @@ export default function ContactsPage() {
       lastName: contact.lastName || '',
       title: contact.title || '',
       department: contact.department || '',
-      company: contact.company?.name || '',
+      companyId: contact.companyId || '',
       email: contact.emails[0]?.address || '',
       phone: '',
       country: contact.country || '',
@@ -125,12 +211,129 @@ export default function ContactsPage() {
       tags: contact.tags.join(', '),
       notes: contact.notes || '',
     })
+    setEditCompanyLabel(contact.company?.name || '')
     setShowEditDialog(true)
   }
 
-  const openDetailDrawer = (contact: Contact) => {
+  const openDetailDrawer = async (contact: Contact) => {
     setCurrentContact(contact)
     setShowDetailDrawer(true)
+    setDrawerTab('timeline')
+    setTimelineEvents([])
+    setTimelineSummary(null)
+    setDeals([])
+    setContactTasks([])
+    setCustomsProfile(null)
+    setTimelineError(false)
+    setDeals360Error(false)
+    setTimelineLoading(true)
+    setDealsLoading(true)
+    setTasksLoading(true)
+
+    try {
+      const [res360, resTimeline] = await Promise.all([
+        fetch(`/api/contacts/${contact.id}/360`),
+        fetch(`/api/contacts/${contact.id}/timeline`),
+      ])
+      const [data360, dataTimeline] = await Promise.all([res360.json(), resTimeline.json()])
+
+      let loadFailed = false
+
+      if (dataTimeline.success) {
+        setTimelineEvents(dataTimeline.data.timeline || [])
+        setTimelineSummary(dataTimeline.data.summary || null)
+      } else {
+        setTimelineEvents([])
+        setTimelineSummary(null)
+        setTimelineError(true)
+        loadFailed = true
+      }
+
+      if (data360.success) {
+        setDeals(data360.data.deals || [])
+        setContactTasks(data360.data.tasks || [])
+        if (data360.data.customsProfile) {
+          setCustomsProfile(data360.data.customsProfile)
+        }
+        if (data360.data.contact) {
+          setCurrentContact((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  pool: data360.data.contact.pool ?? prev.pool,
+                  ownerId: data360.data.contact.ownerId ?? prev.ownerId,
+                }
+              : prev
+          )
+        }
+      } else {
+        setDeals([])
+        setContactTasks([])
+        setDeals360Error(true)
+        loadFailed = true
+      }
+
+      if (loadFailed) {
+        addToast({ type: 'error', title: '加载失败', description: '无法加载联系人详情，请稍后重试' })
+      }
+    } catch (e) {
+      setTimelineEvents([])
+      setTimelineSummary(null)
+      setDeals([])
+      setContactTasks([])
+      setCustomsProfile(null)
+      setTimelineError(true)
+      setDeals360Error(true)
+      addToast({ type: 'error', title: '加载失败', description: '无法加载联系人详情，请稍后重试' })
+    } finally {
+      setTimelineLoading(false)
+      setDealsLoading(false)
+      setTasksLoading(false)
+    }
+  }
+
+  const handleClaimContact = async () => {
+    if (!currentContact) return
+    setClaimingContact(true)
+    try {
+      const res = await fetch(`/api/contacts/${currentContact.id}/claim`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        addToast({ type: 'success', title: '领取成功', description: '客户已移入您的列表' })
+        setCurrentContact({
+          ...currentContact,
+          pool: 'PRIVATE',
+          ownerId: data.data.ownerId || currentContact.ownerId,
+        })
+        fetchContacts()
+      } else {
+        addToast({ type: 'error', title: '领取失败', description: data.error?.message || data.message })
+      }
+    } catch {
+      addToast({ type: 'error', title: '领取失败', description: '网络错误' })
+    } finally {
+      setClaimingContact(false)
+    }
+  }
+
+  const handleReleaseContact = async () => {
+    if (!currentContact) return
+    setReleasingContact(true)
+    try {
+      const res = await fetch(`/api/contacts/${currentContact.id}/release`, { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        addToast({ type: 'success', title: '释放成功', description: '客户已释放回公海' })
+        setCurrentContact({ ...currentContact, pool: 'PUBLIC', ownerId: null })
+        fetchContacts()
+      } else {
+        addToast({ type: 'error', title: '释放失败', description: data.error?.message || data.message })
+      }
+    } catch {
+      addToast({ type: 'error', title: '释放失败', description: '网络错误' })
+    } finally {
+      setReleasingContact(false)
+    }
   }
 
   const confirmDelete = (contact: Contact) => {
@@ -157,7 +360,7 @@ export default function ContactsPage() {
           lastName: form.lastName,
           title: form.title,
           department: form.department,
-          company: form.company,
+          companyId: form.companyId || null,
           emails: [form.email],
           phones: form.phone ? [form.phone] : [],
           country: form.country,
@@ -231,6 +434,42 @@ export default function ContactsPage() {
     }
   }
 
+  const handleBatchVerify = async () => {
+    if (selectedIds.size === 0) {
+      addToast({ type: 'warning', title: '请选择客户', description: '请先选择要验证的客户' })
+      return
+    }
+    if (selectedIds.size > 100) {
+      addToast({ type: 'warning', title: '超出限制', description: '单次最多验证 100 个联系人' })
+      return
+    }
+
+    setVerifying(true)
+    try {
+      const res = await fetch('/api/contacts/verify-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactIds: Array.from(selectedIds) }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const { valid, invalid, total } = data.data
+        addToast({
+          type: 'success',
+          title: '批量验证完成',
+          description: `共 ${total} 个邮箱：有效 ${valid}，无效 ${invalid}`,
+        })
+        fetchContacts()
+      } else {
+        addToast({ type: 'error', title: '验证失败', description: data.error?.message || data.message })
+      }
+    } catch {
+      addToast({ type: 'error', title: '验证失败', description: '网络错误' })
+    } finally {
+      setVerifying(false)
+    }
+  }
+
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds)
     if (newSelected.has(id)) {
@@ -275,6 +514,28 @@ export default function ContactsPage() {
     addToast({ type: 'success', title: t('common.exportSuccess') })
   }
 
+  const handleExportContactGdpr = async (contactId: string, contactName: string) => {
+    addToast({ type: 'info', title: '导出中...', description: '正在准备 GDPR 数据包' })
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/export`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        addToast({ type: 'error', title: '导出失败', description: data?.error?.message || data?.error || '请求失败' })
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contact-${contactId}-export.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      addToast({ type: 'success', title: '导出成功', description: `${contactName} 的数据已下载` })
+    } catch {
+      addToast({ type: 'error', title: '导出失败', description: '网络错误' })
+    }
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -315,6 +576,14 @@ export default function ContactsPage() {
                   <span className="text-sm text-gray-500">{t('contacts.selectedCount').replace('{n}', selectedIds.size.toString())}</span>
                   <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={saving}>
                     <Trash2 className="h-4 w-4 mr-1" /> {t('contacts.batchDelete')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleBatchVerify} disabled={verifying || saving}>
+                    {verifying ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 mr-1" />
+                    )}
+                    批量验证邮箱
                   </Button>
                   <Button variant="outline" size="sm">
                     <Send className="h-4 w-4 mr-1" /> {t('contacts.batchSendEmail')}
@@ -530,11 +799,28 @@ export default function ContactsPage() {
                 />
               </div>
               <div>
+<<<<<<< HEAD
                 <Label>{t('contacts.form.company')}</Label>
                 <Input
                   value={form.company}
                   onChange={(e) => setForm({ ...form, company: e.target.value })}
                   placeholder={t('contacts.form.companyPlaceholder')}
+=======
+                <Label>公司</Label>
+                <SearchableSelect
+                  value={form.companyId}
+                  onChange={(id) => setForm({ ...form, companyId: id })}
+                  onClear={() => setForm({ ...form, companyId: '' })}
+                  onQuickCreate={() => {
+                    setQuickCompanyName('')
+                    setQuickCompanyDomain('')
+                    setShowQuickCompany(true)
+                  }}
+                  fetchOptions={fetchCompanyOptions}
+                  placeholder="搜索公司..."
+                  quickCreateLabel="新建公司"
+                  initialLabel={editCompanyLabel}
+>>>>>>> feat/landing-page
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -615,13 +901,82 @@ export default function ContactsPage() {
         </div>
       )}
 
+      {/* Quick-create Company Dialog */}
+      {showQuickCompany && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold">快速新建公司</h3>
+              <div className="space-y-3">
+                <div>
+                  <Label>公司名称 *</Label>
+                  <Input
+                    value={quickCompanyName}
+                    onChange={(e) => setQuickCompanyName(e.target.value)}
+                    placeholder="ABC 科技有限公司"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <Label>域名</Label>
+                  <Input
+                    value={quickCompanyDomain}
+                    onChange={(e) => setQuickCompanyDomain(e.target.value)}
+                    placeholder="example.com"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setShowQuickCompany(false)}>取消</Button>
+                <Button
+                  onClick={async () => {
+                    if (!quickCompanyName.trim()) {
+                      addToast({ type: 'error', title: '请输入公司名称' })
+                      return
+                    }
+                    try {
+                      const res = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: quickCompanyName.trim(),
+                          domain: quickCompanyDomain.trim() || undefined,
+                        }),
+                      })
+                      const data = await res.json()
+                      if (data.success) {
+                        setForm((prev) => ({ ...prev, companyId: data.data.id }))
+                        setEditCompanyLabel(data.data.name)
+                        setShowQuickCompany(false)
+                        addToast({ type: 'success', title: '公司已创建' })
+                      } else {
+                        addToast({ type: 'error', title: data.error?.message || '创建失败' })
+                      }
+                    } catch {
+                      addToast({ type: 'error', title: '创建公司失败' })
+                    }
+                  }}
+                >
+                  创建
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Drawer */}
       {showDetailDrawer && currentContact && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowDetailDrawer(false)} />
           <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
+<<<<<<< HEAD
             <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between">
               <h2 className="text-lg font-semibold">{t('contacts.detail')}</h2>
+=======
+            <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between z-10">
+              <h2 className="text-lg font-semibold">客户详情</h2>
+>>>>>>> feat/landing-page
               <button onClick={() => setShowDetailDrawer(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
@@ -638,10 +993,28 @@ export default function ContactsPage() {
                 </div>
               </div>
 
+<<<<<<< HEAD
               {/* Status */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">{t('common.statusLabel')}</span>
+=======
+              {/* Status + Pool Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-500">状态：</span>
+>>>>>>> feat/landing-page
                 <StatusBadge status={currentContact.status} />
+                {currentContact.pool === 'PUBLIC' && (
+                  <Button size="sm" className="ml-auto gap-1" onClick={handleClaimContact} disabled={claimingContact}>
+                    {claimingContact ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Hand className="h-3.5 w-3.5" />}
+                    领取
+                  </Button>
+                )}
+                {currentContact.pool === 'PRIVATE' && currentContact.ownerId && (
+                  <Button size="sm" variant="outline" className="ml-auto gap-1" onClick={handleReleaseContact} disabled={releasingContact}>
+                    {releasingContact ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    释放
+                  </Button>
+                )}
               </div>
 
               {/* Contact Info */}
@@ -700,6 +1073,273 @@ export default function ContactsPage() {
                 </div>
               )}
 
+              {/* 360 Tabs */}
+              <div className="space-y-3">
+                <div className="flex border-b border-gray-200">
+                  <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      drawerTab === 'timeline'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setDrawerTab('timeline')}
+                  >
+                    时间线
+                  </button>
+                  <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      drawerTab === 'deals'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setDrawerTab('deals')}
+                  >
+                    商机
+                    {deals.length > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded-full bg-gray-200 text-xs text-gray-700">
+                        {deals.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      drawerTab === 'tasks'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setDrawerTab('tasks')}
+                  >
+                    任务
+                    {contactTasks.length > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center h-5 w-5 rounded-full bg-gray-200 text-xs text-gray-700">
+                        {contactTasks.length}
+                      </span>
+                    )}
+                  </button>
+                  {customsProfile && (
+                    <button
+                      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        drawerTab === 'customs'
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                      onClick={() => setDrawerTab('customs')}
+                    >
+                      海关
+                    </button>
+                  )}
+                </div>
+
+                {/* Timeline Tab */}
+                {drawerTab === 'timeline' && (
+                  <div className="space-y-3">
+                    {timelineSummary && (
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="rounded-lg bg-blue-50 p-2">
+                          <p className="font-semibold text-blue-700">{timelineSummary.totalEmailsSent}</p>
+                          <p className="text-gray-500">已发送</p>
+                        </div>
+                        <div className="rounded-lg bg-emerald-50 p-2">
+                          <p className="font-semibold text-emerald-700">{timelineSummary.totalOpened}</p>
+                          <p className="text-gray-500">已打开</p>
+                        </div>
+                        <div className="rounded-lg bg-violet-50 p-2">
+                          <p className="font-semibold text-violet-700">{timelineSummary.totalReplied}</p>
+                          <p className="text-gray-500">已回复</p>
+                        </div>
+                      </div>
+                    )}
+                    {timelineLoading ? (
+                      <div className="flex items-center justify-center py-6 text-sm text-gray-500">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+                      </div>
+                    ) : timelineError ? (
+                      <p className="text-sm text-red-500 py-4 text-center">加载失败，请稍后重试</p>
+                    ) : timelineEvents.length === 0 ? (
+                      <p className="text-sm text-gray-400 py-4 text-center">暂无邮件互动记录</p>
+                    ) : (
+                      <ul className="space-y-2 max-h-64 overflow-y-auto">
+                        {timelineEvents.map((ev) => {
+                          const iconMap = {
+                            sent: { icon: Send, color: 'text-blue-600 bg-blue-50' },
+                            opened: { icon: Eye, color: 'text-emerald-600 bg-emerald-50' },
+                            clicked: { icon: MousePointer, color: 'text-amber-600 bg-amber-50' },
+                            replied: { icon: MessageSquare, color: 'text-violet-600 bg-violet-50' },
+                            bounced: { icon: AlertCircle, color: 'text-orange-600 bg-orange-50' },
+                            failed: { icon: AlertCircle, color: 'text-red-600 bg-red-50' },
+                          }
+                          const labelMap: Record<string, string> = {
+                            sent: '发送邮件',
+                            opened: '打开邮件',
+                            clicked: '点击链接',
+                            replied: '收到回复',
+                            bounced: '退信',
+                            failed: '发送失败',
+                          }
+                          const cfg = iconMap[ev.type]
+                          const Icon = cfg.icon
+                          return (
+                            <li key={ev.id} className="flex gap-3 rounded-lg border border-gray-100 p-3">
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.color}`}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900">{labelMap[ev.type]}</p>
+                                {ev.details.subject && (
+                                  <p className="truncate text-xs text-gray-500">{ev.details.subject}</p>
+                                )}
+                                {ev.campaign && (
+                                  <p className="text-xs text-gray-400">活动：{ev.campaign.name}</p>
+                                )}
+                                <p className="text-xs text-gray-400">
+                                  {new Date(ev.timestamp).toLocaleString('zh-CN')}
+                                </p>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Deals Tab */}
+                {drawerTab === 'deals' && (
+                  <div className="space-y-3">
+                    {dealsLoading ? (
+                      <div className="flex items-center justify-center py-6 text-sm text-gray-500">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+                      </div>
+                    ) : deals360Error ? (
+                      <div className="py-6 text-center">
+                        <Briefcase className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-red-500">加载失败，请稍后重试</p>
+                      </div>
+                    ) : deals.length === 0 ? (
+                      <div className="py-6 text-center">
+                        <Briefcase className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-400">暂无商机记录</p>
+                      </div>
+                    ) : (
+                      <ul className="space-y-2 max-h-64 overflow-y-auto">
+                        {deals.map((deal) => (
+                          <li key={deal.id} className="rounded-lg border border-gray-100 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-gray-900">{deal.name}</p>
+                              <DealStageBadge stage={deal.stage} />
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              {deal.amount !== null && (
+                                <span className="font-medium text-gray-700">
+                                  {deal.currency} {deal.amount.toLocaleString()}
+                                </span>
+                              )}
+                              {deal.probability !== null && (
+                                <span>概率 {deal.probability}%</span>
+                              )}
+                              {deal.expectedCloseDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  预计 {new Date(deal.expectedCloseDate).toLocaleDateString('zh-CN')}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Tasks Tab */}
+                {drawerTab === 'tasks' && (
+                  <div className="space-y-3">
+                    {tasksLoading ? (
+                      <div className="flex items-center justify-center py-6 text-sm text-gray-500">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 加载中...
+                      </div>
+                    ) : deals360Error ? (
+                      <div className="py-6 text-center">
+                        <ListTodo className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-red-500">加载失败，请稍后重试</p>
+                      </div>
+                    ) : contactTasks.length === 0 ? (
+                      <div className="py-6 text-center">
+                        <ListTodo className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-400">暂无关联任务</p>
+                      </div>
+                    ) : (
+                      <ul className="space-y-2 max-h-64 overflow-y-auto">
+                        {contactTasks.map((task) => {
+                          const taskTypeLabels: Record<string, string> = {
+                            OUTREACH: '拓客',
+                            FOLLOW_UP: '跟进',
+                            NURTURE: '培育',
+                          }
+                          const taskStatusConfig: Record<string, { label: string; color: string }> = {
+                            DRAFT: { label: '草稿', color: 'bg-gray-100 text-gray-700' },
+                            PENDING: { label: '待执行', color: 'bg-yellow-100 text-yellow-700' },
+                            RUNNING: { label: '执行中', color: 'bg-blue-100 text-blue-700' },
+                            COMPLETED: { label: '已完成', color: 'bg-green-100 text-green-700' },
+                            FAILED: { label: '失败', color: 'bg-red-100 text-red-700' },
+                          }
+                          const statusCfg = taskStatusConfig[task.status] || taskStatusConfig.DRAFT
+                          const dueDate = task.dueDate ? new Date(task.dueDate) : null
+                          const isOverdue = dueDate && dueDate < new Date() && task.status === 'PENDING'
+
+                          return (
+                            <li key={task.id} className={`rounded-lg border p-3 space-y-1.5 ${isOverdue ? 'border-amber-300 bg-amber-50/30' : 'border-gray-100'}`}>
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-gray-900">{task.name}</p>
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.color}`}>
+                                  {statusCfg.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span className="inline-flex items-center rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                                  {taskTypeLabels[task.type] || task.type}
+                                </span>
+                                {dueDate && (
+                                  <span className={`flex items-center gap-1 ${isOverdue ? 'text-amber-600 font-medium' : ''}`}>
+                                    <Clock className="h-3 w-3" />
+                                    {dueDate.toLocaleDateString('zh-CN')}
+                                    {isOverdue && ' (已逾期)'}
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Customs Tab */}
+                {drawerTab === 'customs' && customsProfile && (
+                  <div className="space-y-3 rounded-lg border border-cyan-100 bg-cyan-50/40 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900">{customsProfile.companyName}</p>
+                      {customsProfile.purchaseIntentScore != null && (
+                        <span className="text-sm font-semibold text-cyan-700">
+                          意向 {customsProfile.purchaseIntentScore}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                      <p>装运次数：{customsProfile.totalShipments ?? '—'}</p>
+                      <p>总金额：${(customsProfile.totalAmountUsd ?? 0).toLocaleString()}</p>
+                    </div>
+                    {customsProfile.aiSummary && (
+                      <p className="text-xs text-gray-700 leading-relaxed">{customsProfile.aiSummary}</p>
+                    )}
+                    <Link href="/customs" className="text-xs text-primary hover:underline">
+                      在海关数据中查看 →
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               {/* Timestamps */}
               <div className="text-xs text-gray-400 space-y-1">
                 <p>{t('common.createdAt')}：{new Date(currentContact.createdAt).toLocaleString('zh-CN')}</p>
@@ -707,12 +1347,30 @@ export default function ContactsPage() {
               </div>
 
               {/* Actions */}
+<<<<<<< HEAD
               <div className="flex gap-2 pt-4 border-t">
                 <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
                   <Edit className="h-4 w-4 mr-2" /> {t('common.edit')}
                 </Button>
                 <Button variant="outline" className="flex-1">
                   <Send className="h-4 w-4 mr-2" /> {t('contacts.sendEmail')}
+=======
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
+                    <Edit className="h-4 w-4 mr-2" /> 编辑
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <Send className="h-4 w-4 mr-2" /> 发送邮件
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleExportContactGdpr(currentContact.id, currentContact.fullName)}
+                >
+                  <Download className="h-4 w-4 mr-2" /> 导出个人数据 (GDPR)
+>>>>>>> feat/landing-page
                 </Button>
               </div>
             </div>
@@ -762,5 +1420,18 @@ function StatusBadge({ status }: { status: string }) {
     UNREACHABLE: { label: t('contacts.status.unreachable'), color: 'bg-red-100 text-red-600' },
   }
   const s = map[status] || { label: status, color: 'bg-gray-100 text-gray-600' }
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${s.color}`}>{s.label}</span>
+}
+
+function DealStageBadge({ stage }: { stage: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    PROSPECTING: { label: '探索', color: 'bg-gray-100 text-gray-700' },
+    QUALIFICATION: { label: '确认', color: 'bg-blue-100 text-blue-700' },
+    PROPOSAL: { label: '方案', color: 'bg-amber-100 text-amber-700' },
+    NEGOTIATION: { label: '谈判', color: 'bg-orange-100 text-orange-700' },
+    CLOSED_WON: { label: '成交', color: 'bg-emerald-100 text-emerald-700' },
+    CLOSED_LOST: { label: '失败', color: 'bg-red-100 text-red-700' },
+  }
+  const s = map[stage] || { label: stage, color: 'bg-gray-100 text-gray-600' }
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${s.color}`}>{s.label}</span>
 }

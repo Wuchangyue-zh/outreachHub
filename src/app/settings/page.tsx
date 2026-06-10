@@ -1,5 +1,6 @@
-'use client'
+import { redirect } from 'next/navigation'
 
+<<<<<<< HEAD
 import { useState } from 'react'
 import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
@@ -206,4 +207,8 @@ export default function SettingsPage() {
       </div>
     </DashboardLayout>
   )
+=======
+export default function SettingsRedirectPage() {
+  redirect('/dashboard/settings')
+>>>>>>> feat/landing-page
 }

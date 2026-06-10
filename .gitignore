@@ -1,3 +1,6 @@
+# OMC multi-agent state
+.omc/
+
 # Dependencies
 node_modules/
 .pnp
@@ -47,3 +50,6 @@ logs/
 # Temporary
 tmp/
 temp/
+
+# Claude worktrees (duplicate package.json breaks Jest in CI)
+.claude/

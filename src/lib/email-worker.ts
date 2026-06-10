@@ -1,8 +1,18 @@
 import { Worker, Job } from 'bullmq'
-import { redisConnection } from './redis'
-import { sendMail } from './email'
+import { getRedisConnection } from './redis'
+import { sendPlatformMail } from './email'
+import { sendAccountMail, checkDailyLimit } from './email-account-mail'
 import { prisma } from './prisma'
+import { addEmailTracking } from './email-tracking'
+import { applyEmailVariables, buildContactVariables } from './email-variables'
 import type { EmailJobData } from './email-queue'
+import { maybeMarkCampaignCompleted } from './campaign-completion'
+import { isPermanentBounce, markAsBounced } from './bounce-handler'
+import { getWorkerConcurrency, getWorkerRateLimit } from './env'
+import { fetchFileBuffer } from './storage'
+import { resolvePublicUrls } from './email-html'
+import { incrementTenantStat } from './stats-aggregate'
+import { updateCampaignContactStatus } from './campaign-contacts'
 
 async function processEmailJob(job: Job<EmailJobData>) {
   const {
@@ -12,10 +22,12 @@ async function processEmailJob(job: Job<EmailJobData>) {
     text,
     contactId,
     campaignId,
+    emailAccountId,
     fromEmail,
     fromName,
     trackingPixel,
     trackingLinks,
+    attachmentIds,
   } = job.data
 
   console.log(`[Email Worker] Processing job ${job.id}: Sending to ${to}`)
@@ -23,16 +35,86 @@ async function processEmailJob(job: Job<EmailJobData>) {
   // Update job progress
   await job.updateProgress(10)
 
+  // P1-10: 模板变量替换
+  let finalSubject = subject
+  let finalHtml = html || ''
+  let finalText = text || ''
+
+  if (contactId) {
+    // 获取联系人信息用于变量替换
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+      include: {
+        company: true,
+        emails: {
+          where: { isPrimary: true },
+          take: 1,
+        },
+      },
+    })
+
+    if (contact) {
+      const primaryEmail = contact.emails[0]?.address || to
+      const variables = buildContactVariables(contact, primaryEmail)
+
+      finalSubject = applyEmailVariables(subject, variables)
+      finalHtml = applyEmailVariables(html || '', variables)
+      finalText = applyEmailVariables(text || '', variables)
+    }
+  }
+
+  // H1: 加载附件 Buffer
+  let emailAttachments: Array<{ filename: string; content: Buffer }> | undefined
+  if (attachmentIds && attachmentIds.length > 0) {
+    try {
+      const attachments = await prisma.attachment.findMany({
+        where: { id: { in: attachmentIds } },
+      })
+      const loaded: Array<{ filename: string; content: Buffer }> = []
+      for (const att of attachments) {
+        try {
+          const { buffer, filename } = await fetchFileBuffer(att.url)
+          loaded.push({ filename: att.originalName || filename, content: buffer })
+        } catch (err) {
+          console.warn(`[Email Worker] Failed to load attachment ${att.id}:`, err)
+        }
+      }
+      if (loaded.length > 0) emailAttachments = loaded
+    } catch (err) {
+      console.warn(`[Email Worker] Failed to fetch attachments:`, err)
+    }
+  }
+
+  // 确定发件人邮箱
+  let senderEmail = fromEmail || process.env.SMTP_USER || ''
+
+  // 如果指定了 EmailAccount，检查发送限额并获取发件人邮箱
+  if (emailAccountId) {
+    const canSend = await checkDailyLimit(emailAccountId)
+    if (!canSend) {
+      console.warn(`[Email Worker] EmailAccount ${emailAccountId} reached daily limit, skipping job ${job.id}`)
+      throw new Error(`EmailAccount ${emailAccountId} reached daily limit`)
+    }
+    const account = await prisma.emailAccount.findUnique({
+      where: { id: emailAccountId },
+      select: { email: true },
+    })
+    if (account) {
+      senderEmail = account.email
+    }
+  }
+
   // Create email log entry
   const emailLogData: any = {
     contactId: contactId || '',
     messageId: '',
     toEmail: to,
-    fromEmail: fromEmail || process.env.SMTP_USER || '',
-    subject,
+    fromEmail: senderEmail,
+    subject: finalSubject,
     status: 'PENDING',
     sentAt: new Date(),
-    htmlContent: html,
+    content: finalText || finalHtml || '',
+    htmlContent: finalHtml,
   }
 
   if (campaignId) {
@@ -45,35 +127,47 @@ async function processEmailJob(job: Job<EmailJobData>) {
 
   await job.updateProgress(30)
 
-  // Prepare email content with tracking
-  let emailHtml = html || ''
-  if (trackingPixel && emailLog.id) {
-    const pixelUrl = `${process.env.APP_URL}/api/email/track/open?id=${emailLog.id}`
+  // Prepare email content with tracking using the centralized addEmailTracking function
+  let emailHtml = finalHtml
+  if (emailLog.id && contactId) {
+    emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId, campaignId)
+  } else if (trackingPixel && emailLog.id) {
+    // Fallback: just add tracking pixel if no contactId
+    const pixelUrl = `${process.env.APP_URL}/api/email/track/open?e=${emailLog.id}&c=${contactId || ''}&t=${Date.now()}`
     emailHtml += `<img src="${pixelUrl}" width="1" height="1" style="display:none" />`
   }
 
-  if (trackingLinks && emailHtml) {
-    // Replace links with tracking links
-    emailHtml = emailHtml.replace(
-      /href="(https?:\/\/[^"]+)"/g,
-      (match, url) => {
-        const trackingUrl = `${process.env.APP_URL}/api/email/track/click?id=${emailLog.id}&url=${encodeURIComponent(url)}`
-        return `href="${trackingUrl}"`
-      }
-    )
-  }
+  // H2: 将本地路径图片 URL 转为公网可访问 URL
+  emailHtml = resolvePublicUrls(emailHtml)
 
   await job.updateProgress(50)
 
   try {
-    // Send email
-    const result = await sendMail({
-      to,
-      subject,
-      html: emailHtml,
-      text,
-      from: fromName ? `${fromName} <${fromEmail || process.env.SMTP_USER}>` : fromEmail,
-    })
+    // Send email - 根据是否有 EmailAccount 选择发送方式
+    let result: { success: boolean; messageId?: string }
+
+    if (emailAccountId) {
+      // 使用用户 EmailAccount 发送
+      result = await sendAccountMail({
+        emailAccountId,
+        to,
+        subject: finalSubject,
+        html: emailHtml,
+        text: finalText,
+        from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+        attachments: emailAttachments,
+      })
+    } else {
+      // 使用平台 SMTP 发送（降级）
+      result = await sendPlatformMail({
+        to,
+        subject: finalSubject,
+        html: emailHtml,
+        text: finalText,
+        from: fromName ? `${fromName} <${senderEmail}>` : senderEmail,
+        attachments: emailAttachments,
+      })
+    }
 
     await job.updateProgress(90)
 
@@ -97,14 +191,27 @@ async function processEmailJob(job: Job<EmailJobData>) {
       })
     }
 
-    // Update campaign statistics if campaignId exists
+    // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (campaignId) {
-      await prisma.campaign.update({
+      await maybeMarkCampaignCompleted(campaignId)
+      if (contactId) {
+        await updateCampaignContactStatus(campaignId, contactId, 'SENT').catch(() => {})
+      }
+      const campaign = await prisma.campaign.findUnique({
         where: { id: campaignId },
-        data: {
-          totalSent: { increment: 1 },
-        },
+        select: { tenantId: true },
       })
+      if (campaign?.tenantId) {
+        await incrementTenantStat(campaign.tenantId, 'emailsSent')
+      }
+    }
+
+    // #14: 发送成功时小幅恢复账户健康度（上限由 select-email-account 控制）
+    if (emailAccountId) {
+      await prisma.emailAccount.update({
+        where: { id: emailAccountId },
+        data: { healthScore: { increment: 0.5 } },
+      }).catch((err) => console.error(`[Worker] Failed to recover healthScore for ${emailAccountId}:`, err))
     }
 
     await job.updateProgress(100)
@@ -119,36 +226,53 @@ async function processEmailJob(job: Job<EmailJobData>) {
   } catch (error: any) {
     console.error(`[Email Worker] Job ${job.id} failed:`, error)
 
-    // Update email log with failure
-    await prisma.emailLog.update({
-      where: { id: emailLog.id },
-      data: {
-        status: 'FAILED',
-        error: error.message,
-      },
-    })
+    // #14: 检测是否为永久性退信（5xx SMTP 错误）
+    const isBounce = isPermanentBounce(error.message || '')
 
-    // Update campaign failed count if campaignId exists
-    if (campaignId) {
-      await prisma.campaign.update({
-        where: { id: campaignId },
+    if (isBounce) {
+      // 退信：标记 BOUNCED + 降级健康度 + 更新统计
+      await markAsBounced(emailLog.id, error.message, emailAccountId)
+    } else {
+      // 普通发送失败
+      await prisma.emailLog.update({
+        where: { id: emailLog.id },
         data: {
-          totalBounced: { increment: 1 },
+          status: 'FAILED',
+          error: error.message,
         },
       })
+
+      // #14: 发送失败时降低账户健康度
+      if (emailAccountId) {
+        await prisma.emailAccount.update({
+          where: { id: emailAccountId },
+          data: { healthScore: { decrement: 2 } },
+        }).catch((err) => console.error(`[Worker] Failed to degrade healthScore for ${emailAccountId}:`, err))
+      }
+    }
+
+    if (campaignId) {
+      await maybeMarkCampaignCompleted(campaignId)
     }
 
     throw error
   }
 }
 
+
 export function createEmailWorker() {
+  const connection = getRedisConnection()
+  if (!connection) {
+    throw new Error('Redis is not configured. Set REDIS_URL or REDIS_HOST in .env to run the email worker.')
+  }
+
+  const rateLimit = getWorkerRateLimit()
   const worker = new Worker<EmailJobData>('email-queue', processEmailJob, {
-    connection: redisConnection,
-    concurrency: 5, // Process 5 emails concurrently
+    connection,
+    concurrency: getWorkerConcurrency(5),
     limiter: {
-      max: 100, // Max 100 jobs
-      duration: 60000, // Per minute
+      max: rateLimit.max,
+      duration: rateLimit.duration,
     },
   })
 
@@ -170,7 +294,13 @@ export function createEmailWorker() {
 // Start worker if this file is run directly
 if (require.main === module) {
   console.log('[Email Worker] Starting email worker...')
-  const worker = createEmailWorker()
+  let worker
+  try {
+    worker = createEmailWorker()
+  } catch (error) {
+    console.error('[Email Worker]', (error as Error).message)
+    process.exit(1)
+  }
 
   process.on('SIGTERM', async () => {
     console.log('[Email Worker] Shutting down...')

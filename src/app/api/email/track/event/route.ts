@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { emailEvents } from '@/lib/events'
+import { incrementTenantStat } from '@/lib/stats-aggregate'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,21 +64,17 @@ export async function POST(req: NextRequest) {
       subject: emailLog.subject,
       campaignId: emailLog.campaignId || undefined,
       contactId: emailLog.contactId,
+      tenantId: emailLog.campaign?.tenantId || undefined,
       timestamp: Date.now(),
     })
 
-    // Update campaign stats if applicable
-    if (emailLog.campaignId) {
-      const campaignUpdate: any = {}
-      if (eventType === 'opened') campaignUpdate.totalOpened = { increment: 1 }
-      if (eventType === 'clicked') campaignUpdate.totalClicked = { increment: 1 }
-      if (eventType === 'replied') campaignUpdate.totalReplied = { increment: 1 }
-
-      await prisma.campaign.update({
-        where: { id: emailLog.campaignId },
-        data: campaignUpdate,
-      })
+    const tenantId = emailLog.campaign?.tenantId
+    if (tenantId) {
+      if (eventType === 'opened') await incrementTenantStat(tenantId, 'emailsOpened')
+      if (eventType === 'replied') await incrementTenantStat(tenantId, 'emailsReplied')
     }
+
+    // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

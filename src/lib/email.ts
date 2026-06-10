@@ -9,11 +9,33 @@ export interface SendMailOptions {
   attachments?: Array<{ filename: string; content: Buffer }>
 }
 
-export async function createTransporter() {
+/** 根据端口推断 SMTP 是否使用 implicit TLS（465 必须为 true） */
+function resolvePlatformSmtpSecure(port: number): boolean {
+  const env = process.env.SMTP_SECURE
+  if (env === 'true') return true
+  // 465 端口必须使用 SSL；.env 误配 false 时仍强制开启
+  if (port === 465) {
+    if (env === 'false') {
+      console.warn('[SMTP] Port 465 requires secure=true; ignoring SMTP_SECURE=false')
+    }
+    return true
+  }
+  if (env === 'false') return false
+  return false
+}
+
+/**
+ * 创建平台级 transporter（使用 .env SMTP 配置）
+ * 用途：注册确认、密码重置、账单通知、系统告警
+ */
+export async function createPlatformTransporter() {
+  const port = parseInt(process.env.SMTP_PORT || '465', 10)
+  const secure = resolvePlatformSmtpSecure(port)
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.jafron.com',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: process.env.SMTP_SECURE === 'true',
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
@@ -21,15 +43,20 @@ export async function createTransporter() {
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 30000,
+    // 587 等端口走 STARTTLS
+    requireTLS: !secure && port === 587,
     tls: {
-      // Allow IP address connections without certificate validation
       rejectUnauthorized: false,
     },
   })
 }
 
-export async function sendMail(options: SendMailOptions) {
-  const transporter = await createTransporter()
+/**
+ * 发送平台系统邮件（使用 .env SMTP）
+ * 用途：注册确认、密码重置、账单通知、系统告警
+ */
+export async function sendPlatformMail(options: SendMailOptions) {
+  const transporter = await createPlatformTransporter()
 
   const fromName = process.env.SMTP_FROM_NAME || 'OutreachHub'
   const mailOptions = {
@@ -45,8 +72,11 @@ export async function sendMail(options: SendMailOptions) {
   return { success: true, messageId: result.messageId }
 }
 
-export async function sendBatchEmails(emails: SendMailOptions[]) {
-  const transporter = await createTransporter()
+/**
+ * 批量发送平台系统邮件
+ */
+export async function sendPlatformBatchEmails(emails: SendMailOptions[]) {
+  const transporter = await createPlatformTransporter()
   const results: Array<{ success: boolean; messageId?: string; error?: string; to: string }> = []
 
   for (const email of emails) {
@@ -72,3 +102,15 @@ export async function sendBatchEmails(emails: SendMailOptions[]) {
 
   return results
 }
+
+// ==================== 向后兼容别名 ====================
+// 保持向后兼容，现有代码无需立即修改
+
+/** @deprecated 使用 createPlatformTransporter() 代替 */
+export const createTransporter = createPlatformTransporter
+
+/** @deprecated 使用 sendPlatformMail() 代替 */
+export const sendMail = sendPlatformMail
+
+/** @deprecated 使用 sendPlatformBatchEmails() 代替 */
+export const sendBatchEmails = sendPlatformBatchEmails

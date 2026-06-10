@@ -1,37 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initializeIMAPClient } from '@/lib/imap'
-import { getCategoryLabel } from '@/lib/reply-classifier'
+import { checkRepliesFromAllAccounts } from '@/lib/imap-multi'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes } from '@/lib/api-errors'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const client = await initializeIMAPClient()
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
 
-    if (!client) {
+    const result = await checkRepliesFromAllAccounts(auth.userId)
+
+    if (result.totalAccounts === 0) {
       return NextResponse.json({
         success: false,
-        error: 'IMAP未配置，请检查环境变量 IMAP_HOST, IMAP_USER, IMAP_PASSWORD',
+        error: '未找到配置了 IMAP 的邮箱账户，请在邮箱设置中添加 IMAP 信息',
       }, { status: 400 })
     }
 
-    const { replyCount, classifications } = await client.detectReplies()
-
-    const summary = classifications.reduce((acc, { category }) => {
-      const label = getCategoryLabel(category as any)
-      acc[label] = (acc[label] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
     return NextResponse.json({
       success: true,
-      replyCount,
-      classifications: classifications.map(c => ({
-        ...c,
-        categoryLabel: getCategoryLabel(c.category as any),
-      })),
-      summary,
-      message: `检测到 ${replyCount} 封新回复`,
+      replyCount: result.totalReplies,
+      data: result,
+      message: `检测到 ${result.totalReplies} 封新回复（${result.successAccounts}/${result.totalAccounts} 个账户成功）`,
     })
   } catch (error: any) {
     console.error('IMAP check replies error:', error)

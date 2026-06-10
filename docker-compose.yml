@@ -1,0 +1,118 @@
+# OutreachHub Docker Compose
+# 本地开发: docker compose up -d postgres redis
+# 全部服务: docker compose --profile full up -d
+# 生产部署: 见下方 production 环境变量说明
+#
+# 生产环境必填变量（.env）:
+#   DATABASE_URL        — PostgreSQL pooler URL (Neon/Supabase)
+#   REDIS_URL           — Upstash/Redis Cloud URL
+#   NEXTAUTH_SECRET     — JWT 密钥 (≥32 随机字符)
+#   CRON_SECRET         — Cron 鉴权密钥
+#   ENCRYPTION_KEY      — AES-256 加密密钥 (64 hex 字符)
+#   APP_URL             — 生产域名 (https://your-domain.com)
+#   SMTP_HOST/USER/PASS — 平台邮件 SMTP
+#   STRIPE_SECRET_KEY   — Stripe 支付（可选）
+#   BLOB_READ_WRITE_TOKEN — Vercel Blob（Vercel 自动注入）
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: outreachhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: outreach_hub
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: outreachhub-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+      WORKER_HEALTH_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "worker:email"]
+
+  cron-worker:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-cron-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+      CRON_WORKER_HEALTH_PORT: 8082
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "worker:cron"]
+
+  imap-worker:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: outreachhub-imap-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/outreach_hub?schema=public
+      REDIS_URL: redis://redis:6379
+      IMAP_WORKER_HEALTH_PORT: 8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["npm", "run", "worker:imap"]
+
+volumes:
+  postgres_data:
+  redis_data:

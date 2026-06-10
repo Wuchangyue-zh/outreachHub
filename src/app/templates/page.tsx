@@ -10,8 +10,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { useI18n } from '@/hooks/use-i18n'
 import {
-  FileText, Plus, Edit, Trash2, X, Loader2, Wand2, Copy, Eye
+  FileText, Plus, Edit, Trash2, X, Loader2, Wand2, Copy, Eye,
+  Languages, Sparkles, Filter, BarChart3
 } from 'lucide-react'
+import { LANGUAGES, getLanguageLabel } from '@/lib/i18n/languages'
 
 interface Template {
   id: string
@@ -37,7 +39,12 @@ export default function TemplatesPage() {
   const [currentTemplate, setCurrentTemplate] = useState<Template | null>(null)
   const [saving, setSaving] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiPolishing, setAiPolishing] = useState(false)
+  const [aiTranslating, setAiTranslating] = useState(false)
+  const [aiSubjects, setAiSubjects] = useState<string[]>([])
+  const [generatingSubjects, setGeneratingSubjects] = useState(false)
   const [language, setLanguage] = useState('en')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   const [form, setForm] = useState({
     name: '',
@@ -48,21 +55,43 @@ export default function TemplatesPage() {
     variables: '',
   })
 
+  const categoryLabels: Record<string, string> = {
+    '': '全部分类',
+    'cold-outreach': '冷邮件',
+    'follow-up': '跟进',
+    'introduction': '介绍',
+    'promotion': '促销',
+    'meeting-request': '会议邀请',
+  }
+
+  const languageLabels: Record<string, string> = Object.fromEntries(
+    LANGUAGES.map((l) => [l.code, l.nativeName])
+  )
+
   useEffect(() => {
     fetchTemplates()
-  }, [language])
+  }, [language, categoryFilter])
 
   async function fetchTemplates() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/templates?language=${language}`)
+      const params = new URLSearchParams({ language })
+      if (categoryFilter) params.set('category', categoryFilter)
+      const res = await fetch(`/api/templates?${params}`)
       const data = await res.json()
       if (data.success) {
         setTemplates(data.data)
+      } else {
+        addToast({ type: 'error', title: '加载失败', description: data.error?.message || '无法加载模板列表' })
       }
+<<<<<<< HEAD
     } catch (e) {
       console.error(e)
       addToast({ type: 'error', title: t('common.loadFailed') })
+=======
+    } catch {
+      addToast({ type: 'error', title: '加载失败', description: '无法加载模板列表，请稍后重试' })
+>>>>>>> feat/landing-page
     } finally {
       setLoading(false)
     }
@@ -153,6 +182,7 @@ export default function TemplatesPage() {
     }
 
     setAiGenerating(true)
+    setAiSubjects([])
     try {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
@@ -188,11 +218,118 @@ export default function TemplatesPage() {
     }
   }
 
+  // #50: AI 生成主题行备选
+  const handleGenerateSubjects = async () => {
+    if (!form.name || !form.content) {
+      addToast({ type: 'error', title: '请先填写模板名称和内容' })
+      return
+    }
+
+    setGeneratingSubjects(true)
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'generate-subject',
+          data: {
+            productDescription: form.name,
+            emailContent: form.content,
+            language: form.language,
+          },
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success && Array.isArray(data.data)) {
+        setAiSubjects(data.data)
+        addToast({ type: 'success', title: `生成了 ${data.data.length} 个主题行` })
+      } else {
+        addToast({ type: 'error', title: '生成失败', description: data.error })
+      }
+    } catch (e) {
+      addToast({ type: 'error', title: '生成主题行失败' })
+    } finally {
+      setGeneratingSubjects(false)
+    }
+  }
+
+  // #50: AI 润色/改写
+  const handlePolish = async () => {
+    if (!form.content) {
+      addToast({ type: 'error', title: '请先填写邮件内容' })
+      return
+    }
+
+    setAiPolishing(true)
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'polish-email',
+          data: {
+            content: form.content,
+            language: form.language,
+          },
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setForm({ ...form, content: data.data.content })
+        addToast({ type: 'success', title: '润色完成' })
+      } else {
+        addToast({ type: 'error', title: '润色失败', description: data.error })
+      }
+    } catch (e) {
+      addToast({ type: 'error', title: '润色失败' })
+    } finally {
+      setAiPolishing(false)
+    }
+  }
+
+  // #50: AI 翻译
+  const handleTranslate = async (targetLang: string) => {
+    if (!form.content) {
+      addToast({ type: 'error', title: '请先填写邮件内容' })
+      return
+    }
+
+    setAiTranslating(true)
+    try {
+      const res = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'translate-email',
+          data: {
+            content: form.content,
+            targetLanguage: targetLang,
+          },
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setForm({ ...form, content: data.data.content, language: targetLang })
+        addToast({ type: 'success', title: `已翻译为 ${languageLabels[targetLang] || targetLang}` })
+      } else {
+        addToast({ type: 'error', title: '翻译失败', description: data.error })
+      }
+    } catch (e) {
+      addToast({ type: 'error', title: '翻译失败' })
+    } finally {
+      setAiTranslating(false)
+    }
+  }
+
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content)
     addToast({ type: 'success', title: t('templates.copied') })
   }
 
+<<<<<<< HEAD
   const categoryLabels: Record<string, string> = {
     'cold-outreach': t('templates.category.coldOutreach'),
     'follow-up': t('templates.category.followUp'),
@@ -200,6 +337,13 @@ export default function TemplatesPage() {
     'promotion': t('templates.category.promotion'),
     'meeting-request': t('templates.category.meetingRequest'),
   }
+=======
+  // #51: Category stats
+  const categoryStats = templates.reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+>>>>>>> feat/landing-page
 
   return (
     <DashboardLayout>
@@ -207,26 +351,59 @@ export default function TemplatesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
+<<<<<<< HEAD
             <h1 className="text-2xl font-bold text-gray-900">{t('templates.title')}</h1>
             <p className="text-sm text-gray-500">{t('templates.subtitle')}</p>
+=======
+            <h1 className="text-2xl font-bold text-gray-900">邮件模板</h1>
+            <p className="text-sm text-gray-500">管理邮件模板，支持 AI 生成、润色、翻译</p>
+>>>>>>> feat/landing-page
           </div>
           <div className="flex gap-2">
+            {/* #51: Category filter */}
+            <div className="flex items-center gap-1">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                {Object.entries(categoryLabels).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               className="rounded-md border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.nativeName}</option>
+              ))}
             </select>
             <Button className="gap-2" onClick={openAddDialog}>
               <Plus className="h-4 w-4" /> {t('templates.create')}
             </Button>
           </div>
         </div>
+
+        {/* #51: Category stats bar */}
+        {templates.length > 0 && !categoryFilter && (
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(categoryStats).map(([cat, count]) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+              >
+                <BarChart3 className="h-3 w-3 text-gray-400" />
+                <span className="text-gray-600">{categoryLabels[cat] || cat}</span>
+                <span className="font-semibold text-gray-900">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Templates Grid */}
         {loading ? (
@@ -343,6 +520,7 @@ export default function TemplatesPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
+<<<<<<< HEAD
                   <Label>{t('templates.form.content')} *</Label>
                   <Button
                     variant="outline"
@@ -358,6 +536,65 @@ export default function TemplatesPage() {
                     )}
                     {t('templates.aiGenerate')}
                   </Button>
+=======
+                  <Label>邮件内容 *</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAIGenerate}
+                      disabled={aiGenerating}
+                      className="gap-1"
+                    >
+                      {aiGenerating ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      AI 生成
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePolish}
+                      disabled={aiPolishing || !form.content}
+                      className="gap-1"
+                    >
+                      {aiPolishing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      润色
+                    </Button>
+                    <div className="relative group">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={aiTranslating || !form.content}
+                        className="gap-1"
+                      >
+                        {aiTranslating ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Languages className="h-3 w-3" />
+                        )}
+                        翻译
+                      </Button>
+                      <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-10 bg-white border rounded-lg shadow-lg py-1 min-w-[120px]">
+                        {Object.entries(languageLabels).map(([code, label]) => (
+                          <button
+                            key={code}
+                            onClick={() => handleTranslate(code)}
+                            className="block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+>>>>>>> feat/landing-page
                 </div>
                 <Textarea
                   value={form.content}
@@ -366,6 +603,46 @@ export default function TemplatesPage() {
                   rows={12}
                   className="font-mono text-sm"
                 />
+              </div>
+
+              {/* Subject line suggestions */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>邮件主题 *</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleGenerateSubjects}
+                    disabled={generatingSubjects || !form.content}
+                    className="gap-1 text-xs text-gray-500"
+                  >
+                    {generatingSubjects ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    AI 推荐主题
+                  </Button>
+                </div>
+                <Input
+                  value={form.subject}
+                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                  placeholder="如：Quick question about {{companyName}}"
+                />
+                {aiSubjects.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-400">点击选择推荐主题：</p>
+                    {aiSubjects.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setForm({ ...form, subject: s }); setAiSubjects([]) }}
+                        className="block w-full text-left text-sm px-3 py-1.5 rounded border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <Label>{t('templates.form.variables')}</Label>

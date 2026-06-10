@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generateEmail, generateEmailSubject } from '@/lib/openai'
+import { verifyAuthToken } from '@/lib/auth-middleware'
+import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
+import {
+  generateEmail, generateEmailSubject, generateReplyDraft,
+  polishEmail, translateEmail
+} from '@/lib/openai'
+import { getLanguageName } from '@/lib/i18n/languages'
+import { rateLimit } from '@/lib/rate-limit'
+
+const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 export async function POST(req: NextRequest) {
+  const rateLimitResult = await limiter.check(req, 10)
+  if (rateLimitResult) return rateLimitResult
   try {
+    const auth = await verifyAuthToken(req)
+    if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+
     const body = await req.json()
     const { type, data } = body
 
@@ -32,9 +46,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: subjects })
     }
 
-    return NextResponse.json({ error: '无效的生成类型' }, { status: 400 })
+    if (type === 'generate-reply') {
+      const draft = await generateReplyDraft({
+        contactName: data.contactName,
+        company: data.company || '',
+        lastMessage: data.lastMessage,
+      })
+      return NextResponse.json({ success: true, data: draft })
+    }
+
+    // #50: AI 润色/改写邮件
+    if (type === 'polish-email') {
+      if (!data.content) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供邮件内容', 400)
+      }
+      const polished = await polishEmail(data.content, data.tone || 'professional')
+      return NextResponse.json({ success: true, data: { content: polished } })
+    }
+
+    // #50: AI 翻译邮件
+    if (type === 'translate-email') {
+      if (!data.content || !data.targetLanguage) {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, '请提供邮件内容和目标语言', 400)
+      }
+      const translated = await translateEmail(data.content, getLanguageName(data.targetLanguage))
+      return NextResponse.json({ success: true, data: { content: translated } })
+    }
+
+    return errorResponse(ErrorCodes.VALIDATION_ERROR, '无效的生成类型', 400)
   } catch (error) {
-    console.error('AI generation error:', error)
-    return NextResponse.json({ error: 'AI生成失败，请稍后重试' }, { status: 500 })
+    return handleApiError(error)
   }
 }

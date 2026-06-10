@@ -8,9 +8,14 @@ export async function GET(req: NextRequest) {
     const emailLogId = req.nextUrl.searchParams.get('e')
     const contactId = req.nextUrl.searchParams.get('c')
 
+    // K2: 提取 IP 和国家（Vercel/Cloudflare headers）
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || undefined
+    const country = req.headers.get('x-vercel-ip-country') || req.headers.get('cf-ipcountry') || undefined
+    const city = req.headers.get('x-vercel-ip-city') || undefined
+
     // Record the open event asynchronously
     if (emailLogId && contactId) {
-      recordEmailOpen(emailLogId, contactId).catch(console.error)
+      recordEmailOpen(emailLogId, contactId, { ip, country, city }).catch(console.error)
     }
 
     // Return tracking pixel

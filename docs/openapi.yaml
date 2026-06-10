@@ -1,0 +1,643 @@
+openapi: 3.0.3
+info:
+  title: OutreachHub API
+  description: |
+    OutreachHub 智能拓客与邮件营销平台 API。
+
+    ## 认证
+    所有 API 请求需要通过 `Authorization: Bearer <token>` header 或 `auth-token` cookie 进行认证。
+
+    ## 通用响应格式
+    - 成功：`{ "success": true, "data": ... }`
+    - 错误：`{ "success": false, "error": { "code": "...", "message": "..." } }`
+    - 分页：`{ "success": true, "data": [...], "pagination": { "page": 1, "limit": 20, "total": 100, "pages": 5 } }`
+  version: 1.0.0
+  contact:
+    name: OutreachHub Support
+    email: support@outreachhub.com
+
+servers:
+  - url: http://localhost:3030
+    description: 本地开发
+  - url: https://app.outreachhub.com
+    description: 生产环境
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'API Key (格式: oh_xxx)'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        title:
+          type: string
+        companyId:
+          type: string
+        status:
+          type: string
+          enum: [NEW, CONTACTED, INTERESTED, NOT_INTERESTED, QUALIFIED, CONVERTED, UNREACHABLE]
+        tags:
+          type: array
+          items:
+            type: string
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactEmail'
+        createdAt:
+          type: string
+          format: date-time
+
+    ContactEmail:
+      type: object
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        type:
+          type: string
+          enum: [PROFESSIONAL, PERSONAL]
+        isVerified:
+          type: boolean
+
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [SINGLE, SEQUENCE, AB_TEST]
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, RUNNING, PAUSED, COMPLETED, FAILED]
+        subject:
+          type: string
+        totalSent:
+          type: integer
+        totalOpened:
+          type: integer
+        totalReplied:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Deal:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        stage:
+          type: string
+          enum: [LEAD, OPPORTUNITY, QUOTE, WON, LOST]
+        amount:
+          type: number
+        currency:
+          type: string
+        contactId:
+          type: string
+        companyId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+paths:
+  /api/contacts:
+    get:
+      summary: 获取联系人列表
+      tags: [联系人]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          description: 搜索姓名或邮箱
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [NEW, CONTACTED, INTERESTED, NOT_INTERESTED, QUALIFIED, CONVERTED, UNREACHABLE]
+        - name: pool
+          in: query
+          description: 公海/私海筛选
+          schema:
+            type: string
+            enum: [PUBLIC, PRIVATE]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contact'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      summary: 创建联系人
+      tags: [联系人]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName:
+                  type: string
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                title:
+                  type: string
+                companyId:
+                  type: string
+                emails:
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+        '403':
+          description: 权限不足或限额已满
+
+  /api/contacts/{id}:
+    get:
+      summary: 获取联系人详情
+      tags: [联系人]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 联系人不存在
+    put:
+      summary: 更新联系人
+      tags: [联系人]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 删除联系人
+      tags: [联系人]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/campaigns:
+    get:
+      summary: 获取活动列表
+      tags: [邮件营销]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Campaign'
+    post:
+      summary: 创建活动
+      tags: [邮件营销]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, subject, content]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                subject:
+                  type: string
+                content:
+                  type: string
+                emailAccountId:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/campaigns/{id}/launch:
+    post:
+      summary: 启动活动
+      tags: [邮件营销]
+      description: 将活动中的联系人邮件任务加入发送队列
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 启动成功
+        '403':
+          description: 试用期已过或限额已满
+
+  /api/deals:
+    get:
+      summary: 获取商机列表
+      tags: [销售漏斗]
+      parameters:
+        - name: stage
+          in: query
+          schema:
+            type: string
+            enum: [LEAD, OPPORTUNITY, QUOTE, WON, LOST]
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Deal'
+    post:
+      summary: 创建商机
+      tags: [销售漏斗]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                stage:
+                  type: string
+                amount:
+                  type: number
+                contactId:
+                  type: string
+                companyId:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/deals/stats:
+    get:
+      summary: 漏斗转化率统计
+      tags: [销售漏斗]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      byStage:
+                        type: object
+                      totalDeals:
+                        type: integer
+                      wonDeals:
+                        type: integer
+                      wonAmount:
+                        type: number
+                      conversionRate:
+                        type: object
+
+  /api/stats:
+    get:
+      summary: 租户统计数据
+      tags: [统计]
+      responses:
+        '200':
+          description: 成功
+
+  /api/stats/team:
+    get:
+      summary: 团队绩效统计
+      tags: [统计]
+      parameters:
+        - name: period
+          in: query
+          description: 统计周期（天）
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: 成功
+
+  /api/v1/contacts:
+    get:
+      summary: 获取联系人列表（公开 API）
+      tags: [公开 API v1]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建联系人（公开 API）
+      tags: [公开 API v1]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName:
+                  type: string
+                emails:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: 创建成功
+        '403':
+          description: 权限不足或限额已满
+
+  /api/api-keys:
+    get:
+      summary: 获取 API Key 列表
+      tags: [API Key 管理]
+      description: 返回租户所有 API Key（仅显示前缀，不显示完整密钥）
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建 API Key
+      tags: [API Key 管理]
+      description: 创建新的 API Key，完整密钥仅在响应中返回一次
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [contacts:read, contacts:write, campaigns:read, campaigns:write]
+                rateLimit:
+                  type: integer
+                  default: 100
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/api-keys/{id}:
+    patch:
+      summary: 更新 API Key
+      tags: [API Key 管理]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+    delete:
+      summary: 吊销 API Key
+      tags: [API Key 管理]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 吊销成功
+
+  /api/webhooks:
+    get:
+      summary: 获取 Webhook 端点列表
+      tags: [Webhook]
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建 Webhook 端点
+      tags: [Webhook]
+      description: 创建 Webhook 端点，签名密钥仅在响应中返回一次
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum: [campaign.completed, campaign.started, reply.received, contact.created, deal.won, deal.lost]
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/webhooks/{id}/test:
+    post:
+      summary: 发送测试 Webhook
+      tags: [Webhook]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 测试发送成功
+
+  /api/demo:
+    post:
+      summary: 提交演示预约
+      tags: [公开]
+      description: 无需认证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                company:
+                  type: string
+                phone:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '201':
+          description: 提交成功

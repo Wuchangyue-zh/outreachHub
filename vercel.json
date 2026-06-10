@@ -1,0 +1,36 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-replies",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/launch-scheduled",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/advance-sequences",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/ab-test-winner",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/process-follow-ups",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/process-prospecting",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/retry-failed",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/task-reminders",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

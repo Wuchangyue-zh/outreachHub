@@ -1,5 +1,10 @@
 // OutreachHub - SaaS平台数据库架构
 // 面向国内出海外贸企业的智能拓客与邮件营销平台
+//
+// Agent 须知：
+// - Campaign 联系人：优先 CampaignContact 关联表，contactIds[] 为遗留兼容字段
+// - 读写联系人：src/lib/campaign-contacts.ts（getCampaignContactIds / replaceCampaignContacts）
+// - 完整架构规则：CLAUDE.md / docs/architecture.md
 
 generator client {
   provider = "prisma-client-js"
@@ -22,10 +27,17 @@ model User {
   tenantId      String?
   tenant        Tenant?   @relation(fields: [tenantId], references: [id])
   emailAccounts EmailAccount[]
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+  // 2FA（Batch S）
+  twoFactorEnabled     Boolean   @default(false)
+  twoFactorSecret      String?   // TOTP secret (encrypted)
+  twoFactorBackupCodes String?   // JSON array of hashed backup codes
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([tenantId])
+  @@index([passwordResetToken])
 }
 
 model Tenant {
@@ -36,6 +48,9 @@ model Tenant {
   maxContacts Int      @default(1000)
   maxEmailsPerDay Int  @default(50)
   expiresAt   DateTime?
+  // 试用期（Batch R）
+  trialStartedAt  DateTime?
+  trialEndsAt     DateTime?
   settings    Json?
   users       User[]
   campaigns   Campaign[]
@@ -45,10 +60,43 @@ model Tenant {
   prospectingTasks ProspectingTask[]
   emailTemplates EmailTemplate[]
   products    Product[]
+  invitations Invitation[]
+  attachments Attachment[]
+  customsShipments    CustomsShipment[]
+  customsBuyerProfiles CustomsBuyerProfile[]
+  deals               Deal[]
+  apiKeys             ApiKey[]
+  webhookEndpoints    WebhookEndpoint[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([plan])
+}
+
+// #47: 团队邀请
+model Invitation {
+  id          String           @id @default(cuid())
+  email       String
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role        String           @default("USER")
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  invitedBy   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@index([email])
+  @@index([token])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 // ==================== 邮箱账户 ====================
@@ -72,6 +120,13 @@ model EmailAccount {
   dailyLimit   Int      @default(50)
   lastResetAt  DateTime @default(now())
   healthScore  Float    @default(100) // 邮箱健康度评分
+  imapLastError   String?  @db.Text  // 最近一次 IMAP 错误信息
+  imapLastErrorAt DateTime? // 最近一次 IMAP 错误时间
+  // J2: Warm-up 配置
+  warmupEnabled  Boolean  @default(false) // 是否启用 Warm-up
+  warmupDay      Int      @default(0)     // 当前 Warm-up 天数（0 = 未开始）
+  warmupTarget   Int      @default(50)    // Warm-up 目标 dailyLimit
+  campaigns    Campaign[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -120,6 +175,8 @@ model Company {
   isVerified      Boolean  @default(false)
 
   contacts        Contact[]
+  customsBuyerProfiles CustomsBuyerProfile[]
+  deals           Deal[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -186,6 +243,22 @@ model Contact {
   emailsReplied       Int      @default(0)
   emailsBounced       Int      @default(0)
 
+  // 退订状态
+  unsubscribed        Boolean  @default(false)
+  unsubscribedAt      DateTime?
+  unsubscribeReason   String?  // 退订原因：manual, reply-unsubscribe, link-click
+
+  // 公海/私海（Batch P）
+  ownerId         String?   // 所属销售 userId（null = 公海）
+  pool            ContactPool @default(PUBLIC)
+  claimedAt       DateTime? // 领取时间
+  lastActivityAt  DateTime? // 最后活动时间（用于自动回收）
+
+  campaignContacts    CampaignContact[]
+  emailLogs           EmailLog[]
+  deals               Deal[]
+  tasks               Task[]
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -195,6 +268,8 @@ model Contact {
   @@index([countryCode])
   @@index([tags])
   @@index([fullName])
+  @@index([ownerId])
+  @@index([pool])
 }
 
 model ContactEmail {
@@ -229,6 +304,7 @@ model Product {
   features    String[]
   tags        String[]
   isActive    Boolean  @default(true)
+  campaigns   Campaign[]       // #52: 关联的营销活动
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -277,6 +353,14 @@ model Campaign {
   fromEmail       String?
   replyTo         String?
 
+  // 发件账户关联
+  emailAccountId  String?
+  emailAccount    EmailAccount?   @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+
+  // #52: 产品关联
+  productId       String?
+  product         Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+
   // 多封邮件(用于序列活动)
   sequence        Json?           // 多封邮件的配置数组
 
@@ -292,10 +376,16 @@ model Campaign {
   throttlePerHour Int             @default(50)
   throttlePerDay  Int             @default(200)
 
+  // 重复规则（RECURRING 类型）
+  recurrenceRule  String?         // 重复规则：daily, weekly, monthly, 或 cron 表达式
+  lastRecurrenceAt DateTime?      // 上次执行时间
+  nextRecurrenceAt DateTime?      // 下次执行时间
+
   // A/B测试
   abTestEnabled   Boolean         @default(false)
   abTestVariant   String?
   abTestWinner    String?
+  abTestAssignments Json?         // { [contactId]: "A" | "B" }
 
   // 统计
   totalSent       Int             @default(0)
@@ -311,6 +401,7 @@ model Campaign {
   completedAt     DateTime?
 
   emailLogs       EmailLog[]
+  campaignContacts CampaignContact[]
 
   @@index([tenantId])
   @@index([status])
@@ -331,6 +422,12 @@ model Task {
   contactIds      String[]
   templateId      String?
 
+  // 主关联联系人（Batch P）
+  contactId       String?   // 主关联联系人
+  contact         Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  dueDate         DateTime? // 到期时间
+  reminderAt      DateTime? // 提醒时间
+
   // 序列步骤
   steps           Json?      // 多步序列配置
 
@@ -346,6 +443,7 @@ model Task {
 
   @@index([tenantId])
   @@index([status])
+  @@index([contactId])
 }
 
 // ==================== 邮件发送记录 ====================
@@ -356,6 +454,7 @@ model EmailLog {
   campaign    Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   taskId      String?
   contactId   String
+  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
   fromEmail   String
   toEmail     String
   subject     String
@@ -374,7 +473,12 @@ model EmailLog {
   repliedAt   DateTime?
   replyCategory String?  // INTERESTED, NOT_INTERESTED, OUT_OF_OFFICE, QUESTION, UNSUBSCRIBE, AUTO_REPLY, FORWARD, NEGOTIATION, REFERRAL
   replyConfidence Float?
+  // K2: 地理追踪
+  openIp      String?   // 首次打开 IP
+  openCountry String?   // IP 解析国家代码
+  openCity    String?   // IP 解析城市
   replyKeywords String[]
+  replyBody   String?    @db.Text  // P1-3: 存储回复正文
   bouncedAt   DateTime?
   bounceReason String?
 
@@ -386,6 +490,24 @@ model EmailLog {
   @@index([status])
   @@index([toEmail])
   @@index([createdAt])
+}
+
+// ==================== Campaign 联系人关联 ====================
+
+model CampaignContact {
+  id          String                @id @default(cuid())
+  campaignId  String
+  campaign    Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status      CampaignContactStatus @default(PENDING)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([status])
 }
 
 // ==================== 拓客任务 ====================
@@ -437,6 +559,7 @@ model ProspectingTask {
 model SearchHistory {
   id          String   @id @default(cuid())
   userId      String
+  tenantId    String?
   type        String   // keyword, position
   value       String
   suggestions Json?
@@ -444,10 +567,286 @@ model SearchHistory {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+  @@index([tenantId])
   @@index([type])
 }
 
+// ==================== 文件附件 ====================
+
+model Attachment {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy   String   // 上传者 userId
+  originalName String   // 原始文件名
+  filename     String   // 生成的文件名
+  url          String   // 公开访问 URL
+  mimeType     String   // MIME 类型
+  size         Int      // 文件大小（字节）
+  folder       String   // 存储目录，如 'avatars', 'attachments'
+  relatedType  String?  // 关联类型，如 'campaign', 'email-template', 'contact'
+  relatedId    String?  // 多态关联 ID
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([uploadedBy])
+  @@index([relatedType, relatedId])
+}
+
+// ==================== 海关数据（Batch N）====================
+
+model CustomsShipment {
+  id              String    @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // 贸易双方
+  importerName    String
+  importerCountry String?
+  importerCountryCode String?
+  exporterName    String
+  exporterCountry String?
+  exporterCountryCode String?
+
+  // 商品分类
+  hsCode          String?   // HS 编码（6-10 位）
+  hsDescription   String?   // 可读描述
+  productDescription String? @db.Text
+
+  // 装运详情
+  shipmentDate    DateTime?
+  quantity        Float?
+  unitOfMeasure   String?   // kg, units, liters 等
+  amountUsd       Float?    // USD 金额
+  currency        String?
+  originPort      String?
+  destinationPort String?
+
+  // 来源元数据
+  source          String?   // importgenius, panjiva 等
+  sourceId        String?   // 供应商原始 ID
+  rawData         Json?     // 完整 API 响应
+
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([hsCode])
+  @@index([importerName])
+  @@index([exporterName])
+  @@index([shipmentDate])
+  @@index([importerCountryCode])
+}
+
+model CustomsBuyerProfile {
+  id                String    @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // 买家标识
+  companyName       String
+  domain            String?
+  country           String?
+  countryCode       String?
+
+  // 聚合指标
+  totalShipments    Int       @default(0)
+  totalAmountUsd    Float     @default(0)
+  lastShipmentDate  DateTime?
+  firstShipmentDate DateTime?
+  supplierCount     Int       @default(0)
+  topSuppliers      Json?     // [{name, country, count, totalAmount}]
+  topHsCodes        Json?     // [{code, description, count}]
+  avgShipmentAmount Float?
+
+  // AI 评分
+  purchaseIntentScore Float?  // 0-100
+  scoreBreakdown      Json?   // {frequency, trend, diversification, recency}
+  aiSummary           String? @db.Text
+
+  // 关联已有 Company（可选）
+  companyId         String?
+  company           Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  // 导入追踪
+  importedAsContact Boolean   @default(false)
+  importedAt        DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([domain])
+  @@index([countryCode])
+  @@index([purchaseIntentScore])
+  @@index([companyId])
+}
+
+model CustomsSearch {
+  id          String    @id @default(cuid())
+  userId      String
+  tenantId    String?
+
+  // 搜索参数
+  hsCode      String?
+  country     String?
+  keyword     String?
+
+  // 结果
+  resultCount Int       @default(0)
+  filters     Json?
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([hsCode])
+}
+
+// ==================== 销售漏斗（Batch P）====================
+
+model Deal {
+  id              String    @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // 基本信息
+  title           String
+  stage           DealStage @default(LEAD)
+  amount          Float?
+  currency        String    @default("USD")
+  expectedClose   DateTime?
+  probability     Int?      // 成交概率 0-100
+  notes           String?   @db.Text
+
+  // 关联
+  contactId       String?
+  contact         Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownerId         String?   // 负责人 userId
+
+  // 阶段变更追踪
+  stageChangedAt  DateTime? @default(now())
+  closedAt        DateTime?
+  lostReason      String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([stage])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([expectedClose])
+}
+
+// ==================== 审计日志（Batch S）====================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  tenantId    String?
+  action      String   // e.g. 'login', 'launch_campaign', 'delete_contact', 'enable_2fa'
+  resource    String?  // e.g. 'campaign', 'contact', 'user'
+  resourceId  String?  // ID of the affected resource
+  ip          String?
+  userAgent   String?
+  meta        Json?    // Additional context
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ==================== API Key（Batch U）====================
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String    // 创建者
+  name        String    // 可读名称，如 "Production API"
+  keyPrefix   String    // 前 8 位，用于 UI 展示，如 "oh_a1b2c3"
+  keyHash     String    // SHA-256 hash of full key
+  permissions String[]  // 允许的权限列表，如 ["contacts:read", "contacts:write"]
+  rateLimit   Int       @default(100) // 每分钟请求上限
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@unique([keyHash])
+  @@index([tenantId])
+  @@index([keyPrefix])
+}
+
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  url         String    // Webhook delivery URL
+  events      String[]  // 订阅事件，如 ["campaign.completed", "reply.received"]
+  secret      String    // HMAC 签名密钥
+  isActive    Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  failureCount Int      @default(0) // 连续失败次数
+  deliveries  WebhookDelivery[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id          String    @id @default(cuid())
+  endpointId  String
+  endpoint    WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event       String    // 事件类型
+  payload     Json      // 事件数据
+  status      String    @default("pending") // pending, success, failed
+  statusCode  Int?      // HTTP 响应状态码
+  responseBody String?  @db.Text
+  attempts    Int       @default(0)
+  nextRetryAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([endpointId])
+  @@index([status])
+  @@index([nextRetryAt])
+}
+
+// ==================== 演示预约（Batch T）====================
+
+model DemoRequest {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  company     String?
+  phone       String?
+  message     String?  @db.Text
+  status      String   @default("pending") // pending, contacted, converted, rejected
+  createdAt   DateTime @default(now())
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
 // ==================== 枚举类型 ====================
+
+enum CampaignContactStatus {
+  PENDING
+  SENT
+  OPENED
+  REPLIED
+  BOUNCED
+  FAILED
+  SKIPPED
+}
 
 enum UserRole {
   ADMIN
@@ -496,6 +895,8 @@ enum TaskType {
   OUTREACH
   FOLLOW_UP
   NURTURE
+  QUOTE_DUE
+  CUSTOM
 }
 
 enum TaskStatus {
@@ -522,4 +923,18 @@ enum EmailStatus {
   REPLIED
   BOUNCED
   FAILED
+  UNSUBSCRIBED
+}
+
+enum DealStage {
+  LEAD
+  OPPORTUNITY
+  QUOTE
+  WON
+  LOST
+}
+
+enum ContactPool {
+  PUBLIC
+  PRIVATE
 }
