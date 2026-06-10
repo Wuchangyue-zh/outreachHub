@@ -1,3 +1,5 @@
+'use client'
+
 import { Lock, Shield, UserCheck, Server } from 'lucide-react'
 import { useI18n } from '@/hooks/use-i18n'
 import { securityData, type SecurityFeature } from '@/lib/landing-data'

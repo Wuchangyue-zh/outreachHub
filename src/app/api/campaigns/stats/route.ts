@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
         }
 
         // K2: 地理分析 — 按国家聚合打开数
-        const geoWhere: any = { tenantId: authResult.tenantId, openCountry: { not: null } }
+        const geoWhere: any = { campaign: { tenantId: authResult.tenantId }, openCountry: { not: null } }
         if (campaignId) geoWhere.campaignId = campaignId
         const geoStats = await prisma.emailLog.groupBy({
           by: ['openCountry'],

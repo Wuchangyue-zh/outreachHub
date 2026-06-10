@@ -35,7 +35,7 @@ export function Solutions() {
 
         {/* Tab navigation with smooth capsule slider */}
         <div className="mt-12 flex justify-center">
-          <div className="relative inline-flex gap-1 rounded-xl bg-gray-100 p-1">
+          <div className="relative inline-flex gap-1 whitespace-nowrap rounded-xl bg-gray-100 p-1">
             {/* Sliding capsule indicator */}
             <div
               className="absolute top-1 bottom-1 rounded-lg bg-white shadow-sm transition-all duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
@@ -50,10 +50,9 @@ export function Solutions() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(i)}
-                  className={`relative z-10 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
+                  className={`relative z-10 flex flex-1 items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-300 ${
                     i === activeTab ? 'text-blue-700' : 'text-gray-500 hover:text-gray-700'
                   }`}
-                  style={{ width: '25%' }}
                 >
                   <Icon className="h-4 w-4" />
                   <span className="hidden sm:inline">{tab.label}</span>

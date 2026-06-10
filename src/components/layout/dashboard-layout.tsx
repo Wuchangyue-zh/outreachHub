@@ -33,9 +33,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
-<<<<<<< HEAD
 import { useI18n } from '@/hooks/use-i18n'
-=======
 
 interface TenantUsageData {
   tenant: {
@@ -138,7 +136,6 @@ const navigation = [
   { name: '数据报表', href: '/reports', icon: BarChart },
   { name: '审计日志', href: '/dashboard/audit', icon: Shield },
 ]
->>>>>>> feat/landing-page
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -146,17 +143,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const router = useRouter()
   const { t } = useI18n()
-
-  const navigation = [
-    { name: t('nav.dashboard'), href: '/dashboard', icon: LayoutDashboard },
-    { name: t('nav.prospecting'), href: '/prospecting', icon: Search },
-    { name: t('nav.contacts'), href: '/contacts', icon: Users },
-    { name: t('nav.companies'), href: '/companies', icon: Building2 },
-    { name: t('nav.campaigns'), href: '/campaigns', icon: Send },
-    { name: t('nav.templates'), href: '/templates', icon: FileText },
-    { name: t('nav.settings'), href: '/settings', icon: Mail },
-    { name: t('nav.emailQueue'), href: '/email-queue', icon: BarChart3 },
-  ]
 
   const handleLogout = async () => {
     try {

@@ -1,11 +1,7 @@
 'use client'
 
-<<<<<<< HEAD
-import { useState, useEffect } from 'react'
-import { useI18n } from '@/hooks/use-i18n'
-=======
 import { useState, useEffect, useCallback } from 'react'
->>>>>>> feat/landing-page
+import { useI18n } from '@/hooks/use-i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Users, Building2, Send, MailOpen, TrendingUp, Reply, ShieldCheck, Container, Target, DollarSign } from 'lucide-react'
 
@@ -27,12 +23,8 @@ interface Stats {
   wonAmount?: number
 }
 
-<<<<<<< HEAD
-export default function StatsOverview() {
-  const { t } = useI18n()
-=======
 export default function StatsOverview({ refreshToken = 0 }: { refreshToken?: number }) {
->>>>>>> feat/landing-page
+  const { t } = useI18n()
   const [stats, setStats] = useState<Stats>({
     totalContacts: 0,
     totalCompanies: 0,
@@ -68,7 +60,6 @@ export default function StatsOverview({ refreshToken = 0 }: { refreshToken?: num
     }
   }, [])
 
-  // Q2d: Poll stats every 5 minutes; also refresh when SSE pushes new data
   useEffect(() => {
     fetchStats()
     const interval = setInterval(fetchStats, 5 * 60 * 1000)
@@ -122,9 +113,6 @@ export default function StatsOverview({ refreshToken = 0 }: { refreshToken?: num
       bgColor: 'bg-pink-50',
     },
     {
-<<<<<<< HEAD
-      title: t('dashboard.campaigns'),
-=======
       title: '邮箱验证率',
       value: `${verifyRate}%`,
       icon: ShieldCheck,
@@ -133,7 +121,6 @@ export default function StatsOverview({ refreshToken = 0 }: { refreshToken?: num
     },
     {
       title: '营销活动',
->>>>>>> feat/landing-page
       value: stats.totalCampaigns.toLocaleString(),
       icon: TrendingUp,
       color: 'text-indigo-600',

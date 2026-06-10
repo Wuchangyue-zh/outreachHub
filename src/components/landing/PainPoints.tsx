@@ -1,3 +1,5 @@
+'use client'
+
 import { Flame, Search, MailX, Database, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { useI18n } from '@/hooks/use-i18n'
 import { painPointsData, type PainPoint } from '@/lib/landing-data'

@@ -1,3 +1,5 @@
+'use client'
+
 import { Target, ScanSearch, Rocket, ArrowRight } from 'lucide-react'
 import { useI18n } from '@/hooks/use-i18n'
 import { howItWorksData } from '@/lib/landing-data'

@@ -1,7 +1,4 @@
 import type { Metadata } from 'next'
-<<<<<<< HEAD
-import LandingContent from './landing-content'
-=======
 import { Navbar } from '@/components/landing/Navbar'
 import { Hero } from '@/components/landing/Hero'
 import { TrustBar } from '@/components/landing/TrustBar'
@@ -19,7 +16,6 @@ import { CTA } from '@/components/landing/CTA'
 import { Footer } from '@/components/landing/Footer'
 import { ScrollProgress } from '@/components/landing/ScrollProgress'
 import { SmoothScroll } from '@/components/landing/SmoothScroll'
->>>>>>> feat/landing-page
 
 export const metadata: Metadata = {
   title: 'OutreachHub - AI 驱动的海外获客与邮件营销平台',
@@ -48,9 +44,6 @@ export const metadata: Metadata = {
 }
 
 export default function LandingPage() {
-<<<<<<< HEAD
-  return <LandingContent />
-=======
   return (
     <div className="min-h-screen bg-white">
       {/* Subtle dot grid background pattern */}
@@ -84,5 +77,4 @@ export default function LandingPage() {
       <Footer />
     </div>
   )
->>>>>>> feat/landing-page
 }

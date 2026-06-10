@@ -84,14 +84,9 @@ export default function TemplatesPage() {
       } else {
         addToast({ type: 'error', title: '加载失败', description: data.error?.message || '无法加载模板列表' })
       }
-<<<<<<< HEAD
     } catch (e) {
       console.error(e)
-      addToast({ type: 'error', title: t('common.loadFailed') })
-=======
-    } catch {
       addToast({ type: 'error', title: '加载失败', description: '无法加载模板列表，请稍后重试' })
->>>>>>> feat/landing-page
     } finally {
       setLoading(false)
     }
@@ -329,21 +324,11 @@ export default function TemplatesPage() {
     addToast({ type: 'success', title: t('templates.copied') })
   }
 
-<<<<<<< HEAD
-  const categoryLabels: Record<string, string> = {
-    'cold-outreach': t('templates.category.coldOutreach'),
-    'follow-up': t('templates.category.followUp'),
-    'introduction': t('templates.category.introduction'),
-    'promotion': t('templates.category.promotion'),
-    'meeting-request': t('templates.category.meetingRequest'),
-  }
-=======
   // #51: Category stats
   const categoryStats = templates.reduce((acc, t) => {
     acc[t.category] = (acc[t.category] || 0) + 1
     return acc
   }, {} as Record<string, number>)
->>>>>>> feat/landing-page
 
   return (
     <DashboardLayout>
@@ -351,13 +336,8 @@ export default function TemplatesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-<<<<<<< HEAD
-            <h1 className="text-2xl font-bold text-gray-900">{t('templates.title')}</h1>
-            <p className="text-sm text-gray-500">{t('templates.subtitle')}</p>
-=======
             <h1 className="text-2xl font-bold text-gray-900">邮件模板</h1>
             <p className="text-sm text-gray-500">管理邮件模板，支持 AI 生成、润色、翻译</p>
->>>>>>> feat/landing-page
           </div>
           <div className="flex gap-2">
             {/* #51: Category filter */}
@@ -520,23 +500,6 @@ export default function TemplatesPage() {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-<<<<<<< HEAD
-                  <Label>{t('templates.form.content')} *</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAIGenerate}
-                    disabled={aiGenerating}
-                    className="gap-1"
-                  >
-                    {aiGenerating ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-3 w-3" />
-                    )}
-                    {t('templates.aiGenerate')}
-                  </Button>
-=======
                   <Label>邮件内容 *</Label>
                   <div className="flex gap-1">
                     <Button
@@ -594,7 +557,6 @@ export default function TemplatesPage() {
                       </div>
                     </div>
                   </div>
->>>>>>> feat/landing-page
                 </div>
                 <Textarea
                   value={form.content}

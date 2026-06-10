@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { useI18n } from '@/hooks/use-i18n'
 import { Users, Globe, Mail, TrendingUp, ArrowRight, Search, UserCheck, Send, MessageSquare, Trophy, Sparkles } from 'lucide-react'

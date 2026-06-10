@@ -241,15 +241,10 @@ export default function EmailQueuePage() {
                       <XCircle className={`h-5 w-5 ${stats.failed > 0 ? 'text-red-700 animate-pulse' : 'text-red-600'}`} />
                     </div>
                     <div>
-<<<<<<< HEAD
-                      <p className="text-2xl font-bold">{stats.failed}</p>
-                      <p className="text-xs text-gray-500">{t('emailQueue.state.failed')}</p>
-=======
                       <p className={`text-2xl font-bold ${stats.failed > 0 ? 'text-red-700' : ''}`}>{stats.failed}</p>
                       <p className={`text-xs ${stats.failed > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                         失败 {stats.failed > 0 && '⚠️ 需处理'}
                       </p>
->>>>>>> feat/landing-page
                     </div>
                   </div>
                 </CardContent>

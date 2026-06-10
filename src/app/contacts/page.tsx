@@ -9,11 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
-<<<<<<< HEAD
 import { useI18n } from '@/hooks/use-i18n'
-=======
 import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
->>>>>>> feat/landing-page
 import { CSVImport } from '@/components/CSVImport'
 import {
   Users, Plus, Download, Upload, Search, Mail, Building, Tag,
@@ -799,13 +796,6 @@ export default function ContactsPage() {
                 />
               </div>
               <div>
-<<<<<<< HEAD
-                <Label>{t('contacts.form.company')}</Label>
-                <Input
-                  value={form.company}
-                  onChange={(e) => setForm({ ...form, company: e.target.value })}
-                  placeholder={t('contacts.form.companyPlaceholder')}
-=======
                 <Label>公司</Label>
                 <SearchableSelect
                   value={form.companyId}
@@ -820,7 +810,6 @@ export default function ContactsPage() {
                   placeholder="搜索公司..."
                   quickCreateLabel="新建公司"
                   initialLabel={editCompanyLabel}
->>>>>>> feat/landing-page
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -970,13 +959,8 @@ export default function ContactsPage() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowDetailDrawer(false)} />
           <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
-<<<<<<< HEAD
-            <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{t('contacts.detail')}</h2>
-=======
             <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between z-10">
               <h2 className="text-lg font-semibold">客户详情</h2>
->>>>>>> feat/landing-page
               <button onClick={() => setShowDetailDrawer(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
@@ -993,15 +977,9 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-<<<<<<< HEAD
-              {/* Status */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">{t('common.statusLabel')}</span>
-=======
               {/* Status + Pool Actions */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm text-gray-500">状态：</span>
->>>>>>> feat/landing-page
                 <StatusBadge status={currentContact.status} />
                 {currentContact.pool === 'PUBLIC' && (
                   <Button size="sm" className="ml-auto gap-1" onClick={handleClaimContact} disabled={claimingContact}>
@@ -1347,14 +1325,6 @@ export default function ContactsPage() {
               </div>
 
               {/* Actions */}
-<<<<<<< HEAD
-              <div className="flex gap-2 pt-4 border-t">
-                <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
-                  <Edit className="h-4 w-4 mr-2" /> {t('common.edit')}
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Send className="h-4 w-4 mr-2" /> {t('contacts.sendEmail')}
-=======
               <div className="flex flex-col gap-2 pt-4 border-t">
                 <div className="flex gap-2">
                   <Button className="flex-1" onClick={() => { setShowDetailDrawer(false); openEditDialog(currentContact) }}>
@@ -1370,7 +1340,6 @@ export default function ContactsPage() {
                   onClick={() => handleExportContactGdpr(currentContact.id, currentContact.fullName)}
                 >
                   <Download className="h-4 w-4 mr-2" /> 导出个人数据 (GDPR)
->>>>>>> feat/landing-page
                 </Button>
               </div>
             </div>

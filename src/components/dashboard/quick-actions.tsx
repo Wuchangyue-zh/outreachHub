@@ -6,25 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Search, Users, Send, FileText, Plus, Container, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
-<<<<<<< HEAD
-=======
-const actions = [
-  { name: '新建拓客任务', icon: Search, href: '/prospecting', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-  { name: '海关获客', icon: Container, href: '/customs', color: 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100' },
-  { name: '导入客户', icon: Users, href: '/contacts', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
-  { name: '创建邮件活动', icon: Send, href: '/campaigns', color: 'bg-green-50 text-green-600 hover:bg-green-100' },
-  { name: '新建邮件模板', icon: FileText, href: '/templates', color: 'bg-orange-50 text-orange-600 hover:bg-orange-100' },
-  { name: '销售漏斗', icon: TrendingUp, href: '/dashboard/pipeline', color: 'bg-indigo-500' },
-]
-
->>>>>>> feat/landing-page
 export default function QuickActions() {
   const { t } = useI18n()
   const actions = [
-    { name: t('dashboard.quickActions.newProspecting'), icon: Search, href: '/prospecting', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-    { name: t('dashboard.quickActions.importContacts'), icon: Users, href: '/contacts', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
-    { name: t('dashboard.quickActions.createCampaign'), icon: Send, href: '/campaigns', color: 'bg-green-50 text-green-600 hover:bg-green-100' },
-    { name: t('dashboard.quickActions.newTemplate'), icon: FileText, href: '/templates', color: 'bg-orange-50 text-orange-600 hover:bg-orange-100' },
+    { name: '新建拓客任务', icon: Search, href: '/prospecting', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+    { name: '海关获客', icon: Container, href: '/customs', color: 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100' },
+    { name: '导入客户', icon: Users, href: '/contacts', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
+    { name: '创建邮件活动', icon: Send, href: '/campaigns', color: 'bg-green-50 text-green-600 hover:bg-green-100' },
+    { name: '新建邮件模板', icon: FileText, href: '/templates', color: 'bg-orange-50 text-orange-600 hover:bg-orange-100' },
+    { name: '销售漏斗', icon: TrendingUp, href: '/dashboard/pipeline', color: 'bg-indigo-500' },
   ]
   return (
     <Card className="border-gray-100">

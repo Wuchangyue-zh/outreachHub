@@ -1,11 +1,7 @@
 'use client'
 
-<<<<<<< HEAD
-import { useState } from 'react'
-import { useI18n } from '@/hooks/use-i18n'
-=======
 import { useState, useEffect } from 'react'
->>>>>>> feat/landing-page
+import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,11 +44,8 @@ interface DataSourceStatus {
 }
 
 export default function ProspectingPage() {
-<<<<<<< HEAD
   const { t } = useI18n()
-=======
   const [tab, setTab] = useState<Tab>('search')
->>>>>>> feat/landing-page
   const [searching, setSearching] = useState(false)
   const [importing, setImporting] = useState(false)
   const [searchMode, setSearchMode] = useState<'companies' | 'people'>('companies')
@@ -307,33 +300,18 @@ export default function ProspectingPage() {
         body: JSON.stringify({
           type: 'create-prospecting-task',
           taskData: {
-<<<<<<< HEAD
-            name: `${t('prospecting.taskPrefix')} - ${new Date().toLocaleDateString()}`,
-            keywords: formData.keywords.split(',').map(s => s.trim()).filter(Boolean),
-            positions: formData.positions.split(',').map(s => s.trim()).filter(Boolean),
-            locations: formData.locations.split(',').map(s => s.trim()).filter(Boolean),
-            industries: formData.industries.split(',').map(s => s.trim()).filter(Boolean),
-            companySizes: formData.companySizes.split(',').map(s => s.trim()).filter(Boolean),
-=======
             name: `拓客任务 - ${new Date().toLocaleDateString()}`,
             keywords: formData.keywords.split(',').map((s) => s.trim()).filter(Boolean),
             positions: formData.positions.split(',').map((s) => s.trim()).filter(Boolean),
             locations: formData.locations.split(',').map((s) => s.trim()).filter(Boolean),
             industries: formData.industries.split(',').map((s) => s.trim()).filter(Boolean),
             companySizes: formData.companySizes.split(',').map((s) => s.trim()).filter(Boolean),
->>>>>>> feat/landing-page
             status: 'PENDING',
           },
         }),
       })
       const data = await res.json()
       if (data.success) {
-<<<<<<< HEAD
-        alert(t('prospecting.taskCreated'))
-      }
-    } catch (e) {
-      alert(t('prospecting.taskFailed'))
-=======
         setMessage('拓客任务已创建，等待后台执行（本地可 curl process-prospecting cron）')
         handleTabChange('tasks')
       } else {
@@ -341,7 +319,6 @@ export default function ProspectingPage() {
       }
     } catch {
       setMessage('创建任务失败')
->>>>>>> feat/landing-page
     } finally {
       setSearching(false)
     }
@@ -409,13 +386,8 @@ export default function ProspectingPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-<<<<<<< HEAD
-          <h1 className="text-2xl font-bold text-gray-900">{t('prospecting.title')}</h1>
-          <p className="text-sm text-gray-500">{t('prospecting.subtitle')}</p>
-=======
           <h1 className="text-2xl font-bold text-gray-900">智能拓客</h1>
           <p className="text-sm text-gray-500">RocketReach 搜索并一键导入公司与联系人</p>
->>>>>>> feat/landing-page
         </div>
 
         <div className="flex gap-2">
@@ -454,11 +426,7 @@ export default function ProspectingPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5 text-primary" />
-<<<<<<< HEAD
-                {t('prospecting.searchCriteria')}
-=======
                 {tab === 'search' ? '搜索条件' : '任务条件'}
->>>>>>> feat/landing-page
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -557,11 +525,6 @@ export default function ProspectingPage() {
               )}
 
               <div>
-<<<<<<< HEAD
-                <Label>{t('prospecting.keywords')}</Label>
-                <Input
-                  placeholder={t('prospecting.keywordsPlaceholder')}
-=======
                 <div className="flex items-center justify-between">
                   <Label>{searchMode === 'companies' || tab === 'task' ? '关键词 / 公司名' : '公司 / 关键词'}</Label>
                   {tab === 'task' && (
@@ -580,7 +543,6 @@ export default function ProspectingPage() {
                 </div>
                 <Input
                   placeholder="例如：SaaS, Acme Corp"
->>>>>>> feat/landing-page
                   value={formData.keywords}
                   onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
                 />
@@ -643,50 +605,21 @@ export default function ProspectingPage() {
                 </div>
               )}
               <div>
-<<<<<<< HEAD
-                <Label>{t('prospecting.positions')}</Label>
+                <Label>目标职位（逗号分隔）</Label>
                 <Input
-                  placeholder={t('prospecting.positionsPlaceholder')}
+                  placeholder="例如：CTO, VP Engineering"
                   value={formData.positions}
                   onChange={(e) => setFormData({ ...formData, positions: e.target.value })}
                 />
               </div>
               <div>
-                <Label>{t('prospecting.locations')}</Label>
-                <Input
-                  placeholder={t('prospecting.locationsPlaceholder')}
-=======
                 <Label>目标地区</Label>
                 <Input
                   placeholder="例如：United States, Germany"
->>>>>>> feat/landing-page
                   value={formData.locations}
                   onChange={(e) => setFormData({ ...formData, locations: e.target.value })}
                 />
               </div>
-<<<<<<< HEAD
-              <div>
-                <Label>{t('prospecting.industries')}</Label>
-                <Input
-                  placeholder={t('prospecting.industriesPlaceholder')}
-                  value={formData.industries}
-                  onChange={(e) => setFormData({ ...formData, industries: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>{t('prospecting.companySize')}</Label>
-                <Input
-                  placeholder={t('prospecting.companySizePlaceholder')}
-                  value={formData.companySizes}
-                  onChange={(e) => setFormData({ ...formData, companySizes: e.target.value })}
-                />
-              </div>
-              <Button onClick={handleSearch} disabled={searching} className="w-full">
-                {searching ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('prospecting.creating')}</>
-                ) : (
-                  <><Search className="mr-2 h-4 w-4" /> {t('prospecting.createTask')}</>
-=======
               {(tab === 'task' || searchMode === 'companies') && (
                 <>
                   <div>
@@ -731,7 +664,6 @@ export default function ProspectingPage() {
                   <><Search className="mr-2 h-4 w-4" /> 搜索</>
                 ) : (
                   <><Send className="mr-2 h-4 w-4" /> 创建拓客任务</>
->>>>>>> feat/landing-page
                 )}
               </Button>
 
@@ -847,17 +779,10 @@ export default function ProspectingPage() {
                 <CardTitle className="text-base">{t('prospecting.tips.title')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-gray-600">
-<<<<<<< HEAD
-                <p>💡 {t('prospecting.tips.tip1')}</p>
-                <p>💡 {t('prospecting.tips.tip2')}</p>
-                <p>💡 {t('prospecting.tips.tip3')}</p>
-                <p>💡 {t('prospecting.tips.tip4')}</p>
-=======
                 <p>💡 使用英文关键词搜索，结果更准确</p>
                 <p>💡 职位使用英文标准名称，如 CTO、VP of Sales</p>
                 <p>💡 地区使用国家英文名，如 United States、Germany</p>
                 <p>💡 勾选结果后点击「导入选中」写入公司/联系人库</p>
->>>>>>> feat/landing-page
               </CardContent>
             </Card>
 
