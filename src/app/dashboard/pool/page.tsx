@@ -353,8 +353,8 @@ interface ContactCardProps {
 }
 
 function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing, t }: ContactCardProps) {
-  const status = STATUS_MAP[contact.status] || { labelKey: contact.status, color: 'bg-gray-100 text-gray-600' }
-  const sourceKey = SOURCE_MAP[contact.source] || contact.source
+  const status = STATUS_MAP[contact.status] || { labelKey: contact.status || 'NEW', color: 'bg-gray-100 text-gray-600' }
+  const sourceKey = SOURCE_MAP[contact.source] || contact.source || 'pool.source.manual'
   const primaryEmail = contact.emails.find(e => e.isPrimary)?.address || contact.emails[0]?.address || '-'
   const lastActivity = contact.lastActivityAt
     ? new Date(contact.lastActivityAt).toLocaleDateString('zh-CN')

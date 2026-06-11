@@ -15,7 +15,7 @@ export function useI18n() {
     setCurrentLocale(newLocale)
   }
 
-  const translate = (key: string) => t(key, locale)
+  const translate = (key: string, params?: Record<string, string | number>) => params ? t(key, params, locale) : t(key, locale)
 
   return {
     locale,

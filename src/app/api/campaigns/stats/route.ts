@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
         )
 
         // Q2b: 城市 Top 10 — 按 openCity 聚合打开数
-        const cityWhere: any = { tenantId: authResult.tenantId, openCity: { not: null } }
+        const cityWhere: any = { campaign: { tenantId: authResult.tenantId }, openCity: { not: null } }
         if (campaignId) cityWhere.campaignId = campaignId
         const cityStats = await prisma.emailLog.groupBy({
           by: ['openCity'],

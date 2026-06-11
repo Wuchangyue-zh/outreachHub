@@ -82,7 +82,7 @@ export default function AuditPage() {
 
         {/* Filter */}
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant={actionFilter === '' ? 'default' : 'outline'} onClick={() => { setActionFilter(''); setPage(1) }}>{t('audit.all')}
+          <Button size="sm" variant={actionFilter === '' ? 'default' : 'outline'} onClick={() => { setActionFilter(''); setPage(1) }}>{t('audit.all')}</Button>
           {Object.entries(ACTION_LABELS).map(([key, { label }]) => (
             <Button key={key} size="sm" variant={actionFilter === key ? 'default' : 'outline'} onClick={() => { setActionFilter(key); setPage(1) }}>{label}</Button>
           ))}

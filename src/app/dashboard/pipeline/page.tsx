@@ -26,6 +26,7 @@ import {
 import { SearchableSelect, type SearchableOption } from '@/components/ui/searchable-select'
 import { toast } from 'sonner'
 import { useI18n } from '@/hooks/use-i18n'
+import { t } from '@/lib/i18n'
 import {
   Plus,
   RefreshCw,

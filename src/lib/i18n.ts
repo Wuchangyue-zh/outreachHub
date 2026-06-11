@@ -1,7 +1,7 @@
 export type Locale = 'zh' | 'en'
 
 export interface Translations {
-  [key: string]: string | Translations
+  [key: string]: string | string[] | Translations
 }
 
 const translations: Record<Locale, Translations> = {
@@ -1103,6 +1103,25 @@ const translations: Record<Locale, Translations> = {
       releaseFailed: '释放失败',
       networkError: '网络错误',
       operationFailed: '操作失败',
+      claimedToday: '今日领取',
+      publicContacts: '公海联系人',
+      myContactsTab: '我的客户',
+      noPublicContacts: '公海暂无联系人',
+      noMatch: '没有匹配结果',
+      total: '共 {count} 条',
+      claimFromPool: '从公海领取客户开始跟进',
+      claimContact: '领取客户',
+      followUp: '跟进',
+      loadFailedDesc: '无法加载公海数据',
+      claimSuccessDesc: '已成功领取该客户',
+      releaseSuccessDesc: '已成功释放该客户',
+      status: {
+        new: '新', contacted: '已联系', interested: '有意向', qualified: '已验证',
+        converted: '已转化', notInterested: '无意向', unreachable: '无法触达',
+      },
+      source: {
+        import: '导入', manual: '手动', prospecting: '拓客', customs: '海关', website: '网站',
+      },
     },
     products: {
       title: '产品管理',
@@ -2406,6 +2425,25 @@ const translations: Record<Locale, Translations> = {
       releaseFailed: 'Release failed',
       networkError: 'Network error',
       operationFailed: 'Operation failed',
+      claimedToday: 'Claimed Today',
+      publicContacts: 'Pool Contacts',
+      myContactsTab: 'My Contacts',
+      noPublicContacts: 'No pool contacts',
+      noMatch: 'No matching results',
+      total: '{count} total',
+      claimFromPool: 'Claim contacts from the pool to start follow-up',
+      claimContact: 'Claim Contact',
+      followUp: 'Follow Up',
+      loadFailedDesc: 'Failed to load pool data',
+      claimSuccessDesc: 'Contact claimed successfully',
+      releaseSuccessDesc: 'Contact released successfully',
+      status: {
+        new: 'New', contacted: 'Contacted', interested: 'Interested', qualified: 'Qualified',
+        converted: 'Converted', notInterested: 'Not Interested', unreachable: 'Unreachable',
+      },
+      source: {
+        import: 'Import', manual: 'Manual', prospecting: 'Prospecting', customs: 'Customs', website: 'Website',
+      },
     },
     products: {
       title: 'Products',
@@ -2613,6 +2651,7 @@ const translations: Record<Locale, Translations> = {
 }
 
 function getNestedValue(obj: any, path: string): string {
+  if (!path) return ''
   const keys = path.split('.')
   let current = obj
 
@@ -2627,8 +2666,22 @@ function getNestedValue(obj: any, path: string): string {
   return typeof current === 'string' ? current : path
 }
 
-export function t(key: string, locale: Locale = 'zh'): string {
-  return getNestedValue(translations[locale], key)
+export function t(key: string, localeOrParams?: Locale | Record<string, string | number>, maybeLocale?: Locale): string {
+  let locale: Locale = 'zh'
+  let params: Record<string, string | number> | undefined
+  if (typeof localeOrParams === 'string') {
+    locale = localeOrParams
+  } else if (localeOrParams && typeof localeOrParams === 'object') {
+    params = localeOrParams
+    if (maybeLocale) locale = maybeLocale
+  }
+  let result = getNestedValue(translations[locale], key)
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      result = result.replace(new RegExp('\\{' + k + '\\}', 'g'), String(v))
+    }
+  }
+  return result
 }
 
 export function getLocale(): Locale {
