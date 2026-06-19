@@ -66,6 +66,7 @@ test.describe('Authentication', () => {
       await companyField.fill('Test Company')
     }
 
+    await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: /注册/ }).click()
 
     // Wait for navigation
@@ -80,6 +81,7 @@ test.describe('Authentication', () => {
     await page.getByLabel(/邮箱/).fill('admin@outreachhub.com')
     await page.getByLabel(/密码/).fill('password123')
 
+    await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: /注册/ }).click()
 
     // Should show error message about duplicate email

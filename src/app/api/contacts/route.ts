@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
       include: { emails: true, company: true },
     })
 
-    return NextResponse.json({ success: true, data: contact })
+    return NextResponse.json({ success: true, data: contact }, { status: 201 })
   } catch (error) {
     return handleApiError(error)
   }

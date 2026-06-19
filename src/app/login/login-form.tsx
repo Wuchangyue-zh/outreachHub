@@ -31,7 +31,7 @@ export default function LoginForm() {
     setError('')
 
     if (!email || !password) {
-      setError(t('loginForm.enterEmailAndPassword'))
+      setError(t('loginForm.enterEmailPassword'))
       return
     }
 
@@ -46,7 +46,7 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: `${t('loginForm.welcomeBack')}${data.user.name}` })
+        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: t('loginForm.welcomeBackName', { name: data.user.name }) })
         router.push(redirectTo)
       } else if (data.requires2FA) {
         // Switch to 2FA verification step
@@ -86,10 +86,10 @@ export default function LoginForm() {
       const data = await res.json()
 
       if (data.success) {
-        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: `${t('loginForm.welcomeBack')}${data.user.name}` })
+        addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: t('loginForm.welcomeBackName', { name: data.user.name }) })
         router.push(redirectTo)
       } else {
-        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('loginForm.verifyFailed')
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('loginForm.verificationFailed')
         setError(errorMsg)
       }
     } catch {
@@ -116,7 +116,7 @@ export default function LoginForm() {
                 <h1 className="text-2xl font-bold text-gray-900">{t('loginForm.twoFactorTitle')}</h1>
               </div>
               <p className="mt-2 text-sm text-gray-500">
-                {useBackupCode ? t('loginForm.enterBackupCode') : t('loginForm.enter2faCode')}
+                {useBackupCode ? t('loginForm.enterBackupCode') : t('loginForm.enterVerificationCode')}
               </p>
             </div>
 
@@ -129,7 +129,7 @@ export default function LoginForm() {
             <form onSubmit={handle2FAVerify} className="mt-8 space-y-5">
               {useBackupCode ? (
                 <div>
-                  <label htmlFor="backupCode" className="block text-sm font-medium text-gray-700">{t('loginForm.backupCode')}</label>
+                  <label htmlFor="backupCode" className="block text-sm font-medium text-gray-700">{t('loginForm.backupCodeLabel')}</label>
                   <input
                     id="backupCode"
                     type="text"
@@ -184,7 +184,7 @@ export default function LoginForm() {
                 }}
                 className="text-sm font-medium text-primary hover:text-primary/80"
               >
-                {useBackupCode ? t('loginForm.useAuthenticator') : t('loginForm.useBackupCodeLink')}
+                {useBackupCode ? t('loginForm.useAuthenticator') : t('loginForm.useBackupCode')}
               </button>
             </div>
 
@@ -209,9 +209,9 @@ export default function LoginForm() {
 
         <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
           <div className="mx-auto max-w-md text-white">
-            <h2 className="text-3xl font-bold">{t('loginForm.heroTitle')}</h2>
+            <h2 className="text-3xl font-bold">{t('loginForm.smartOutreach')}</h2>
             <p className="mt-4 text-lg text-blue-100">
-              {t('loginForm.heroSubtitle')}
+              {t('loginForm.smartOutreachDesc')}
             </p>
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function LoginForm() {
           </Link>
 
           <div className="mt-12">
-            <h1 className="text-2xl font-bold text-gray-900">{t('loginForm.welcome')}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('loginForm.welcomeBack')}</h1>
             <p className="mt-2 text-sm text-gray-500">{t('loginForm.loginToContinue')}</p>
           </div>
 
@@ -242,7 +242,7 @@ export default function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('loginForm.email')}</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('loginForm.emailLabel')}</label>
               <input
                 id="email"
                 type="email"
@@ -269,7 +269,7 @@ export default function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder={t('loginForm.enterPassword')}
+                placeholder={t('loginForm.passwordPlaceholder')}
                 disabled={loading}
               />
             </div>
@@ -290,16 +290,16 @@ export default function LoginForm() {
 
           <p className="mt-6 text-center text-sm text-gray-500">
             {t('loginForm.noAccount')}{' '}
-            <Link href="/register" className="font-medium text-primary hover:text-primary/80">{t('loginForm.register')}</Link>
+            <Link href="/register" className="font-medium text-primary hover:text-primary/80">{t('loginForm.freeRegister')}</Link>
           </p>
         </div>
       </div>
 
       <div className="hidden w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 lg:flex lg:flex-col lg:justify-center lg:px-16">
         <div className="mx-auto max-w-md text-white">
-          <h2 className="text-3xl font-bold">{t('loginForm.heroTitle')}</h2>
+          <h2 className="text-3xl font-bold">{t('loginForm.smartOutreach')}</h2>
           <p className="mt-4 text-lg text-blue-100">
-            {t('loginForm.heroSubtitle')}
+            {t('loginForm.smartOutreachDesc')}
           </p>
         </div>
       </div>

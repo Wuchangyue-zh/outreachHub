@@ -14,7 +14,7 @@ test.describe('Landing Page', () => {
   test('should have login and register links', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('link', { name: /登录/ })).toBeVisible()
-    await expect(page.getByRole('link', { name: /注册/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /免费试用|注册/ }).first()).toBeVisible()
   })
 
   test('should navigate to login page', async ({ page }) => {
@@ -25,15 +25,13 @@ test.describe('Landing Page', () => {
 
   test('should navigate to register page', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('link', { name: /注册/ }).click()
+    await page.getByRole('link', { name: /免费试用|注册/ }).first().click()
     await expect(page).toHaveURL(/\/register/)
   })
 
   test('should display feature cards', async ({ page }) => {
     await page.goto('/')
-    await page.waitForLoadState('networkidle')
-    // Use more flexible text matching
-    await expect(page.getByText(/AI.*拓客|智能拓客/i)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: 'AI 智能拓客', exact: true })).toBeVisible({ timeout: 10000 })
   })
 
   test('should have working CTA buttons', async ({ page }) => {

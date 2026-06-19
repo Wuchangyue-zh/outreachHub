@@ -391,7 +391,7 @@ function ContactCard({ contact, variant, onClaim, claiming, onRelease, releasing
           )}
           <div className="flex items-center gap-2">
             <Tag className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-            <span>{t('pool.source')}：{t(sourceKey)}</span>
+            <span>{t('pool.sourceLabel')}：{t(sourceKey)}</span>
           </div>
           {variant === 'mine' && lastActivity && (
             <div className="flex items-center gap-2">

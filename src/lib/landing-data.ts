@@ -698,10 +698,10 @@ export const footerData = {
     {
       title: '关于我们',
       links: [
-        { label: '公司介绍', href: '#' },
-        { label: '加入我们', href: '#' },
-        { label: '合作伙伴', href: '#' },
-        { label: '联系我们', href: '#' },
+        { label: '公司介绍', href: '/about' },
+        { label: '加入我们', href: '/about#careers' },
+        { label: '合作伙伴', href: '/about#partners' },
+        { label: '联系我们', href: 'mailto:support@outreachhub.com' },
         { label: '服务条款', href: '/terms' },
         { label: '隐私政策', href: '/privacy' },
       ],
@@ -712,11 +712,7 @@ export const footerData = {
     email: 'support@outreachhub.com',
     address: '深圳市南山区科技园南区 W1-B 栋 5F',
   },
-  social: [
-    { name: '微信公众号', href: '#' },
-    { name: 'LinkedIn', href: '#' },
-    { name: 'Twitter', href: '#' },
-  ],
+  social: [] as Array<{ name: string; href: string }>,
   copyright: `© ${new Date().getFullYear()} OutreachHub. All rights reserved.`,
   icp: '粤ICP备XXXXXXXX号-1',
 }

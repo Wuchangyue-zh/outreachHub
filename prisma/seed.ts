@@ -6,6 +6,16 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('开始初始化种子数据...')
 
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: 'admin@outreachhub.com' },
+    select: { id: true },
+  })
+
+  if (existingAdmin) {
+    console.log('演示数据已初始化，跳过重复创建。')
+    return
+  }
+
   // 创建演示租户
   const tenant = await prisma.tenant.create({
     data: {

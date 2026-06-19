@@ -14,8 +14,6 @@
 #   STRIPE_SECRET_KEY   — Stripe 支付（可选）
 #   BLOB_READ_WRITE_TOKEN — Vercel Blob（Vercel 自动注入）
 
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine

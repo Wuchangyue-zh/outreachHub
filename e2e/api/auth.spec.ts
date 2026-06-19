@@ -74,12 +74,13 @@ test.describe('Contacts API', () => {
   })
 
   test('POST /api/contacts — create contact', async ({ request }) => {
+    const email = `api-test-${Date.now()}@example.com`
     const res = await request.post(`${BASE}/api/contacts`, {
       headers: { Cookie: `auth-token=${authToken}` },
       data: {
         firstName: 'API',
         lastName: 'Test',
-        emails: ['api-test@example.com'],
+        emails: [email],
       },
     })
     expect(res.status()).toBe(201)
