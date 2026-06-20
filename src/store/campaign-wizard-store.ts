@@ -29,7 +29,32 @@ export type RecurrenceRule = 'daily' | 'weekly' | 'monthly'
 // #7: 序列步骤定义（支持 email / wait / condition）
 export type SequenceStep = SequenceStepPayload
 
+export interface HydratePayload {
+  id: string
+  name: string
+  type: CampaignType
+  subject: string
+  content: string
+  htmlContent?: string | null
+  emailAccountId?: string | null
+  productId?: string | null
+  scheduleType: ScheduleType
+  scheduledAt?: string | null
+  timezone?: string
+  sendingWindows?: { start?: string; end?: string } | null
+  recurrenceRule?: string | null
+  contactIds?: string[]
+  sequence?: any[] | null
+  abTestEnabled?: boolean
+}
+
 export interface WizardState {
+  // Edit mode
+  editingCampaignId: string | null
+  isHydrating: boolean
+  hydrateError: string | null
+  hydrateFromCampaign: (campaign: HydratePayload) => void
+
   // Step tracking
   currentStep: WizardStep
   setStep: (step: WizardStep) => void
@@ -107,6 +132,60 @@ export interface WizardState {
 // ─── Store ──────────────────────────────────────────────────
 
 export const useCampaignWizardStore = create<WizardState>((set) => ({
+  // Edit mode
+  editingCampaignId: null,
+  isHydrating: false,
+  hydrateError: null,
+  hydrateFromCampaign: (campaign) => {
+    const sendingWindows = campaign.sendingWindows as { start?: string; end?: string } | null
+    const seq = Array.isArray(campaign.sequence) ? campaign.sequence : []
+
+    // Parse A/B test variant B from sequence
+    let variantBSubject = ''
+    let variantBContent = ''
+    if (campaign.abTestEnabled && seq.length >= 2) {
+      const variantB = seq.find((s: any) => s.variant === 'B')
+      if (variantB) {
+        variantBSubject = variantB.subject || ''
+        variantBContent = variantB.content || ''
+      }
+    }
+
+    set({
+      editingCampaignId: campaign.id,
+      isHydrating: false,
+      hydrateError: null,
+      campaignName: campaign.name || '',
+      campaignType: campaign.type || 'SINGLE',
+      senderAccountId: campaign.emailAccountId || '',
+      productId: campaign.productId || '',
+      scheduleType: campaign.scheduleType || 'IMMEDIATE',
+      scheduledAt: campaign.scheduledAt
+        ? new Date(campaign.scheduledAt).toISOString().slice(0, 16)
+        : '',
+      timezone: campaign.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai',
+      windowStart: sendingWindows?.start || '09:00',
+      windowEnd: sendingWindows?.end || '17:00',
+      recurrenceRule: (campaign.recurrenceRule as RecurrenceRule) || 'weekly',
+      selectedContactIds: campaign.contactIds || [],
+      generatedEmail: campaign.content || '',
+      variantBSubject,
+      variantBContent,
+      sequence: campaign.type === 'SEQUENCE'
+        ? seq.filter((s: any) => s.type !== undefined || s.subject !== undefined).map((s: any, i: number) => ({
+            id: s.id || `step-${i + 1}`,
+            type: s.type || 'email',
+            subject: s.subject || '',
+            content: s.content || '',
+            htmlContent: s.htmlContent || '',
+            delayHours: s.delayHours ?? (i === 0 ? 0 : 24),
+            ...(s.conditionType ? { conditionType: s.conditionType, lookbackHours: s.lookbackHours, branches: s.branches } : {}),
+          }))
+        : [],
+      currentStep: 1,
+    })
+  },
+
   // Step tracking
   currentStep: 1,
   setStep: (step) => set({ currentStep: step }),
@@ -200,6 +279,9 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
   // Reset
   resetWizard: () =>
     set({
+      editingCampaignId: null,
+      isHydrating: false,
+      hydrateError: null,
       currentStep: 1,
       campaignName: '',
       language: 'en',

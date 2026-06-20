@@ -50,7 +50,10 @@ export function StepAiWriter() {
     variantBSubject, variantBContent,
     scheduleType, scheduledAt, recurrenceRule, timezone,
     windowStart, windowEnd,
+    editingCampaignId,
   } = useCampaignWizardStore()
+
+  const isEditMode = !!editingCampaignId
 
   const router = useRouter()
   const [copied, setCopied] = useState(false)
@@ -229,7 +232,7 @@ export function StepAiWriter() {
       router.push('/campaigns')
     } catch (e) {
       console.error('Launch failed:', e)
-      setLaunchError(t('campaignWizard.error.launchRetry'))
+      setLaunchError(isEditMode ? '保存失败，请重试' : t('campaignWizard.error.launchRetry'))
     } finally {
       setLaunching(false)
     }
@@ -290,7 +293,7 @@ export function StepAiWriter() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-gray-900">
-          {isSequence ? t('campaignWizard.aiWriter.titleSequence') : isAbTest ? t('campaignWizard.aiWriter.titleAbTest') : t('campaignWizard.aiWriter.titleSingle')}
+          {isEditMode ? '编辑邮件内容' : isSequence ? t('campaignWizard.aiWriter.titleSequence') : isAbTest ? t('campaignWizard.aiWriter.titleAbTest') : t('campaignWizard.aiWriter.titleSingle')}
         </h2>
         <p className="mt-1 text-sm text-gray-500">
           {isSequence
@@ -464,12 +467,12 @@ export function StepAiWriter() {
             {launching ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {t('campaignWizard.launching')}
+                {isEditMode ? '保存中...' : t('campaignWizard.launching')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {isSequence ? t('campaignWizard.launchSequence') : t('campaignWizard.launchCampaign')}
+                {isEditMode ? '保存修改' : (isSequence ? t('campaignWizard.launchSequence') : t('campaignWizard.launchCampaign'))}
               </>
             )}
           </Button>

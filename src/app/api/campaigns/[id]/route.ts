@@ -7,6 +7,8 @@ import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+const EDITABLE_STATUSES = ['DRAFT', 'PAUSED']
+
 export async function GET(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
             },
           },
         },
+
       },
     })
 
@@ -35,7 +38,13 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '活动不存在', 404)
     }
 
-    return NextResponse.json({ success: true, data: campaign })
+    // Attachments use polymorphic relations, query separately
+    const attachments = await prisma.attachment.findMany({
+      where: { relatedType: 'campaign', relatedId: id },
+      select: { id: true, filename: true, url: true, size: true, mimeType: true },
+    })
+
+    return NextResponse.json({ success: true, data: { ...campaign, attachments } })
   } catch (error) {
     return handleApiError(error)
   }
@@ -45,14 +54,12 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
-    // #48: 编辑活动需要 campaigns:manage 权限
     if (!hasPermission(auth.role, 'campaigns:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
     }
 
     const { id } = await ctx.params
 
-    // 验证记录归属
     const existing = await prisma.campaign.findUnique({
       where: { id, tenantId: auth.tenantId },
       select: { id: true },
@@ -86,7 +93,6 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
-    // #48: 更新活动需要 campaigns:manage 权限
     if (!hasPermission(auth.role, 'campaigns:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
     }
@@ -101,6 +107,21 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     }
 
     const body = await req.json()
+
+    // Status guard: editing content fields requires DRAFT or PAUSED
+    const isContentEdit = ['name', 'subject', 'content', 'htmlContent', 'type', 'sequence',
+      'emailAccountId', 'productId', 'scheduleType', 'scheduledAt', 'timezone',
+      'sendingWindows', 'recurrenceRule', 'abTestEnabled', 'contactIds'].some(
+      (k) => body[k] !== undefined
+    )
+    if (isContentEdit && !EDITABLE_STATUSES.includes(existing.status)) {
+      return errorResponse(
+        ErrorCodes.FORBIDDEN,
+        `活动状态为「${existing.status}」，仅 DRAFT 和 PAUSED 状态允许编辑`,
+        403
+      )
+    }
+
     const updateData: Record<string, any> = {}
 
     if (body.status !== undefined) updateData.status = body.status
@@ -111,6 +132,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.fromName !== undefined) updateData.fromName = body.fromName
     if (body.fromEmail !== undefined) updateData.fromEmail = body.fromEmail
     if (body.replyTo !== undefined) updateData.replyTo = body.replyTo
+    if (body.emailAccountId !== undefined) updateData.emailAccountId = body.emailAccountId || null
     if (body.scheduleType !== undefined) updateData.scheduleType = body.scheduleType
     if (body.scheduledAt !== undefined) updateData.scheduledAt = new Date(body.scheduledAt)
     if (body.timezone !== undefined) updateData.timezone = body.timezone
@@ -119,8 +141,10 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.throttlePerDay !== undefined) updateData.throttlePerDay = body.throttlePerDay
     if (body.abTestEnabled !== undefined) updateData.abTestEnabled = body.abTestEnabled
     if (body.type !== undefined) updateData.type = body.type
-    // #52: 产品关联
     if (body.productId !== undefined) updateData.productId = body.productId || null
+    if (body.recurrenceRule !== undefined) updateData.recurrenceRule = body.recurrenceRule || null
+    // Sequence/A-B test config
+    if (body.sequence !== undefined) updateData.sequence = body.sequence
 
     const campaign = await prisma.campaign.update({
       where: { id, tenantId: auth.tenantId },
@@ -141,14 +165,12 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
-    // #48: 删除活动需要 campaigns:manage 权限
     if (!hasPermission(auth.role, 'campaigns:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
     }
 
     const { id } = await ctx.params
 
-    // 验证记录归属
     const existing = await prisma.campaign.findUnique({
       where: { id, tenantId: auth.tenantId },
       select: { id: true },
@@ -157,7 +179,6 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '活动不存在或无权操作', 404)
     }
 
-    // 通过关系过滤确保租户隔离（EmailLog 无 tenantId 字段）
     await prisma.emailLog.deleteMany({ where: { campaign: { id, tenantId: auth.tenantId } } })
     await prisma.campaign.delete({ where: { id, tenantId: auth.tenantId } })
 

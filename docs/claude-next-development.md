@@ -26,8 +26,8 @@
 
 ## P1：核心产品缺口
 
-1. **Campaign 编辑模式**：实现 `/campaigns/new?edit=<id>` 数据加载、Zustand hydration、PATCH 保存；仅允许编辑 DRAFT/PAUSED，RUNNING 需明确限制。
-2. **Webhook 投递历史**：Settings 展示最近 `WebhookDelivery`，包含状态码、尝试次数、时间和错误摘要。
+1. ~~**Campaign 编辑模式**~~ ✅ §9.48： `/campaigns/new?edit=<id>` 数据加载、Zustand hydrateFromCampaign、PATCH 保存；DRAFT/PAUSED 可编辑，RUNNING/COMPLETED/FAILED 返回 403。
+2. ~~**Webhook 投递历史**~~ ✅ §9.49：GET /api/webhooks/deliveries（租户隔离、PRO 限制、分页、筛选）；Settings 端点/状态筛选、徽章、展开摘要、手动刷新。
 3. **Demo 预约后台**：新增受权限保护的 `/dashboard/demo-leads`，支持列表、状态和跟进备注。
 4. **移动端**：Pipeline Kanban 横向滚动提示、联系人详情抽屉全屏、Developers 文档移动端可读性。
 
@@ -53,7 +53,7 @@
 npx tsc --noEmit
 npm test -- --runInBand
 npm run build
-npm run test:e2e:ci
+npm run test:e2e
 ```
 
 涉及完整浏览器流程时额外执行 `npm run test:e2e`。完成后更新 `docs/audit-report.md`，记录真实测试数量与未完成项，不沿用旧数字。

@@ -1581,4 +1581,58 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 ---
 
-*本报告最后更新：2026-06-19。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 全部完成。*
+
+### §9.48 Campaign 编辑模式（2026-06-19）
+
+**P1-1 — 实现 /campaigns/new?edit=<id> 编辑流程：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| GET API 增强 | ✅ | 返回 campaignContacts + attachments（多态查询） |
+| PATCH 状态守卫 | ✅ | 仅 DRAFT/PAUSED 允许编辑内容字段，RUNNING/COMPLETED/FAILED 返回 403 |
+| PATCH 新增字段 | ✅ | emailAccountId、recurrenceRule、sequence 支持编辑保存 |
+| Store hydrateFromCampaign | ✅ | 类型安全的 HydratePayload 接口，回填所有向导字段 |
+| Store resetWizard | ✅ | 清除 editingCampaignId 及所有编辑状态 |
+| 新建页 ?edit= 支持 | ✅ | 读取 searchParams、fetch 数据、状态守卫、加载态/错误态 |
+| 编辑模式 UI | ✅ | StepAiWriter 使用 PATCH 保存（非 POST 创建）、蓝色提示横幅、按钮文案切换 |
+| 列表页编辑入口 | ✅ | DRAFT/PAUSED 行显示 Pencil 编辑按钮 |
+| 详情页编辑入口 | ✅ | DRAFT/PAUSED 头部显示编辑按钮 |
+| 单元测试 | ✅ | 11 条（状态守卫 5 + store hydrate 5 + resetWizard 1） |
+| E2E 测试 | ✅ | 7 条（数据回填、RUNNING 拒绝、PATCH 保存、联系人同步、状态守卫、编辑按钮） |
+
+**测试统计（本轮新增后总计）：**
+- **单元测试：96 条**（+9 campaign-edit）
+- **E2E 测试：103 条**（+7 campaign-edit + 3 campaign-edit API）
+- **TypeScript：零错误**
+- **Build：通过**
+
+**架构要点：**
+- 编辑模式复用现有向导组件，通过 store.editingCampaignId 区分新建/编辑
+- StepAiWriter 根据 isEditMode 选择 POST（新建+启动）或 PATCH（仅保存）
+- 状态守卫同时在前端（页面加载校验）和后端（PATCH API 校验）实施
+- 联系人同步继续通过 campaign-contacts.ts 的 replaceCampaignContacts，禁止裸 contactIds[]
+- 页面卸载时自动 resetWizard 清理状态
+
+**已知限制：**
+- 编辑模式暂不支持「保存并启动」，需先保存再从列表手动启动
+- sequence 步骤的 wait/condition 类型回填依赖 JSON 结构完整性
+
+
+### §9.49 Webhook 投递历史（2026-06-19）
+
+**P1-2 — Settings 展示 WebhookDelivery 历史：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| GET /api/webhooks/deliveries | ✅ | 租户隔离（endpoint.tenantId）、PRO 限制、分页、状态/端点筛选 |
+| 响应安全 | ✅ | 不泄露 payload/secret，responseBody 截断 200 字符 |
+| Settings UI | ✅ | 端点筛选、状态筛选、成功/失败/待处理徽章、HTTP 状态码、尝试次数、展开响应摘要、分页、手动刷新 |
+| i18n | ✅ | 中英文文案通过 t() + fallback |
+| 单元测试 | ✅ | 10 条（租户隔离 4 + 响应脱敏 3 + 分页 3） |
+| E2E 测试 | ✅ | 5 条（分页、状态筛选、无效状态、脱敏、端点筛选） |
+
+**测试统计：**
+- 单元测试：106 条通过
+- E2E 测试：108 条（106 passed, 1 skipped, 1 flaky auth）
+
+*本报告最后更新：2026-06-19。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 + Campaign 编辑模式 全部完成。*

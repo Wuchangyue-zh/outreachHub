@@ -54,3 +54,8 @@ temp/
 # Claude worktrees (duplicate package.json breaks Jest in CI)
 .claude/
 e2e/.auth/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
+.playwright/

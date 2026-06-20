@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, RefreshCw, Mail, Eye, MousePointer, MessageSquare,
+  ArrowLeft, RefreshCw, Mail, Eye, MousePointer, MessageSquare, Pencil,
   AlertCircle, Users, Calendar, Clock, Play, Pause, BarChart3,
 } from 'lucide-react'
 import { useI18n } from '@/hooks/use-i18n'
@@ -175,7 +175,13 @@ export default function CampaignDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {(campaign.status === 'RUNNING' || campaign.status === 'PAUSED') && (
+            {(campaign.status === "DRAFT" || campaign.status === "PAUSED") && (
+              <Button variant="outline" onClick={() => router.push("/campaigns/new?edit=" + campaign.id)}>
+                <Pencil className="h-4 w-4 mr-1" />
+                编辑
+              </Button>
+            )}
+            {(campaign.status === "RUNNING" || campaign.status === "PAUSED") && (
               <Button variant="outline" onClick={handlePauseResume}>
                 {campaign.status === 'RUNNING' ? (
                   <><Pause className="h-4 w-4 mr-1" /> {t('campaignDetail.pause')}</>

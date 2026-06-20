@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   Send, Plus, TrendingUp, TrendingDown, Eye, Reply, Rocket,
-  Search, Pause, Play, Trash2, Zap,
+  Search, Pause, Play, Trash2, Zap, Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CampaignStats } from '@/components/CampaignStats'
@@ -132,6 +133,7 @@ export default function CampaignsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [actioning, setActioning] = useState<string | null>(null)
+  const router = useRouter()
 
   // Fetch campaigns
   const fetchCampaigns = useCallback(async () => {
@@ -455,6 +457,17 @@ export default function CampaignsPage() {
                             {campaign.status === 'RUNNING'
                               ? <Pause className="h-4 w-4" />
                               : <Play className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        {(campaign.status === "DRAFT" || campaign.status === "PAUSED") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                            onClick={() => router.push("/campaigns/new?edit=" + campaign.id)}
+                            title="编辑"
+                          >
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         )}
                         <Button

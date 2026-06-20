@@ -25,7 +25,7 @@ import {
   Plus,
   TestTube,
   Trash2,
-  RefreshCw,
+  RefreshCw, Clock, ChevronDown,
   CheckCircle,
   XCircle,
   Settings as SettingsIcon,
@@ -283,6 +283,14 @@ export default function SettingsPage() {
   const [createdWebhookSecret, setCreatedWebhookSecret] = useState<string | null>(null)
   const [showWebhookSecretDialog, setShowWebhookSecretDialog] = useState(false)
 
+  // P1-2: Webhook delivery history
+  const [deliveries, setDeliveries] = useState<any[]>([])
+  const [loadingDeliveries, setLoadingDeliveries] = useState(false)
+  const [deliveryFilter, setDeliveryFilter] = useState({ endpointId: "", status: "" })
+  const [deliveryPage, setDeliveryPage] = useState(1)
+  const [deliveryPagination, setDeliveryPagination] = useState({ total: 0, totalPages: 0 })
+  const [expandedDelivery, setExpandedDelivery] = useState<string | null>(null)
+
   // 加载邮件账户列表
   const loadAccounts = async () => {
     try {
@@ -514,6 +522,7 @@ export default function SettingsPage() {
           setShowWebhookSecretDialog(true)
         }
         fetchWebhooks()
+    fetchDeliveries()
       } else {
         toast.error(data.error?.message || '创建失败')
       }
@@ -556,6 +565,24 @@ export default function SettingsPage() {
       }
     } catch {
       toast.error('删除失败')
+    }
+  }
+
+  const fetchDeliveries = async (p = 1) => {
+    setLoadingDeliveries(true)
+    try {
+      const params = new URLSearchParams({ page: String(p), limit: "10" })
+      if (deliveryFilter.endpointId) params.set("endpointId", deliveryFilter.endpointId)
+      if (deliveryFilter.status) params.set("status", deliveryFilter.status)
+      const res = await fetch("/api/webhooks/deliveries?" + params)
+      const data = await res.json()
+      if (data.success) {
+        setDeliveries(data.data)
+        setDeliveryPagination(data.pagination)
+        setDeliveryPage(p)
+      }
+    } catch { /* silent */ } finally {
+      setLoadingDeliveries(false)
     }
   }
 
@@ -1955,6 +1982,94 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* P1-2: Webhook Delivery History */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="h-5 w-5" /> {t('dashboardSettings.recentDeliveries') || '最近投递记录'}
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={deliveryFilter.endpointId}
+                      onChange={(e) => { setDeliveryFilter(f => ({...f, endpointId: e.target.value})); setDeliveryPage(1) }}
+                      className="text-xs rounded border px-2 py-1"
+                    >
+                      <option value="">{t('dashboardSettings.allEndpoints') || '全部端点'}</option>
+                      {webhooks.map(w => { const label = w.url.replace("https://","").replace("http://",""); return <option key={w.id} value={w.id}>{label.slice(0, 30)}</option>; })}
+                    </select>
+                    <select
+                      value={deliveryFilter.status}
+                      onChange={(e) => { setDeliveryFilter(f => ({...f, status: e.target.value})); setDeliveryPage(1) }}
+                      className="text-xs rounded border px-2 py-1"
+                    >
+                      <option value="">{t('dashboardSettings.allStatuses') || '全部状态'}</option>
+                      <option value="success">{t('dashboardSettings.statusSuccess') || '成功'}</option>
+                      <option value="failed">{t('dashboardSettings.statusFailed') || '失败'}</option>
+                      <option value="pending">{t('dashboardSettings.statusPending') || '待处理'}</option>
+                    </select>
+                    <Button variant="outline" size="sm" onClick={() => fetchDeliveries(1)} disabled={loadingDeliveries}>
+                      <RefreshCw className={"h-3 w-3 " + (loadingDeliveries ? 'animate-spin' : '')} />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingDeliveries ? (
+                  <div className="flex items-center justify-center py-8 text-gray-400">
+                    <RefreshCw className="h-5 w-5 animate-spin mr-2" /> {t('dashboardSettings.loading') || '加载中...'}
+                  </div>
+                ) : deliveries.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center">
+                    <Clock className="mx-auto h-8 w-8 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">{t('dashboardSettings.noDeliveries') || '暂无投递记录'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {deliveries.map((d) => (
+                      <div key={d.id} className="rounded-lg border border-gray-200 p-3">
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandedDelivery(expandedDelivery === d.id ? null : d.id)}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Badge className={d.status === 'success' ? 'bg-green-100 text-green-700' : d.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}>
+                              {d.status === 'success' ? (t('dashboardSettings.statusSuccess') || '成功') : d.status === 'failed' ? (t('dashboardSettings.statusFailed') || '失败') : (t('dashboardSettings.statusPending') || '待处理')}
+                            </Badge>
+                            <span className="text-xs font-mono text-gray-600">{d.event}</span>
+                            {d.statusCode && <span className="text-xs text-gray-400">HTTP {d.statusCode}</span>}
+                            <span className="text-xs text-gray-400">{t('dashboardSettings.attempts') || '尝试'}: {d.attempts}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">{new Date(d.createdAt).toLocaleString('zh-CN')}</span>
+                            <ChevronDown className={"h-4 w-4 text-gray-400 transition-transform " + (expandedDelivery === d.id ? 'rotate-180' : '')} />
+                          </div>
+                        </div>
+                        {expandedDelivery === d.id && (
+                          <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+                            <p className="text-xs text-gray-500">{t('dashboardSettings.endpoint') || '端点'}: <code className="text-xs">{d.endpointUrl}</code></p>
+                            {d.responseSummary && (
+                              <div className="rounded bg-gray-50 p-2">
+                                <p className="text-xs text-gray-500 mb-1">{t('dashboardSettings.responseSummary') || '响应摘要'}:</p>
+                                <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all">{d.responseSummary}</pre>
+                              </div>
+                            )}
+                            {d.nextRetryAt && <p className="text-xs text-gray-400">{t('dashboardSettings.nextRetry') || '下次重试'}: {new Date(d.nextRetryAt).toLocaleString('zh-CN')}</p>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {deliveryPagination.totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-2">
+                        <span className="text-xs text-gray-400">{t('dashboardSettings.totalRecords') || '共'} {deliveryPagination.total} {t('dashboardSettings.records') || '条'}</span>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" disabled={deliveryPage <= 1} onClick={() => fetchDeliveries(deliveryPage - 1)}>{t('dashboardSettings.prev') || '上一页'}</Button>
+                          <Button variant="outline" size="sm" disabled={deliveryPage >= deliveryPagination.totalPages} onClick={() => fetchDeliveries(deliveryPage + 1)}>{t('dashboardSettings.next') || '下一页'}</Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
