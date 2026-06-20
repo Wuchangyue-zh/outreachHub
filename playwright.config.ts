@@ -2,10 +2,10 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 2,
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:3030',
@@ -15,8 +15,23 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'setup',
+      testMatch: /global\.setup\.ts/,
+    },
+    {
+      name: 'unauth',
+      testMatch: /e2e\/(auth|landing)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'chromium',
+      testIgnore: /e2e\/(auth|landing)\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
   ],
   webServer: {

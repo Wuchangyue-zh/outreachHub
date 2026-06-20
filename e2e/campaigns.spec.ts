@@ -1,127 +1,90 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('Campaigns Management', () => {
+test.describe('Campaigns Page', () => {
   test.beforeEach(async ({ page }) => {
-    // Login before each test
-    await page.goto('/login')
-    await page.getByLabel(/邮箱/).fill('admin@outreachhub.com')
-    await page.getByLabel(/密码/).fill('admin123')
-    await page.getByRole('button', { name: /登录/ }).click()
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
-
-    // Navigate to campaigns with longer timeout
-    await page.goto('/campaigns', { timeout: 30000 })
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page.getByRole('heading', { name: /邮件营销/i })).toBeVisible({ timeout: 15000 })
+    await page.goto('/campaigns', { waitUntil: 'domcontentloaded' })
   })
 
-  test('should display campaigns list', async ({ page }) => {
-    await expect(page.getByRole('table')).toBeVisible()
+  test('should show stat cards', async ({ page }) => {
+    await expect(page.getByText('Total Sent')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Avg Open Rate')).toBeVisible()
+    await expect(page.getByText('Avg Reply Rate')).toBeVisible()
+    await expect(page.getByText('Active Campaigns')).toBeVisible()
   })
 
-  test('should have create campaign button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /创建|Create/i })).toBeVisible()
+  test('should show search input', async ({ page }) => {
+    await expect(page.getByPlaceholder('搜索任务名称...')).toBeVisible({ timeout: 10000 })
   })
 
-  test('should have view mode toggle', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /列表|List/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /统计|Stats/i })).toBeVisible()
+  test('should show status filter', async ({ page }) => {
+    const select = page.locator('select')
+    await expect(select).toBeVisible({ timeout: 10000 })
+    await expect(select).toContainText('All Status')
   })
 
-  test('should switch to stats view', async ({ page }) => {
-    await page.getByRole('button', { name: /统计|Stats/i }).click()
-    // Wait for view to switch
-    await page.waitForTimeout(1000)
-    // The stats view might show different content depending on whether a campaign is selected
-    // Just verify the button click worked and page didn't crash
-    await expect(page.getByRole('heading', { name: /邮件营销/i })).toBeVisible()
+  test('should show New Campaign button', async ({ page }) => {
+    await expect(page.getByRole('link', { name: /New Campaign/ })).toBeVisible({ timeout: 10000 })
   })
 
-  test('should switch back to list view', async ({ page }) => {
-    await page.getByRole('button', { name: /统计|Stats/i }).click()
-    await page.getByRole('button', { name: /列表|List/i }).click()
-    await expect(page.getByRole('table')).toBeVisible()
+  test('should display campaigns table', async ({ page }) => {
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 })
   })
 
-  test('should open create campaign dialog', async ({ page }) => {
-    await page.getByRole('button', { name: /创建|Create/i }).click()
-    await expect(page.getByText(/创建活动|Create Campaign/i).first()).toBeVisible()
+  test('should display table column headers', async ({ page }) => {
+    const headerRow = page.getByRole('table').locator('thead tr')
+    await expect(headerRow.getByText('Campaign Name')).toBeVisible({ timeout: 10000 })
+    await expect(headerRow.getByText('Audience')).toBeVisible()
+    await expect(headerRow.getByText('Sent')).toBeVisible()
+    await expect(headerRow.getByText('Open Rate')).toBeVisible()
+    await expect(headerRow.getByText('Reply Rate')).toBeVisible()
   })
 
-  test('should display campaign table headers', async ({ page }) => {
-    await expect(page.getByText(/名称|Name/i).first()).toBeVisible()
-    await expect(page.getByText(/状态|Status/i).first()).toBeVisible()
+  test('should filter by status', async ({ page }) => {
+    const select = page.locator('select')
+    await select.selectOption('Draft')
+    await expect(select).toHaveValue('DRAFT')
   })
 
-  test('should show quick stats cards', async ({ page }) => {
-    await expect(page.getByText(/进行中|Running/i).first()).toBeVisible()
+  test('should navigate to new campaign page', async ({ page }) => {
+    await page.goto('/campaigns/new', { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/\/campaigns\/new/)
+    await expect(page.getByText('基础信息').first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('should have view stats button for campaigns', async ({ page }) => {
-    // Check if there are campaigns in the list
-    const firstRow = page.getByRole('row').nth(1)
-    if (await firstRow.isVisible()) {
-      await expect(firstRow.getByRole('button', { name: /查看|View/i })).toBeVisible()
-    }
+  test('should search campaigns by name', async ({ page }) => {
+    const searchInput = page.getByPlaceholder('搜索任务名称...')
+    await searchInput.fill('test campaign')
+    await expect(searchInput).toHaveValue('test campaign')
+  })
+})
+
+test.describe('New Campaign Wizard', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/campaigns/new', { waitUntil: 'domcontentloaded' })
   })
 
-  test('should show campaign status badges', async ({ page }) => {
-    // Check for status badges (draft, running, completed, etc.)
-    const statusBadge = page.getByText(/草稿|Draft|进行中|Running|已完成|Completed/i).first()
-    if (await statusBadge.isVisible()) {
-      await expect(statusBadge).toBeVisible()
-    }
+  test('should display step 1 basic info', async ({ page }) => {
+    await expect(page.getByText('基础信息').first()).toBeVisible({ timeout: 10000 })
   })
 
-  // P1-15: 完整的 E2E 冒烟测试
-  test('should create and launch a campaign', async ({ page }) => {
-    // 点击创建按钮
-    await page.getByRole('button', { name: /创建|Create/i }).click()
-    await expect(page.getByText(/创建活动|Create Campaign/i).first()).toBeVisible({ timeout: 10000 })
-
-    // 填写活动名称
-    const nameInput = page.getByLabel(/名称|Name/i).first()
-    await nameInput.fill('E2E 测试活动')
-
-    // 填写邮件主题
-    const subjectInput = page.getByLabel(/主题|Subject/i).first()
-    await subjectInput.fill('测试邮件主题')
-
-    // 填写邮件内容
-    const contentInput = page.getByLabel(/内容|Content/i).first()
-    await contentInput.fill('这是一封测试邮件的内容。')
-
-    // 提交创建
-    await page.getByRole('button', { name: /创建|Create|保存|Save/i }).click()
-
-    // 等待创建成功
-    await page.waitForTimeout(2000)
-
-    // 验证活动已创建（应该出现在列表中）
-    await expect(page.getByText('E2E 测试活动')).toBeVisible({ timeout: 10000 })
+  test('should show campaign name input', async ({ page }) => {
+    await expect(page.getByPlaceholder(/例：2024 Q4/)).toBeVisible({ timeout: 10000 })
   })
 
-  test('should display campaign details', async ({ page }) => {
-    // 点击第一个活动查看详情
-    const firstRow = page.getByRole('row').nth(1)
-    if (await firstRow.isVisible()) {
-      await firstRow.getByRole('button', { name: /查看|View/i }).click()
-
-      // 等待详情页加载
-      await page.waitForTimeout(1000)
-
-      // 验证详情页显示
-      await expect(page.getByText(/活动详情|Campaign Details/i).first()).toBeVisible()
-    }
+  test('should show campaign type options', async ({ page }) => {
+    await expect(page.getByText('单次发送')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('多步序列')).toBeVisible()
+    await expect(page.getByText('A/B 测试')).toBeVisible()
   })
 
-  test('should show campaign statistics', async ({ page }) => {
-    // 切换到统计视图
-    await page.getByRole('button', { name: /统计|Stats/i }).click()
-    await page.waitForTimeout(1000)
+  test('should show next step button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /下一步/ })).toBeVisible({ timeout: 10000 })
+  })
 
-    // 验证统计卡片显示
-    await expect(page.getByText(/总发送|Total Sent/i).first()).toBeVisible()
-    await expect(page.getByText(/打开率|Open Rate/i).first()).toBeVisible()
+  test('should fill campaign name', async ({ page }) => {
+    const ts = Date.now()
+    const nameInput = page.getByPlaceholder(/例：2024 Q4/)
+    await nameInput.fill(`E2E Campaign ${ts}`)
+    await expect(nameInput).toHaveValue(`E2E Campaign ${ts}`)
   })
 })

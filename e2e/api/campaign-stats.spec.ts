@@ -1,26 +1,10 @@
-/**
- * L1: UI 组件测试 — Campaign Stats 地理分析 + DNS 对话框
- */
 import { test, expect } from '@playwright/test'
 
+const BASE = 'http://localhost:3030'
+
 test.describe('Campaign Stats API', () => {
-  let token = ''
-
-  test.beforeAll(async ({ request }) => {
-    const res = await request.post('http://localhost:3030/api/auth/login', {
-      data: { email: 'admin@outreachhub.com', password: 'admin123' },
-    })
-    const cookies = res.headers()['set-cookie']
-    if (cookies) {
-      const match = cookies.match(/auth-token=([^;]+)/)
-      if (match) token = match[1]
-    }
-  })
-
   test('GET /api/campaigns/stats — returns geo data', async ({ request }) => {
-    const res = await request.get('http://localhost:3030/api/campaigns/stats', {
-      headers: { Cookie: `auth-token=${token}` },
-    })
+    const res = await request.get(`${BASE}/api/campaigns/stats`)
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -32,23 +16,10 @@ test.describe('Campaign Stats API', () => {
 })
 
 test.describe('DNS Records API', () => {
-  let token = ''
   let accountId = ''
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.post('http://localhost:3030/api/auth/login', {
-      data: { email: 'admin@outreachhub.com', password: 'admin123' },
-    })
-    const cookies = res.headers()['set-cookie']
-    if (cookies) {
-      const match = cookies.match(/auth-token=([^;]+)/)
-      if (match) token = match[1]
-    }
-
-    // 获取邮箱账户列表
-    const accountsRes = await request.get('http://localhost:3030/api/email-accounts', {
-      headers: { Cookie: `auth-token=${token}` },
-    })
+    const accountsRes = await request.get(`${BASE}/api/email-accounts`)
     const accountsBody = await accountsRes.json()
     if (accountsBody.data?.length > 0) {
       accountId = accountsBody.data[0].id
@@ -58,9 +29,7 @@ test.describe('DNS Records API', () => {
   test('GET /api/email-accounts/[id]/dns-records — returns records + verification', async ({ request }) => {
     test.skip(!accountId, 'No email account found')
 
-    const res = await request.get(`http://localhost:3030/api/email-accounts/${accountId}/dns-records`, {
-      headers: { Cookie: `auth-token=${token}` },
-    })
+    const res = await request.get(`${BASE}/api/email-accounts/${accountId}/dns-records`)
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -69,7 +38,6 @@ test.describe('DNS Records API', () => {
     expect(Array.isArray(body.data.verification)).toBe(true)
     expect(Array.isArray(body.data.tips)).toBe(true)
 
-    // 每条记录应有 type/host/value/description/status
     for (const rec of body.data.records) {
       expect(rec).toHaveProperty('type')
       expect(rec).toHaveProperty('host')
@@ -80,23 +48,10 @@ test.describe('DNS Records API', () => {
 })
 
 test.describe('GDPR Export API', () => {
-  let token = ''
   let contactId = ''
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.post('http://localhost:3030/api/auth/login', {
-      data: { email: 'admin@outreachhub.com', password: 'admin123' },
-    })
-    const cookies = res.headers()['set-cookie']
-    if (cookies) {
-      const match = cookies.match(/auth-token=([^;]+)/)
-      if (match) token = match[1]
-    }
-
-    // 获取联系人列表
-    const contactsRes = await request.get('http://localhost:3030/api/contacts', {
-      headers: { Cookie: `auth-token=${token}` },
-    })
+    const contactsRes = await request.get(`${BASE}/api/contacts`)
     const contactsBody = await contactsRes.json()
     if (contactsBody.data?.length > 0) {
       contactId = contactsBody.data[0].id
@@ -106,9 +61,7 @@ test.describe('GDPR Export API', () => {
   test('GET /api/contacts/[id]/export — returns JSON download', async ({ request }) => {
     test.skip(!contactId, 'No contact found')
 
-    const res = await request.get(`http://localhost:3030/api/contacts/${contactId}/export`, {
-      headers: { Cookie: `auth-token=${token}` },
-    })
+    const res = await request.get(`${BASE}/api/contacts/${contactId}/export`)
     expect(res.status()).toBe(200)
     expect(res.headers()['content-type']).toContain('application/json')
     expect(res.headers()['content-disposition']).toContain('attachment')

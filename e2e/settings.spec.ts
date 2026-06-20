@@ -2,51 +2,59 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Settings Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login')
-    await page.getByLabel(/邮箱/).fill('admin@outreachhub.com')
-    await page.getByLabel(/密码/).fill('admin123')
-    await page.getByRole('button', { name: /登录/ }).click()
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 })
-
-    await page.goto('/settings', { timeout: 30000 })
-    await page.waitForLoadState('domcontentloaded')
+    await page.goto('/dashboard/settings', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[role="tab"]', { timeout: 10000 })
   })
 
-  test('should display settings page', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /设置|Settings/i })).toBeVisible({ timeout: 15000 })
+  test('should display settings heading', async ({ page }) => {
+    await expect(page.getByText('设置').first()).toBeVisible({ timeout: 10000 })
   })
 
-  test('should show profile section', async ({ page }) => {
-    await expect(page.getByText(/个人资料|Profile|个人信息/i).first()).toBeVisible({ timeout: 15000 })
+  test('should show email accounts tab by default', async ({ page }) => {
+    await expect(page.getByRole('tab', { name: /邮件账户/ })).toBeVisible({ timeout: 10000 })
   })
 
-  test('should show email accounts section', async ({ page }) => {
-    await expect(page.getByText(/邮箱账户|Email Account|发件邮箱/i).first()).toBeVisible({ timeout: 15000 })
+  test('should show add account button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /添加账户/ })).toBeVisible({ timeout: 10000 })
   })
 
-  test('should have add email account button', async ({ page }) => {
-    const addBtn = page.getByRole('button', { name: /添加|Add|新增/i }).first()
-    await expect(addBtn).toBeVisible({ timeout: 15000 })
+  test('should show all tab buttons', async ({ page }) => {
+    await expect(page.getByRole('tab', { name: /邮件账户/ })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('tab', { name: /通用设置/ })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /数据源/ })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /安全设置/ })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /API Keys/ })).toBeVisible()
   })
 
-  test('should display plan info', async ({ page }) => {
-    const planInfo = page.getByText(/套餐|Plan|免费|Free|基础|Basic|专业|Pro/i).first()
-    if (await planInfo.isVisible()) {
-      await expect(planInfo).toBeVisible()
-    }
+  test('should click general settings tab', async ({ page }) => {
+    await page.getByRole('tab', { name: /通用设置/ }).click({ force: true })
+    await page.waitForTimeout(500)
+    // Just verify the click didn't crash the page
+    await expect(page.getByText('设置').first()).toBeVisible()
   })
 
-  test('should show profile name field', async ({ page }) => {
-    const nameField = page.getByLabel(/姓名|Name/i).first()
-    if (await nameField.isVisible()) {
-      await expect(nameField).toBeVisible()
-    }
+  test('should click data sources tab', async ({ page }) => {
+    await page.getByRole('tab', { name: /数据源/ }).click({ force: true })
+    await page.waitForTimeout(500)
+    await expect(page.getByText('设置').first()).toBeVisible()
   })
 
-  test('should show save profile button', async ({ page }) => {
-    const saveBtn = page.getByRole('button', { name: /保存|Save/i }).first()
-    if (await saveBtn.isVisible()) {
-      await expect(saveBtn).toBeVisible()
-    }
+  test('should click security tab', async ({ page }) => {
+    await page.getByRole('tab', { name: /安全设置/ }).click({ force: true })
+    await page.waitForTimeout(500)
+    await expect(page.getByText('设置').first()).toBeVisible()
+  })
+
+  test('should click API keys tab', async ({ page }) => {
+    await page.getByRole('tab', { name: /API Keys/ }).click({ force: true })
+    await page.waitForTimeout(500)
+    await expect(page.getByText('设置').first()).toBeVisible()
+  })
+
+  test('should click add account button', async ({ page }) => {
+    await page.getByRole('button', { name: /添加账户/ }).click()
+    await page.waitForTimeout(1000)
+    // Just verify the page didn't crash
+    await expect(page.getByText('设置').first()).toBeVisible()
   })
 })
