@@ -271,6 +271,7 @@ model Contact {
   @@index([fullName])
   @@index([ownerId])
   @@index([pool])
+  @@index([pool, claimedAt, lastActivityAt])
 }
 
 model ContactEmail {
@@ -941,4 +942,20 @@ enum DealStage {
 enum ContactPool {
   PUBLIC
   PRIVATE
+}
+
+// P2-2: Stripe Webhook 幂等事件追踪
+model ProcessedStripeEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  eventType   String
+  status      String    @default("processing") // processing | processed | failed
+  attempts    Int       @default(1)
+  error       String?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([createdAt])
 }

@@ -15,6 +15,7 @@ export type CronJobType =
   | 'process-prospecting'
   | 'retry-failed'
   | 'task-reminders'
+  | 'recycle-pool'
 
 export interface CronJobData {
   type: CronJobType

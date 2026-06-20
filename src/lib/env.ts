@@ -86,6 +86,12 @@ export function getWorkerRateLimit(): { max: number; duration: number } {
   return { max, duration }
 }
 
+export function getPoolReleaseDays(): number {
+  const raw = parseInt(process.env.POOL_AUTO_RELEASE_DAYS || '30', 10)
+  if (!Number.isFinite(raw)) return 30
+  return Math.max(1, Math.min(365, raw))
+}
+
 export function getStorageBackend(): 'blob' | 's3' | 'local' {
   if (process.env.BLOB_READ_WRITE_TOKEN) return 'blob'
   if (

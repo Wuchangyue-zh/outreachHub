@@ -34,6 +34,10 @@ export async function runCronHandler(type: CronJobType): Promise<unknown> {
       const { executeTaskReminders } = await import('./cron-jobs/task-reminders')
       return executeTaskReminders()
     }
+    case 'recycle-pool': {
+      const { executeRecyclePool } = await import('./cron-jobs/recycle-pool')
+      return executeRecyclePool()
+    }
     default:
       throw new Error(`Unknown cron job type: ${type}`)
   }

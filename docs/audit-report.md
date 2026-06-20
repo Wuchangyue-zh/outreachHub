@@ -1677,4 +1677,57 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 | frontend-gaps.md D6 | ✅ | 标记完成 |
 | i18n | ✅ | 横向滚动提示文案 |
 
-*本报告最后更新：2026-06-19。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 + Campaign 编辑模式 全部完成。*
+### §9.52 公海自动回收（2026-06-20）
+
+**P2-1 — 公海客户 N 天未跟进自动回收：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| CronJobType recycle-pool | ✅ | cron-queue.ts 新增类型 |
+| cron-handlers 注册 | ✅ | executeRecyclePool 动态导入 |
+| recycle-pool.ts | ✅ | 游标分页、条件 updateMany、幂等、AuditLog |
+| /api/cron/recycle-pool | ✅ | verifyCronSecret + dispatchCronJob，零业务逻辑 |
+| vercel.json | ✅ | `0 2 * * *` 每天 02:00 UTC |
+| POOL_AUTO_RELEASE_DAYS | ✅ | env.ts + .env.example，默认 30，范围 1-365 |
+| 复合索引 | ✅ | Contact `@@index([pool, claimedAt, lastActivityAt])` |
+| 单元测试 | ✅ | 19 条（cutoff 5 + cron-auth 3 + handler 1 + execute 9 + dispatch 1） |
+
+**回收规则：**
+- 仅回收 pool=PRIVATE、ownerId 非空、claimedAt 早于 cutoff
+- lastActivityAt / lastContactedAt / lastEmailRepliedAt 均为空或早于 cutoff
+- 排除：CONVERTED 状态、有 PENDING/RUNNING Task、有活跃 Deal（非 WON/LOST）、cutoff 后有 EmailLog/Task/Deal 活动
+- 条件 updateMany 原子复核租户、负责人、池状态、cutoff、活动字段及 Task/Deal/EmailLog 关系，防止检查后状态变化导致误回收
+- 回收后：ownerId=null、pool=PUBLIC、claimedAt=null，保留 lastActivityAt 和历史
+- AuditLog 等待写入完成；inactiveDays 按领取/活动/联系/回复中的最近时间计算
+
+**测试统计：**
+- 单元测试：134 条通过
+- E2E 测试：122 条（118 passed, 3 pre-existing flaky, 1 skipped）
+- tsc --noEmit：通过
+- build：通过
+
+*本报告最后更新：2026-06-20。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 + Campaign 编辑模式 + P1 全部 + P2-1 公海自动回收 完成。*
+
+### §9.53 Stripe 订阅状态处理与 Webhook 幂等（2026-06-20）
+
+**P2-2 — Stripe Webhook 完善：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| customer.subscription.updated | ✅ | active/trialing 按已配置 price 恢复套餐；其他状态降级 FREE；未知 active price 拒绝授权 |
+| customer.subscription.deleted | ✅ | 降级 FREE、清理 subscriptionId |
+| 旧订阅保护 | ✅ | subscription.id 不匹配或 event.created 早于已应用事件时跳过 |
+| Webhook 幂等 | ✅ | event.id 唯一领取 + processing 租约；并发请求只有领取者可执行副作用 |
+| 失败重试 | ✅ | failed 原地 CAS 重领；processing 超过 5 分钟可恢复，不删除幂等记录 |
+| 签名验证 | ✅ | 失败返回 400，不写数据库 |
+| 日志安全 | ✅ | 不记录 secret、客户 PII、支付数据 |
+| Prisma Schema | ✅ | ProcessedStripeEvent：唯一 eventId、status、attempts、processedAt、updatedAt |
+| 单元测试 | ✅ | 27 条定向测试（真实 POST 路由 24 + 套餐限额 3） |
+
+**测试统计：**
+- 单元测试：161 条通过（17 suites）
+- E2E：环境阻塞（缺少 Playwright Chromium，未执行）
+- tsc --noEmit：通过
+- build：通过
+
+*本报告最后更新：2026-06-20。P2-2 Stripe Webhook 完成。*

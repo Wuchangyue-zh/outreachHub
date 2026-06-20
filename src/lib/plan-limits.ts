@@ -33,7 +33,9 @@ export async function getTenantLimits(tenantId: string): Promise<PlanLimits> {
   if (!tenant) return PLAN_DEFAULTS.FREE
 
   const defaults = PLAN_DEFAULTS[tenant.plan] || PLAN_DEFAULTS.FREE
-  // 以套餐默认值为准；Tenant 表字段可高于套餐（Enterprise 定制）
+  // Only Enterprise tenants may retain custom limits above the plan defaults.
+  // This prevents stale PRO/Enterprise values from surviving a billing downgrade.
+  if (tenant.plan !== 'ENTERPRISE') return defaults
   return {
     maxContacts: Math.max(defaults.maxContacts, tenant.maxContacts),
     maxUsers: Math.max(defaults.maxUsers, tenant.maxUsers),
