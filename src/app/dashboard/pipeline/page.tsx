@@ -290,7 +290,7 @@ function KanbanColumn({
 }: KanbanColumnProps) {
   return (
     <div
-      className={`flex min-w-[280px] flex-shrink-0 flex-col rounded-lg border-2 transition-colors ${
+      className={`flex min-w-[260px] sm:min-w-[280px] flex-shrink-0 flex-col rounded-lg border-2 scroll-snap-align-start transition-colors ${
         isDragOver
           ? 'border-primary bg-primary/5'
           : `${stage.borderColor} ${stage.bgColor}`
@@ -799,7 +799,11 @@ export default function PipelinePage() {
             )}
 
             {/* Kanban board */}
-            <div className="overflow-x-auto pb-4">
+            <div className="relative">
+              <div className="flex items-center gap-2 px-1 pb-2 sm:hidden">
+                <span className="text-xs text-gray-400">← 左右滑动查看更多阶段 →</span>
+              </div>
+              <div className="overflow-x-auto pb-4 scroll-smooth" style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
               <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
                 {STAGES.map((stage) => (
                   <KanbanColumn
@@ -816,6 +820,7 @@ export default function PipelinePage() {
                   />
                 ))}
               </div>
+            </div>
             </div>
           </>
         )}

@@ -27,12 +27,16 @@ test.describe('Campaign Edit Mode', () => {
     // Should show loading then the wizard
     await expect(page.getByText('基础信息').first()).toBeVisible({ timeout: 15000 })
 
-    // Campaign name should be pre-filled
+    // Wait for hydration to complete
     const nameInput = page.getByPlaceholder(/例：2024 Q4/)
+    await expect(nameInput).not.toHaveValue('', { timeout: 10000 })
     await expect(nameInput).toHaveValue(campaign.name)
 
-    // Cleanup
-    await page.request.delete(`${BASE}/api/campaigns/${campaign.id}`)
+    try {
+      // verified above
+    } finally {
+      await page.request.delete(`${BASE}/api/campaigns/${campaign.id}`).catch(()=>{})
+    }
   })
 
   test('should show error for RUNNING campaign', async ({ page }) => {

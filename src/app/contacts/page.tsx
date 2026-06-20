@@ -101,6 +101,15 @@ export default function ContactsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showDetailDrawer, setShowDetailDrawer] = useState(false)
+
+  // Escape to close + scroll lock when drawer open
+  useEffect(() => {
+    if (!showDetailDrawer) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowDetailDrawer(false) }
+    document.addEventListener('keydown', handler)
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', handler); document.body.style.overflow = '' }
+  }, [showDetailDrawer])
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [currentContact, setCurrentContact] = useState<Contact | null>(null)
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([])
@@ -956,16 +965,16 @@ export default function ContactsPage() {
 
       {/* Detail Drawer */}
       {showDetailDrawer && currentContact && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="客户详情">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowDetailDrawer(false)} />
-          <div className="relative w-full max-w-lg bg-white shadow-xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between z-10">
+          <div className="relative w-full sm:max-w-lg h-full bg-white shadow-xl flex flex-col">
+            <div className="shrink-0 bg-white border-b p-4 sm:p-6 flex items-center justify-between z-10">
               <h2 className="text-lg font-semibold">客户详情</h2>
               <button onClick={() => setShowDetailDrawer(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
               {/* Profile */}
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
@@ -973,7 +982,7 @@ export default function ContactsPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{currentContact.fullName}</h3>
-                  <p className="text-gray-500">{currentContact.title || t('contacts.noTitle')}</p>
+                  <p className="text-gray-500 break-words">{currentContact.title || t('contacts.noTitle')}</p>
                 </div>
               </div>
 

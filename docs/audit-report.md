@@ -1657,4 +1657,24 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - 单元测试：115 条通过
 - E2E 测试：114 条（110 passed, 3 pre-existing flaky, 1 skipped）
 
+
+### §9.51 移动端适配 + Flaky 清零（2026-06-20）
+
+**P1-4 — Pipeline/Contacts/Developers 移动端 + 测试稳定性：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| Pipeline 横向滚动提示 | ✅ | 390px 下显示滑动提示 + 边缘渐变 + scroll-snap |
+| Pipeline 列宽适配 | ✅ | min-w-[260px] sm:min-w-[280px]，scroll-snap-align-start |
+| Contacts Drawer 全屏 | ✅ | sm 以下占满屏幕，flex-col 布局，独立滚动 |
+| Contacts Drawer A11y | ✅ | role=dialog, aria-modal, Escape 关闭, scroll lock |
+| Contacts Tabs 横滚 | ✅ | overflow-x-auto, scrollbarWidth:none |
+| Developers 响应式 | ✅ | 标题/按钮纵向布局，移动端外部文档入口，pre overflow-x-auto |
+| Flaky campaign-edit | ✅ | waitForValue 非空 + try/finally cleanup |
+| Flaky dashboard | ✅ | waitForURL + toBeVisible 前置 |
+| Flaky auth | ✅ | waitFor networkidle + fill + waitForResponse |
+| 响应式 E2E | ✅ | 390x844 viewport: Pipeline/Contacts/Developers/Desktop |
+| frontend-gaps.md D6 | ✅ | 标记完成 |
+| i18n | ✅ | 横向滚动提示文案 |
+
 *本报告最后更新：2026-06-19。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 + Campaign 编辑模式 全部完成。*

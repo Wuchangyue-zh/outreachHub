@@ -53,14 +53,17 @@ test.describe('Authentication', () => {
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' })
+    await page.goto('/login', { waitUntil: 'networkidle' })
     const emailInput = page.locator('#email')
     await emailInput.click()
     await emailInput.pressSequentially('invalid@example.com', { delay: 10 })
     const passwordInput = page.locator('#password')
     await passwordInput.click()
     await passwordInput.pressSequentially('wrongpassword', { delay: 10 })
-    await page.getByRole('button', { name: /登录/ }).click()
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/api/auth/login')),
+      page.getByRole('button', { name: /登录/ }).click(),
+    ])
     await expect(page.getByText(/错误|失败|invalid/i)).toBeVisible({ timeout: 10000 })
   })
 

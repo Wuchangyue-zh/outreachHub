@@ -59,7 +59,7 @@ export default function DevelopersPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-12">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-bold">{t('developers.apiDoc')}</h1>
             <p className="mt-2 text-gray-600">{t('developers.apiRef')}</p>
@@ -67,7 +67,7 @@ export default function DevelopersPage() {
                 {t('developers.apiRequiresPlan').split('专业版及以上套餐').length > 1 ? <>{t('developers.apiRequiresPlan').split('专业版及以上套餐')[0]}<a href="/pricing" className="underline font-medium">专业版及以上套餐</a>{t('developers.apiRequiresPlan').split('专业版及以上套餐')[1]}</> : t('developers.apiRequiresPlan')}
               </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="gap-2" onClick={() => setShowRedoc(!showRedoc)}>
               <BookOpen className="h-4 w-4" /> {showRedoc ? t('developers.close') : t('developers.redocInteractive')}
             </Button>
@@ -83,11 +83,18 @@ export default function DevelopersPage() {
         {showRedoc && (
           <Card className="mt-6 overflow-hidden">
             <CardContent className="p-0">
-              <iframe
+              {/* Mobile: external link */}
+            <div className="sm:hidden mb-4 flex gap-2">
+              <a href="/docs/openapi.yaml" target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline">下载 OpenAPI 规范</a>
+              <a href="https://cdn.redoc.ly/redoc/" target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline">在新窗口打开文档</a>
+            </div>
+            <div className="hidden sm:block">
+            <iframe
                 src={`https://cdn.redoc.ly/redoc/embed?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin + '/docs/openapi.yaml' : '/docs/openapi.yaml')}`}
-                style={{ width: '100%', height: '80vh', border: 'none' }}
+                style={{ width: '100%', height: 'min(80vh, 600px)', border: 'none', minHeight: '400px' }}
                 title="API 文档 (Redoc)"
               />
+            </div>
             </CardContent>
           </Card>
         )}
