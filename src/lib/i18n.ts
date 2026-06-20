@@ -1322,6 +1322,15 @@ const translations: Record<Locale, Translations> = {
       revokeConfirm: '确定要吊销此 API Key 吗？吊销后将立即失效。',
       apiKeyRevoked: 'API Key 已吊销',
       enterWebhookUrl: '请输入 Webhook URL', selectEvent: '请至少选择一个事件',
+      demoLeads: {
+        title: 'Demo 预约管理', subtitle: '管理产品演示预约，跟进潜在客户',
+        searchPlaceholder: '搜索姓名、邮箱、公司...', allStatuses: '全部状态', search: '搜索',
+        loading: '加载中...', loadFailed: '加载预约数据失败', retry: '重试', empty: '暂无预约记录',
+        originalMessage: '用户留言', internalNotes: '内部跟进备注', notesPlaceholder: '添加跟进备注...',
+        contactedAt: '联系时间', saveNotes: '保存备注', notesSaved: '备注已保存',
+        statusUpdated: '状态已更新', saveFailed: '保存失败', total: '共', prev: '上一页', next: '下一页',
+        status: { pending: '待联系', contacted: '已联系', converted: '已转化', rejected: '已拒绝', },
+      },
     },
 
   },
@@ -2642,6 +2651,15 @@ const translations: Record<Locale, Translations> = {
       revokeConfirm: 'Revoke this API Key? It will be invalidated immediately.',
       apiKeyRevoked: 'API Key revoked',
       enterWebhookUrl: 'Please enter Webhook URL', selectEvent: 'Please select at least one event',
+      demoLeads: {
+        title: 'Demo Leads', subtitle: 'Manage demo requests and follow up with prospects',
+        searchPlaceholder: 'Search by name, email, company...', allStatuses: 'All Statuses', search: 'Search',
+        loading: 'Loading...', loadFailed: 'Failed to load demo requests', retry: 'Retry', empty: 'No demo requests yet',
+        originalMessage: 'Original Message', internalNotes: 'Internal Notes', notesPlaceholder: 'Add follow-up notes...',
+        contactedAt: 'Contacted At', saveNotes: 'Save Notes', notesSaved: 'Notes saved',
+        statusUpdated: 'Status updated', saveFailed: 'Save failed', total: 'Total', prev: 'Previous', next: 'Next',
+        status: { pending: 'Pending', contacted: 'Contacted', converted: 'Converted', rejected: 'Rejected', },
+      },
     },
   },
 }

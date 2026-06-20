@@ -13,6 +13,7 @@ async function main() {
 
   if (existingAdmin) {
     console.log('演示数据已初始化，跳过重复创建。')
+    await prisma.user.update({ where: { email: 'admin@outreachhub.com' }, data: { isPlatformAdmin: true } }).catch(() => {})
     return
   }
 

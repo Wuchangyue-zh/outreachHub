@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   Users,
-  Building2,
+  Building2, UserCircle,
   Send,
   FileText,
   Search,
@@ -117,7 +117,7 @@ function TrialBanner() {
   )
 }
 
-const navigation = [
+const navigation: { name: string; href: string; icon: any; platformAdminOnly?: boolean }[] = [
   { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
   { name: '智能拓客', href: '/prospecting', icon: Search },
   { name: '海关数据', href: '/customs', icon: Container },
@@ -140,7 +140,9 @@ const navigation = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
   const pathname = usePathname()
+  useEffect(() => { fetch('/api/users/me').then(r=>r.json()).then(d=>{ if(d.success) setIsPlatformAdmin(d.user?.isPlatformAdmin===true) }).catch(()=>{}) }, [])
   const router = useRouter()
   const { t } = useI18n()
 
@@ -193,7 +195,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2 py-4">
           <ul className="space-y-1">
-            {navigation.map((item) => {
+            {navigation.filter(item => !item.platformAdminOnly || isPlatformAdmin).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <li key={item.href}>

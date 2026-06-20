@@ -1635,4 +1635,26 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - 单元测试：106 条通过
 - E2E 测试：108 条（106 passed, 1 skipped, 1 flaky auth）
 
+
+### §9.50 Demo 预约后台（2026-06-20）
+
+**P1-3 — 平台管理员 Demo 预约管理：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| User.isPlatformAdmin | ✅ | Boolean @default(false)，seed 管理员设为 true |
+| DemoRequest 新字段 | ✅ | internalNotes、contactedAt、updatedAt |
+| requirePlatformAdmin() | ✅ | 实时查询 DB，不信任 JWT |
+| GET /api/admin/demo-requests | ✅ | 平台管理员限定、status/search 筛选、分页 |
+| PATCH /api/admin/demo-requests/[id] | ✅ | status allowlist、contactedAt 自动设置、AuditLog |
+| /dashboard/demo-leads 页面 | ✅ | 列表、筛选、展开留言、编辑备注、更新状态 |
+| 侧边栏条件显示 | ✅ | 仅 isPlatformAdmin 用户可见 |
+| i18n | ✅ | 中英文 demoLeads 完整文案 |
+| 单元测试 | ✅ | 9 条 |
+| E2E 测试 | ✅ | 7 条 |
+
+**测试统计：**
+- 单元测试：115 条通过
+- E2E 测试：114 条（110 passed, 3 pre-existing flaky, 1 skipped）
+
 *本报告最后更新：2026-06-19。Batch D–U + Post-GA + Launch Prep + Security Fix + Architecture Cleanup + Rate Limit + Frontend + Frontend Error Handling + E2E 现代化 + Campaign 编辑模式 全部完成。*

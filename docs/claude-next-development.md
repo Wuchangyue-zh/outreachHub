@@ -28,7 +28,7 @@
 
 1. ~~**Campaign 编辑模式**~~ ✅ §9.48： `/campaigns/new?edit=<id>` 数据加载、Zustand hydrateFromCampaign、PATCH 保存；DRAFT/PAUSED 可编辑，RUNNING/COMPLETED/FAILED 返回 403。
 2. ~~**Webhook 投递历史**~~ ✅ §9.49：GET /api/webhooks/deliveries（租户隔离、PRO 限制、分页、筛选）；Settings 端点/状态筛选、徽章、展开摘要、手动刷新。
-3. **Demo 预约后台**：新增受权限保护的 `/dashboard/demo-leads`，支持列表、状态和跟进备注。
+3. ~~**Demo 预约后台**~~ ✅ §9.50：平台管理员限定（isPlatformAdmin 实时 DB 查询）；GET/PATCH /api/admin/demo-requests；/dashboard/demo-leads 列表+筛选+备注+状态管理。
 4. **移动端**：Pipeline Kanban 横向滚动提示、联系人详情抽屉全屏、Developers 文档移动端可读性。
 
 验收：每项包含 API 权限/tenant 过滤、页面空态/错误态、至少一条 API 或 E2E 测试。

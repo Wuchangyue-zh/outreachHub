@@ -33,6 +33,7 @@ model User {
   twoFactorEnabled     Boolean   @default(false)
   twoFactorSecret      String?   // TOTP secret (encrypted)
   twoFactorBackupCodes String?   // JSON array of hashed backup codes
+  isPlatformAdmin      Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -829,6 +830,9 @@ model DemoRequest {
   phone       String?
   message     String?  @db.Text
   status      String   @default("pending") // pending, contacted, converted, rejected
+  internalNotes String? @db.Text
+  contactedAt DateTime?
+  updatedAt   DateTime @default(now()) @updatedAt
   createdAt   DateTime @default(now())
 
   @@index([email])
