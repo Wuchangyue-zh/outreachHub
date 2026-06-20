@@ -22,12 +22,15 @@ function getEncryptionKey(): Buffer {
     return crypto.createHash('sha256').update('outreachhub-dev-encryption-key').digest()
   }
 
-  // 如果是 hex 字符串，转换为 Buffer
-  if (key.length === 64) {
+  // Production keys must be exactly 32 bytes encoded as 64 hex characters.
+  if (/^[0-9a-fA-F]{64}$/.test(key)) {
     return Buffer.from(key, 'hex')
   }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('ENCRYPTION_KEY must be a 64-character hex string in production')
+  }
 
-  // 如果是普通字符串，使用 SHA-256 哈希为 32 字节
+  // Preserve compatibility with existing development-only passphrases.
   return crypto.createHash('sha256').update(key).digest()
 }
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { resolveAuth, hasPermission, canReadContacts } from '@/lib/auth-middleware'
+import { resolveAuth, hasPermission, canReadContacts, tenantWhere } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { rateLimit, checkApiKeyRateLimit } from '@/lib/rate-limit'
+import { rateLimit, consumeApiKeyRateLimit, type RateLimitHeaders } from '@/lib/rate-limit'
 import { checkContactLimit } from '@/lib/plan-limits'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
@@ -13,11 +13,15 @@ export async function GET(req: NextRequest) {
   if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
   if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
 
-  // Per-key rate limit for API key auth, global for JWT
-  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
-    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
-    : await limiter.check(req, 30)
-  if (keyLimit) return keyLimit
+  let rateLimitHeaders: RateLimitHeaders | undefined
+  if (auth.apiKeyId) {
+    const result = await consumeApiKeyRateLimit(auth.apiKeyId, auth.apiKeyRateLimit || 100)
+    if (result.response) return result.response
+    rateLimitHeaders = result.headers
+  } else {
+    const response = await limiter.check(req, 30)
+    if (response) return response
+  }
 
   try {
     const { searchParams } = new URL(req.url)
@@ -26,7 +30,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')
     const status = searchParams.get('status')
 
-    const where: any = { tenantId: auth.tenantId }
+    const where: any = tenantWhere(auth.tenantId)
     if (status) where.status = status
     if (search) {
       where.OR = [
@@ -50,7 +54,7 @@ export async function GET(req: NextRequest) {
       success: true,
       data: contacts,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
-    })
+    }, { headers: rateLimitHeaders })
   } catch (error) {
     return handleApiError(error)
   }
@@ -62,11 +66,15 @@ export async function POST(req: NextRequest) {
   if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
   if (!hasPermission(auth.role, 'contacts:manage', auth.effectivePermissions)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
 
-  // Per-key rate limit for API key auth, global for JWT
-  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
-    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
-    : await limiter.check(req, 10)
-  if (keyLimit) return keyLimit
+  let rateLimitHeaders: RateLimitHeaders | undefined
+  if (auth.apiKeyId) {
+    const result = await consumeApiKeyRateLimit(auth.apiKeyId, auth.apiKeyRateLimit || 100)
+    if (result.response) return result.response
+    rateLimitHeaders = result.headers
+  } else {
+    const response = await limiter.check(req, 10)
+    if (response) return response
+  }
 
   try {
     const limitCheck = await checkContactLimit(auth.tenantId)
@@ -82,6 +90,14 @@ export async function POST(req: NextRequest) {
     }
 
     const name = fullName || `${firstName || ''} ${lastName || ''}`.trim()
+
+    if (companyId) {
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, ...tenantWhere(auth.tenantId) },
+        select: { id: true },
+      })
+      if (!company) return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+    }
 
     const contact = await prisma.contact.create({
       data: {
@@ -113,7 +129,7 @@ export async function POST(req: NextRequest) {
       include: { emails: true, company: { select: { id: true, name: true } } },
     })
 
-    return NextResponse.json({ success: true, data: fullContact }, { status: 201 })
+    return NextResponse.json({ success: true, data: fullContact }, { status: 201, headers: rateLimitHeaders })
   } catch (error) {
     return handleApiError(error)
   }

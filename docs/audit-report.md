@@ -1731,3 +1731,51 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - build：通过
 
 *本报告最后更新：2026-06-20。P2-2 Stripe Webhook 完成。*
+
+### §9.54 TOTP Secret 加密存储与历史明文迁移（2026-06-20）
+
+**P2-3 — TOTP Secret AES-256-GCM 加密：**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| totp-secret.ts 工具层 | ✅ | 版本化加解密、明文/旧密文识别、条件迁移 updateMany |
+| 密文格式 | ✅ | `enc:v1:<iv>:<authTag>:<data>` 前缀标识，复用 encryption.ts AES-256-GCM |
+| enable 路由 | ✅ | 使用 encryptTotpSecret() 替代 encrypt() |
+| verify 路由 | ✅ | 使用 decryptTotpSecretWithMigration() + 惰性迁移回写 |
+| disable 路由 | ✅ | 使用 decryptTotpSecretWithMigration() + 惰性迁移回写 |
+| verify-2fa 路由 | ✅ | 使用 decryptTotpSecretWithMigration() + 惰性迁移回写 |
+| 历史格式兼容 | ✅ | 32 位 Base32 明文及旧版无前缀 AES 密文均可验证，成功后条件回写 |
+| 损坏密文拒绝 | ✅ | 当前/旧版密文认证失败均拒绝，不回退为明文 |
+| 生产密钥校验 | ✅ | ENCRYPTION_KEY 必须为 64 位 hex；缺失或非法均拒绝 |
+| 单元测试 | ✅ | 23 条定向测试（工具与迁移 17 + 真实 2FA 路由 6） |
+
+**测试统计：**
+- 单元测试：184 条通过（19 suites）
+- E2E：环境阻塞（缺少 Playwright Chromium，global setup 前停止，未执行）
+- tsc --noEmit：通过
+- build：通过
+
+### §9.55 API Key 权限细粒度校验、按 Key 独立限流、OpenAPI 补齐（2026-06-20）
+
+**P2-4 — API Key permissions enforcement + per-key rate limiting + OpenAPI /api/v1:**
+
+| 任务 | 状态 | 说明 |
+|------|------|------|
+| 权限映射审计 | ✅ | 对外仅允许 contacts/campaigns 的 read/write scope；未知或越权 scope 在创建和更新时返回 400 |
+| /api/v1/contacts 权限校验 | ✅ | GET 需 contacts:read 或 contacts:manage，POST/PUT/DELETE 需 contacts:write 或 contacts:manage |
+| /api/v1/contacts/[id] 权限校验 | ✅ | GET 用 canReadContacts()，PUT/DELETE 用 hasPermission('contacts:manage') |
+| 租户隔离 | ✅ | 联系人及 companyId 关联均使用 tenantWhere(tenantId)，跨租户返回空/404 |
+| API Key 管理保护 | ✅ | 列表/创建/更新/撤销均需 settings:manage；rateLimit、permissions、expiresAt、isActive 严格校验 |
+| 按 Key 独立限流 | ✅ | Redis key 为 ratelimit:apikey:{apiKeyId}，Lua 原子 INCR + EXPIRE，不记录明文 Key |
+| X-RateLimit 响应头 | ✅ | 成功响应包含 X-RateLimit-Limit/Remaining/Reset |
+| 429 响应格式 | ✅ | 包含 Retry-After 头、RATE_LIMIT_EXCEEDED code、retryAfter 字段 |
+| Redis 故障策略 | ✅ | API Key 限流 fail-closed 返回 503 + Retry-After，禁止多实例下可绕过的进程内降级 |
+| OpenAPI /api/v1/contacts | ✅ | 完整覆盖 GET/POST，含权限说明、分页、限流头、错误码 |
+| OpenAPI /api/v1/contacts/[id] | ✅ | 完整覆盖 GET/PUT/DELETE，含权限说明、限流头、错误码 |
+| 定向测试 | ✅ | 17 条真实鉴权/路由/限流测试：权限拒绝、租户查询、跨租户公司、无效/撤销/过期 Key、独立计数、429、Redis 故障 503 |
+
+**测试统计：**
+- 单元测试：201 条通过（22 suites；P2-4 定向测试 17 条）
+- E2E 稳定套件：34 passed，1 skipped（`npm run test:e2e:ci`）
+- tsc --noEmit：通过
+- build：通过

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission, tenantWhere } from '@/lib/auth-middleware'
 import { isProOrAbove, planUpgradeRequiredResponse } from '@/lib/plan-limits'
+import { areValidApiKeyPermissions } from '@/lib/api-key'
 
 /**
  * PATCH /api/api-keys/:id — Update an API key (name, permissions, rateLimit, isActive).
@@ -46,19 +47,22 @@ export async function PATCH(
       data.name = name.trim()
     }
     if (permissions !== undefined) {
-      if (!Array.isArray(permissions)) {
-        return NextResponse.json({ error: 'Permissions must be an array' }, { status: 400 })
+      if (!areValidApiKeyPermissions(permissions)) {
+        return NextResponse.json({ error: 'Invalid API key permissions' }, { status: 400 })
       }
       data.permissions = permissions
     }
     if (rateLimit !== undefined) {
-      if (typeof rateLimit !== 'number' || rateLimit <= 0) {
-        return NextResponse.json({ error: 'rateLimit must be a positive number' }, { status: 400 })
+      if (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 10000) {
+        return NextResponse.json({ error: 'rateLimit must be an integer between 1 and 10000' }, { status: 400 })
       }
       data.rateLimit = rateLimit
     }
     if (isActive !== undefined) {
-      data.isActive = Boolean(isActive)
+      if (typeof isActive !== 'boolean') {
+        return NextResponse.json({ error: 'isActive must be a boolean' }, { status: 400 })
+      }
+      data.isActive = isActive
     }
 
     const updated = await prisma.apiKey.update({

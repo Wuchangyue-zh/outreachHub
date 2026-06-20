@@ -37,6 +37,19 @@ components:
       name: x-api-key
       description: 'API Key (格式: oh_xxx)'
 
+  responses:
+    RateLimitUnavailable:
+      description: API Key 分布式限流服务暂不可用
+      headers:
+        Retry-After:
+          description: 建议重试等待秒数
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
   schemas:
     Error:
       type: object
@@ -211,7 +224,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [fullName]
+              anyOf:
+                - required: [fullName]
+                - required: [firstName]
               properties:
                 fullName:
                   type: string
@@ -456,7 +471,10 @@ paths:
 
   /api/v1/contacts:
     get:
-      summary: 获取联系人列表（公开 API）
+      summary: 获取联系人列表（公开 API v1）
+      description: |
+        需要 `contacts:read` 或 `contacts:manage` 权限。
+        所有查询自动过滤为当前租户数据，无法跨租户访问。
       tags: [公开 API v1]
       security:
         - bearerAuth: []
@@ -464,27 +482,113 @@ paths:
       parameters:
         - name: page
           in: query
+          description: 页码（从 1 开始）
           schema:
             type: integer
             default: 1
+            minimum: 1
         - name: limit
           in: query
+          description: 每页数量（最大 100）
           schema:
             type: integer
             default: 20
+            minimum: 1
+            maximum: 100
         - name: search
           in: query
+          description: 搜索姓名或邮箱
           schema:
             type: string
         - name: status
           in: query
           schema:
             type: string
+            enum: [NEW, CONTACTED, INTERESTED, NOT_INTERESTED, QUALIFIED, CONVERTED, UNREACHABLE]
       responses:
         '200':
           description: 成功
+          headers:
+            X-RateLimit-Limit:
+              description: 当前时间窗口最大请求数
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: 当前窗口剩余请求数
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: 窗口重置的 Unix 时间戳（秒）
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contact'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: 未认证或 API Key 无效/过期/已撤销
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 权限不足或缺少租户关联
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 请求频率超出限制
+          headers:
+            Retry-After:
+              description: 建议等待秒数
+              schema:
+                type: integer
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+              example: 0
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: RATE_LIMIT_EXCEEDED
+                      message:
+                        type: string
+                  retryAfter:
+                    type: integer
+        '503':
+          $ref: '#/components/responses/RateLimitUnavailable'
     post:
-      summary: 创建联系人（公开 API）
+      summary: 创建联系人（公开 API v1）
+      description: |
+        需要 `contacts:write` 或 `contacts:manage` 权限。
+        受套餐联系人数量限制。
       tags: [公开 API v1]
       security:
         - bearerAuth: []
@@ -495,19 +599,243 @@ paths:
           application/json:
             schema:
               type: object
-              required: [fullName]
+              anyOf:
+                - required: [fullName]
+                - required: [firstName]
               properties:
                 fullName:
+                  type: string
+                  description: 全名（与 firstName 二选一）
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                title:
+                  type: string
+                companyId:
                   type: string
                 emails:
                   type: array
                   items:
                     type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                notes:
+                  type: string
       responses:
         '201':
           description: 创建成功
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Contact'
+        '400':
+          description: 参数校验失败
+        '401':
+          description: 未认证或 API Key 无效
         '403':
           description: 权限不足或限额已满
+        '429':
+          description: 请求频率超出限制
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+        '503':
+          $ref: '#/components/responses/RateLimitUnavailable'
+
+  /api/v1/contacts/{id}:
+    get:
+      summary: 获取联系人详情（公开 API v1）
+      description: |
+        需要 `contacts:read` 或 `contacts:manage` 权限。
+        自动过滤为当前租户数据，无法访问其他租户联系人。
+      tags: [公开 API v1]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Contact'
+        '401':
+          description: 未认证或 API Key 无效
+        '403':
+          description: 权限不足
+        '404':
+          description: 联系人不存在（或不属于当前租户）
+        '429':
+          description: 请求频率超出限制
+        '503':
+          $ref: '#/components/responses/RateLimitUnavailable'
+    put:
+      summary: 更新联系人（公开 API v1）
+      description: |
+        需要 `contacts:write` 或 `contacts:manage` 权限。
+        自动过滤为当前租户数据。
+      tags: [公开 API v1]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                title:
+                  type: string
+                companyId:
+                  type: string
+                emails:
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                notes:
+                  type: string
+                status:
+                  type: string
+                  enum: [NEW, CONTACTED, INTERESTED, NOT_INTERESTED, QUALIFIED, CONVERTED, UNREACHABLE]
+      responses:
+        '200':
+          description: 更新成功
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Contact'
+        '401':
+          description: 未认证或 API Key 无效
+        '403':
+          description: 权限不足
+        '404':
+          description: 联系人不存在
+        '429':
+          description: 请求频率超出限制
+        '503':
+          $ref: '#/components/responses/RateLimitUnavailable'
+    delete:
+      summary: 删除联系人（公开 API v1）
+      description: |
+        需要 `contacts:write` 或 `contacts:manage` 权限。
+        级联删除关联的邮箱、邮件日志和活动联系人记录。
+      tags: [公开 API v1]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+        '401':
+          description: 未认证或 API Key 无效
+        '403':
+          description: 权限不足
+        '404':
+          description: 联系人不存在
+        '429':
+          description: 请求频率超出限制
+        '503':
+          $ref: '#/components/responses/RateLimitUnavailable'
 
   /api/api-keys:
     get:

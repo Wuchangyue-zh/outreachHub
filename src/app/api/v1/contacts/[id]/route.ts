@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveAuth, hasPermission, tenantWhere, canReadContacts } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { rateLimit, checkApiKeyRateLimit } from '@/lib/rate-limit'
+import { rateLimit, consumeApiKeyRateLimit, type RateLimitHeaders } from '@/lib/rate-limit'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
 type RouteContext = { params: Promise<{ id: string }> }
+
+async function enforceRateLimit(req: NextRequest, apiKeyId: string | undefined, limit: number) {
+  if (apiKeyId) return consumeApiKeyRateLimit(apiKeyId, limit)
+  const response = await limiter.check(req, limit)
+  return { response, headers: undefined as RateLimitHeaders | undefined }
+}
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
   const auth = await resolveAuth(req)
@@ -14,11 +20,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '需要租户关联', 403)
   if (!canReadContacts(auth)) return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
 
-  // Per-key rate limit for API key auth, global for JWT
-  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
-    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
-    : await limiter.check(req, 30)
-  if (keyLimit) return keyLimit
+  const rateLimit = await enforceRateLimit(req, auth.apiKeyId, auth.apiKeyId ? (auth.apiKeyRateLimit || 100) : 30)
+  if (rateLimit.response) return rateLimit.response
 
   try {
     const { id } = await ctx.params
@@ -31,7 +34,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       return errorResponse(ErrorCodes.NOT_FOUND, '联系人不存在', 404)
     }
 
-    return NextResponse.json({ success: true, data: contact })
+    return NextResponse.json({ success: true, data: contact }, { headers: rateLimit.headers })
   } catch (error) {
     return handleApiError(error)
   }
@@ -45,11 +48,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
   }
 
-  // Per-key rate limit for API key auth, global for JWT
-  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
-    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
-    : await limiter.check(req, 10)
-  if (keyLimit) return keyLimit
+  const rateLimit = await enforceRateLimit(req, auth.apiKeyId, auth.apiKeyId ? (auth.apiKeyRateLimit || 100) : 10)
+  if (rateLimit.response) return rateLimit.response
 
   try {
     const { id } = await ctx.params
@@ -64,7 +64,15 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     const body = await req.json()
     const { fullName, firstName, lastName, title, companyId, emails, tags, notes, status } = body
 
-    const contact = await prisma.contact.update({
+    if (companyId) {
+      const company = await prisma.company.findFirst({
+        where: { id: companyId, ...tenantWhere(auth.tenantId) },
+        select: { id: true },
+      })
+      if (!company) return errorResponse(ErrorCodes.NOT_FOUND, '公司不存在', 404)
+    }
+
+    await prisma.contact.update({
       where: { id, tenantId: auth.tenantId },
       data: {
         fullName: fullName || (firstName || lastName ? `${firstName || ''} ${lastName || ''}`.trim() : undefined),
@@ -98,7 +106,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
       include: { emails: true, company: { select: { id: true, name: true } } },
     })
 
-    return NextResponse.json({ success: true, data: fullContact })
+    return NextResponse.json({ success: true, data: fullContact }, { headers: rateLimit.headers })
   } catch (error) {
     return handleApiError(error)
   }
@@ -112,11 +120,8 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     return errorResponse(ErrorCodes.FORBIDDEN, '权限不足', 403)
   }
 
-  // Per-key rate limit for API key auth, global for JWT
-  const keyLimit = auth.apiKeyId && auth.apiKeyRateLimit
-    ? await checkApiKeyRateLimit(req, auth.apiKeyId, auth.apiKeyRateLimit)
-    : await limiter.check(req, 10)
-  if (keyLimit) return keyLimit
+  const rateLimit = await enforceRateLimit(req, auth.apiKeyId, auth.apiKeyId ? (auth.apiKeyRateLimit || 100) : 10)
+  if (rateLimit.response) return rateLimit.response
 
   try {
     const { id } = await ctx.params
@@ -134,7 +139,7 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
     await prisma.campaignContact.deleteMany({ where: { contact: { id, tenantId: auth.tenantId } } })
     await prisma.contact.delete({ where: { id, tenantId: auth.tenantId } })
 
-    return NextResponse.json({ success: true, data: { deleted: true } })
+    return NextResponse.json({ success: true, data: { deleted: true } }, { headers: rateLimit.headers })
   } catch (error) {
     return handleApiError(error)
   }

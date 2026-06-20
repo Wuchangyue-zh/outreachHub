@@ -42,6 +42,16 @@ export function validateEnv(): void {
     )
   }
 
+  if (
+    isProduction &&
+    process.env.ENCRYPTION_KEY &&
+    !/^[0-9a-fA-F]{64}$/.test(process.env.ENCRYPTION_KEY)
+  ) {
+    throw new Error(
+      '[Env] ENCRYPTION_KEY must be a 64-character hex string in production'
+    )
+  }
+
   for (const key of warnings) {
     console.warn(`[Env] Recommended variable not set: ${key}`)
   }

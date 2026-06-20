@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken } from '@/lib/auth-middleware'
 import { generateTOTPSecret } from '@/lib/two-factor'
-import { encrypt } from '@/lib/encryption'
+import { encryptTotpSecret } from '@/lib/totp-secret'
 import { successResponse, errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -34,14 +34,25 @@ export async function POST(req: NextRequest) {
 
     const { secret, otpauthUrl } = generateTOTPSecret(user.email)
 
-    // Encrypt the TOTP secret before storing (AES-256-GCM)
-    const encryptedSecret = encrypt(secret)
+    // P2-3: Encrypt with versioned prefix enc:v1:
+    const encryptedSecret = encryptTotpSecret(secret)
 
-    // Store the encrypted secret temporarily (not yet enabled)
-    await prisma.user.update({
-      where: { id: user.id },
+    // Store only if no concurrent request changed the 2FA setup state.
+    const stored = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        twoFactorEnabled: false,
+        twoFactorSecret: user.twoFactorSecret,
+      },
       data: { twoFactorSecret: encryptedSecret },
     })
+    if (stored.count !== 1) {
+      return errorResponse(
+        ErrorCodes.CONFLICT,
+        '两步验证状态已变化，请重新操作',
+        409
+      )
+    }
 
     return successResponse({
       secret,

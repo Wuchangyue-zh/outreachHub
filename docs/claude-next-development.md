@@ -37,8 +37,8 @@
 
 1. ~~公海客户 N 天未跟进自动回收~~ ✅ §9.52，业务逻辑放 `src/lib/cron-jobs/recycle-pool.ts`，Cron route 只入队。
 2. ~~Stripe `customer.subscription.updated` 的 `past_due`、`unpaid`、恢复支付状态处理及 webhook 幂等测试。~~ ✅ §9.53
-3. TOTP secret 使用现有 AES-256-GCM 加密层存储，并兼容历史明文迁移。
-4. API Key permissions 服务端细粒度 enforcement、按 Key 独立限流、OpenAPI 补齐 `/api/v1`。
+3. ~~TOTP secret 使用现有 AES-256-GCM 加密层存储，并兼容历史明文迁移。~~ ✅ §9.54
+4. ~~API Key permissions 服务端细粒度 enforcement、按 Key 独立限流、OpenAPI 补齐 `/api/v1`。~~ ✅ §9.55
 5. SMTP 连接池先做压测与连接生命周期设计，再决定是否启用；不得跨 Serverless 请求保存进程级 transporter。
 
 ## P3：外部依赖任务

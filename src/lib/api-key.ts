@@ -5,6 +5,21 @@ import type { AuthResult } from './auth-middleware'
 const KEY_PREFIX = 'oh_'
 const KEY_LENGTH = 32 // bytes -> 64 hex chars
 
+export const ALLOWED_API_KEY_PERMISSIONS = [
+  'contacts:read',
+  'contacts:write',
+  'campaigns:read',
+  'campaigns:write',
+] as const
+
+export function areValidApiKeyPermissions(value: unknown): value is string[] {
+  return Array.isArray(value)
+    && value.every(permission => (
+      typeof permission === 'string'
+      && (ALLOWED_API_KEY_PERMISSIONS as readonly string[]).includes(permission)
+    ))
+}
+
 /**
  * Maps API key granular permission strings to backend role-equivalent permissions.
  * e.g. 'contacts:read' and 'contacts:write' both map to 'contacts:manage'

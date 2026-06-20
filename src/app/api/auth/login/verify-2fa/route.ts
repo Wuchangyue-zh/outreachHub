@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verify2FAToken, generateToken } from '@/lib/jwt'
 import { verifyTOTP, verifyBackupCode } from '@/lib/two-factor'
-import { safeDecrypt } from '@/lib/encryption'
+import { decryptTotpSecretWithMigration, migrateTotpSecret } from '@/lib/totp-secret'
 import { writeAuditLog } from '@/lib/audit'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
@@ -50,9 +50,20 @@ export async function POST(req: NextRequest) {
     let matchedBackupIndex = -1
 
     if (code) {
-      // TOTP verification — decrypt stored secret (may be encrypted or legacy plaintext)
-      const decryptedSecret = safeDecrypt(user.twoFactorSecret)
+      // P2-3: Unified decrypt with legacy plaintext migration
+      const { secret: decryptedSecret, needsMigration } = decryptTotpSecretWithMigration(user.twoFactorSecret)
       verified = verifyTOTP(code.trim(), decryptedSecret)
+      if (verified && needsMigration) {
+        try {
+          await migrateTotpSecret(
+            user.id,
+            user.twoFactorSecret,
+            decryptedSecret
+          )
+        } catch {
+          // Migration failure must not block an otherwise valid login.
+        }
+      }
     } else if (backupCode && user.twoFactorBackupCodes) {
       // Backup code verification
       const hashedCodes: string[] = JSON.parse(user.twoFactorBackupCodes)

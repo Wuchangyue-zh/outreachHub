@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission, tenantWhere } from '@/lib/auth-middleware'
-import { generateApiKey } from '@/lib/api-key'
+import { areValidApiKeyPermissions, generateApiKey } from '@/lib/api-key'
 import { isProOrAbove, planUpgradeRequiredResponse } from '@/lib/plan-limits'
 
 /**
@@ -13,6 +13,10 @@ export async function GET(req: NextRequest) {
   const auth = await verifyAuthToken(req)
   if (!auth.success) {
     return NextResponse.json({ error: auth.error }, { status: 401 })
+  }
+
+  if (!hasPermission(auth.role, 'settings:manage')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   if (!auth.tenantId || !(await isProOrAbove(auth.tenantId))) {
@@ -73,6 +77,17 @@ export async function POST(req: NextRequest) {
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
+    if (permissions !== undefined && !areValidApiKeyPermissions(permissions)) {
+      return NextResponse.json({ error: 'Invalid API key permissions' }, { status: 400 })
+    }
+    if (rateLimit !== undefined && (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 10000)) {
+      return NextResponse.json({ error: 'rateLimit must be an integer between 1 and 10000' }, { status: 400 })
+    }
+
+    const expiry = expiresAt ? new Date(expiresAt) : null
+    if (expiry && (Number.isNaN(expiry.getTime()) || expiry <= new Date())) {
+      return NextResponse.json({ error: 'expiresAt must be a future date' }, { status: 400 })
+    }
 
     const { raw, hash, prefix } = generateApiKey()
 
@@ -83,9 +98,9 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         keyPrefix: prefix,
         keyHash: hash,
-        permissions: Array.isArray(permissions) ? permissions : [],
-        rateLimit: typeof rateLimit === 'number' && rateLimit > 0 ? rateLimit : 100,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        permissions: permissions || [],
+        rateLimit: rateLimit || 100,
+        expiresAt: expiry,
       },
       select: {
         id: true,
