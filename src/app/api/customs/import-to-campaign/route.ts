@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, tenantWhere, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { getCustomsProvider } from '@/lib/data-providers/customs'
+import { checkTrialStatus, trialExpiredResponse } from '@/lib/trial-guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,10 @@ export async function POST(req: NextRequest) {
     if (!hasPermission(auth.role, 'contacts:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
     }
+
+    // R2b: 试用期过期限制海关导入能力
+    const trial = await checkTrialStatus(auth.tenantId)
+    if (!trial.allowed) return trialExpiredResponse()
 
     const body = await req.json()
     const { buyerIds, campaignId } = body as { buyerIds: string[]; campaignId?: string }

@@ -9,6 +9,7 @@ import { ApolloProvider } from '@/lib/data-providers/apollo'
 import { dedupContacts } from '@/lib/contact-dedup'
 import type { SearchPeopleInput } from '@/lib/data-providers/types'
 import { rateLimit } from '@/lib/rate-limit'
+import { checkTrialStatus, trialExpiredResponse } from '@/lib/trial-guard'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -26,6 +27,13 @@ export async function POST(req: NextRequest) {
     const mutateTypes = ['create-prospecting-task', 'import-companies', 'import-contacts']
     if (mutateTypes.includes(type) && !hasPermission(auth.role, 'contacts:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要客户管理权限', 403)
+    }
+
+    // R2b: 试用期过期限制拓客能力（多源搜索 / 导入 / 创建任务）
+    const trialGuardedTypes = ['search-people-multi', 'import-companies', 'import-contacts', 'create-prospecting-task']
+    if (trialGuardedTypes.includes(type)) {
+      const trial = await checkTrialStatus(auth.tenantId)
+      if (!trial.allowed) return trialExpiredResponse()
     }
 
     if (type === 'search-companies') {

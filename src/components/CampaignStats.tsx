@@ -7,7 +7,9 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts'
-import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe, MapPin } from 'lucide-react'
+import { TrendingUp, Mail, Eye, MousePointer, Reply, Globe, MapPin, LayoutGrid, BarChart3 } from 'lucide-react'
+import { GeoMap } from '@/components/dashboard/geo-map'
+import { cn } from '@/lib/utils'
 
 interface CampaignStatsProps {
   campaignId?: string
@@ -61,6 +63,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
   const [geoStats, setGeoStats] = useState<GeoStats[]>([])
   const [cityStats, setCityStats] = useState<CityStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [geoView, setGeoView] = useState<'bar' | 'map'>('bar')
 
   useEffect(() => {
     fetchStats()
@@ -233,31 +236,59 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
         </Card>
       )}
 
-      {/* K2: 打开地理分布 */}
+      {/* Q2b: 打开地理分布 — 柱状图 / 地图视图可切换 */}
       {geoStats.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5" />
               Opens by Country
             </CardTitle>
+            <div className="flex items-center rounded-md border border-gray-200 p-0.5">
+              <button
+                type="button"
+                onClick={() => setGeoView('bar')}
+                title="Bar chart"
+                className={cn(
+                  'rounded px-2 py-1 text-xs',
+                  geoView === 'bar' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setGeoView('map')}
+                title="Map view"
+                className={cn(
+                  'rounded px-2 py-1 text-xs',
+                  geoView === 'map' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, geoStats.length * 32)}>
-              <BarChart data={geoStats} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="country" width={72} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value) => [value, 'Opens']}
-                  labelFormatter={(_, payload) => {
-                    const item = payload?.[0]?.payload as GeoStats | undefined
-                    return item?.code ? `${item.country} (${item.code})` : item?.country
-                  }}
-                />
-                <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {geoView === 'bar' ? (
+              <ResponsiveContainer width="100%" height={Math.max(200, geoStats.length * 32)}>
+                <BarChart data={geoStats} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="country" width={72} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value) => [value, 'Opens']}
+                    labelFormatter={(_, payload) => {
+                      const item = payload?.[0]?.payload as GeoStats | undefined
+                      return item?.code ? `${item.country} (${item.code})` : item?.country
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#3b82f6" name="Opens" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <GeoMap data={geoStats} />
+            )}
           </CardContent>
         </Card>
       )}

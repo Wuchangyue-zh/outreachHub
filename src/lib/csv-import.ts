@@ -9,11 +9,19 @@ export interface ColumnMapping {
   [csvColumn: string]: string // Maps CSV column to database field
 }
 
+export interface ImportedEmail {
+  contactId: string
+  contactEmailId: string
+  address: string
+}
+
 export interface ImportResult {
   total: number
   success: number
   failed: number
   errors: Array<{ row: number; error: string }>
+  // M3d: 本次成功导入的邮箱列表（用于自动验证）
+  importedEmails: ImportedEmail[]
 }
 
 export interface ParseResult {
@@ -106,6 +114,7 @@ export async function importContacts(
     success: 0,
     failed: 0,
     errors: [],
+    importedEmails: [],
   }
 
   for (let i = 0; i < rows.length; i++) {
@@ -124,13 +133,17 @@ export async function importContacts(
       // Map row to contact data
       const contactData = mapRowToContact(row, mapping)
 
+      // 邮箱通过 ContactEmail 关联表存储，不能作为 Contact 标量写入
+      const emailAddress = (contactData.email || '').trim()
+      delete contactData.email
+
       // Check if contact already exists (by email address)
       const existingContact = await prisma.contact.findFirst({
         where: {
           tenantId,
           emails: {
             some: {
-              address: contactData.email || '',
+              address: emailAddress,
             },
           },
         },
@@ -140,7 +153,7 @@ export async function importContacts(
       })
 
       if (existingContact) {
-        // Update existing contact
+        // Update existing contact（不覆盖已有的联系方式标量之外字段）
         await prisma.contact.update({
           where: { id: existingContact.id },
           data: {
@@ -148,17 +161,36 @@ export async function importContacts(
             updatedAt: new Date(),
           },
         })
+        // 确保该邮箱在 ContactEmail 表中存在
+        let ce = existingContact.emails.find(
+          (e) => e.address.toLowerCase() === emailAddress.toLowerCase()
+        )
+        if (!ce) {
+          ce = await prisma.contactEmail.create({
+            data: { contactId: existingContact.id, address: emailAddress, isPrimary: existingContact.emails.length === 0 },
+          })
+        }
+        result.importedEmails.push({ contactId: existingContact.id, contactEmailId: ce.id, address: ce.address })
       } else {
-        // Create new contact
-        await prisma.contact.create({
+        // Create new contact，同时写入 ContactEmail 关联
+        const primaryEmail = emailAddress
+          ? { address: emailAddress, isPrimary: true }
+          : null
+        const created = await prisma.contact.create({
           data: {
             ...contactData,
             tenantId,
             status: 'NEW',
             createdAt: new Date(),
             updatedAt: new Date(),
+            emails: primaryEmail ? { create: [primaryEmail] } : undefined,
           },
+          include: { emails: true },
         })
+        const ce = created.emails[0]
+        if (ce) {
+          result.importedEmails.push({ contactId: created.id, contactEmailId: ce.id, address: ce.address })
+        }
       }
 
       result.success++

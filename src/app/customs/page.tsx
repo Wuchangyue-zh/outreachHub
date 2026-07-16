@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,10 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/hooks/use-i18n'
+import { toast } from 'sonner'
+
+// §9.61: 使用 useSearchParams 预填搜索条件，需强制动态渲染
+export const dynamic = 'force-dynamic'
 
 interface SupplierSummary {
   name: string
@@ -128,7 +133,7 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
   )
 }
 
-export default function CustomsPage() {
+function CustomsContent() {
   const { t } = useI18n()
   const [searchResults, setSearchResults] = useState<CustomsBuyer[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -147,6 +152,34 @@ export default function CustomsPage() {
   const [sortField, setSortField] = useState<'purchaseIntentScore' | 'totalShipments' | 'totalAmountUsd' | 'lastShipmentDate'>('purchaseIntentScore')
   const [sortAsc, setSortAsc] = useState(false)
   const [provider, setProvider] = useState('')
+  const searchParams = useSearchParams()
+
+  // §9.61: 从快速开始向导带回 ICP 参数预填搜索条件
+  useEffect(() => {
+    const keyword = searchParams.get('keyword')
+    const country = searchParams.get('country')
+    const hsCode = searchParams.get('hsCode')
+    if (keyword || country || hsCode) {
+      setFormData((prev) => ({
+        ...prev,
+        keyword: keyword || prev.keyword,
+        country: country || prev.country,
+        hsCode: hsCode || prev.hsCode,
+      }))
+    }
+  }, [searchParams])
+
+  // R2b: 试用期过期 → toast 引导升级 + 跳转 /pricing
+  const handleTrialExpired = (data: { error?: { code?: string; message?: string } }) => {
+    if (data.error?.code === 'TRIAL_EXPIRED') {
+      toast.error(data.error.message || t('customs.trialExpired'), {
+        action: { label: t('customs.viewPlans'), onClick: () => { window.location.href = '/pricing' } },
+        duration: 8000,
+      })
+      return true
+    }
+    return false
+  }
 
   const handleSearch = async () => {
     if (!formData.hsCode && !formData.country && !formData.keyword) {
@@ -177,7 +210,7 @@ export default function CustomsPage() {
             : t('customs.noBuyersFound')
         )
       } else {
-        setMessage(data.error?.message || data.message || t('customs.searchFailed'))
+        if (!handleTrialExpired(data)) setMessage(data.error?.message || data.message || t('customs.searchFailed'))
       }
     } catch {
       setMessage(t('customs.searchRequestFailed'))
@@ -245,7 +278,7 @@ export default function CustomsPage() {
         )
         setSelectedIds(new Set())
       } else {
-        setMessage(data.error?.message || t('customs.importFailed'))
+        if (!handleTrialExpired(data)) setMessage(data.error?.message || t('customs.importFailed'))
       }
     } catch {
       setMessage(t('customs.importRequestFailed'))
@@ -613,5 +646,14 @@ export default function CustomsPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+// §9.61: useSearchParams 需在 Suspense 内消费，避免静态预渲染报错
+export default function CustomsPage() {
+  return (
+    <Suspense fallback={<div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+      <CustomsContent />
+    </Suspense>
   )
 }

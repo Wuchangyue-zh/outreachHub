@@ -61,6 +61,8 @@ export async function GET(req: NextRequest) {
           trialStartedAt: tenant.trialStartedAt,
           trialEndsAt: tenant.trialEndsAt,
           language: ((tenant.settings as Record<string, unknown>)?.language as string) || 'zh',
+          // M3d: CSV 导入后自动验证邮箱开关
+          autoVerifyOnImport: ((tenant.settings as Record<string, unknown>)?.autoVerifyOnImport) === true,
         },
         limits,
         usage: {
@@ -92,7 +94,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { language } = body
+    const { language, autoVerifyOnImport } = body
 
     const updateData: Record<string, unknown> = {}
 
@@ -101,18 +103,28 @@ export async function PATCH(req: NextRequest) {
       return errorResponse(ErrorCodes.FORBIDDEN, '套餐变更请通过订阅结账或 Stripe 客户门户完成', 403)
     }
 
-    // K6: 语言设置（写入 tenant.settings.language）
-    if (language !== undefined) {
-      const validLangs = LANGUAGES.map((l) => l.code)
-      if (!validLangs.includes(language)) {
-        return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效语言，可选：${validLangs.join(', ')}`, 400)
+    const settingsDirty = language !== undefined || autoVerifyOnImport !== undefined
+
+    // K6: 语言设置 + M3d: 导入自动验证开关（写入 tenant.settings）
+    if (settingsDirty) {
+      if (language !== undefined) {
+        const validLangs = LANGUAGES.map((l) => l.code)
+        if (!validLangs.includes(language)) {
+          return errorResponse(ErrorCodes.VALIDATION_ERROR, `无效语言，可选：${validLangs.join(', ')}`, 400)
+        }
+      }
+      if (autoVerifyOnImport !== undefined && typeof autoVerifyOnImport !== 'boolean') {
+        return errorResponse(ErrorCodes.VALIDATION_ERROR, 'autoVerifyOnImport 必须为布尔值', 400)
       }
       const tenant = await prisma.tenant.findUnique({
         where: { id: auth.tenantId },
         select: { settings: true },
       })
-      const currentSettings = (tenant?.settings as Record<string, unknown>) || {}
-      updateData.settings = { ...currentSettings, language }
+      const currentSettings = ((tenant?.settings as Record<string, unknown>) || {})
+      const nextSettings: Record<string, unknown> = { ...currentSettings }
+      if (language !== undefined) nextSettings.language = language
+      if (autoVerifyOnImport !== undefined) nextSettings.autoVerifyOnImport = autoVerifyOnImport
+      updateData.settings = nextSettings
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -133,13 +145,16 @@ export async function PATCH(req: NextRequest) {
       }),
     ])
 
-    const savedLanguage = ((updatedTenant?.settings as Record<string, unknown>)?.language as string) || 'zh'
+    const savedSettings = (updatedTenant?.settings as Record<string, unknown>) || {}
+    const savedLanguage = (savedSettings.language as string) || 'zh'
+    const savedAutoVerify = savedSettings.autoVerifyOnImport === true
 
     return NextResponse.json({
       success: true,
       data: {
         plan: updatedTenant?.plan,
         language: language !== undefined ? savedLanguage : undefined,
+        autoVerifyOnImport: autoVerifyOnImport !== undefined ? savedAutoVerify : undefined,
         limits,
         usage,
       },

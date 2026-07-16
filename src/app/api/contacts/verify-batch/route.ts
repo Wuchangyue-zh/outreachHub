@@ -58,12 +58,14 @@ export async function POST(req: NextRequest) {
     for (const result of results) {
       const match = emailsToVerify.find((e) => e.email.toLowerCase().trim() === result.email && e.contactEmailId)
       if (match?.contactEmailId) {
+        const valid = result.status === 'valid'
         updates.push(
           prisma.contactEmail.update({
             where: { id: match.contactEmailId },
             data: {
-              isVerified: result.status === 'valid',
-              verifiedAt: result.status === 'valid' ? new Date() : null,
+              isVerified: valid,
+              verifyStatus: result.status,
+              verifiedAt: valid ? new Date() : null,
             },
           }).catch(() => {})
         )

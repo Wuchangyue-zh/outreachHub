@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/hooks/use-i18n'
 import DashboardLayout from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Search, Building, Globe, Users, Send, Loader2, Download, UserPlus, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+// §9.61: 使用 useSearchParams 预填搜索条件，需强制动态渲染
+export const dynamic = 'force-dynamic'
 
 type Tab = 'search' | 'task' | 'tasks'
 
@@ -43,7 +48,7 @@ interface DataSourceStatus {
   configured: boolean
 }
 
-export default function ProspectingPage() {
+function ProspectingContent() {
   const { t } = useI18n()
   const [tab, setTab] = useState<Tab>('search')
   const [searching, setSearching] = useState(false)
@@ -69,6 +74,22 @@ export default function ProspectingPage() {
   })
   const [peopleSources, setPeopleSources] = useState({ rocketreach: true, apollo: true })
   const [dataSources, setDataSources] = useState<DataSourceStatus[]>([])
+  const searchParams = useSearchParams()
+
+  // §9.61: 从快速开始向导带回 ICP 参数预填搜索条件
+  useEffect(() => {
+    const keyword = searchParams.get('keyword')
+    const country = searchParams.get('country')
+    const industry = searchParams.get('industry')
+    if (keyword || country || industry) {
+      setFormData((prev) => ({
+        ...prev,
+        keywords: keyword || prev.keywords,
+        locations: country || prev.locations,
+        industries: industry || prev.industries,
+      }))
+    }
+  }, [searchParams])
 
   useEffect(() => {
     fetch('/api/settings/data-sources')
@@ -98,6 +119,18 @@ export default function ProspectingPage() {
 
   const apiErrorMessage = (data: { error?: { message?: string }; message?: string }, fallback: string) =>
     data.error?.message || data.message || fallback
+
+  // R2b: 试用期过期 → toast 引导升级 + 跳转 /pricing
+  const handleTrialExpired = (data: { error?: { code?: string; message?: string } }) => {
+    if (data.error?.code === 'TRIAL_EXPIRED') {
+      toast.error(data.error.message || t('prospecting.trialExpired'), {
+        action: { label: t('prospecting.viewPlans'), onClick: () => { window.location.href = '/pricing' } },
+        duration: 8000,
+      })
+      return true
+    }
+    return false
+  }
 
   // 任务列表 tab：定时刷新进度
   useEffect(() => {
@@ -196,7 +229,7 @@ export default function ProspectingPage() {
               : '未找到结果，请调整搜索条件或配置数据源 API Key'
           )
         } else {
-          setMessage(apiErrorMessage(data, '搜索失败'))
+          if (!handleTrialExpired(data)) setMessage(apiErrorMessage(data, '搜索失败'))
         }
       }
     } catch {
@@ -235,7 +268,7 @@ export default function ProspectingPage() {
         setMessage(`公司导入完成：成功 ${data.data.imported}，跳过/失败 ${data.data.failed}`)
         setSelectedCompanyIds(new Set())
       } else {
-        setMessage(data.message || '导入失败')
+        if (!handleTrialExpired(data)) setMessage(data.message || '导入失败')
       }
     } catch {
       setMessage('导入请求失败')
@@ -281,7 +314,7 @@ export default function ProspectingPage() {
         setMessage(`联系人导入完成：成功 ${data.data.imported}，跳过/失败 ${data.data.failed}`)
         setSelectedPersonIds(new Set())
       } else {
-        setMessage(data.message || '导入失败')
+        if (!handleTrialExpired(data)) setMessage(data.message || '导入失败')
       }
     } catch {
       setMessage('导入请求失败')
@@ -315,7 +348,7 @@ export default function ProspectingPage() {
         setMessage('拓客任务已创建，等待后台执行（本地可 curl process-prospecting cron）')
         handleTabChange('tasks')
       } else {
-        setMessage(apiErrorMessage(data, '创建任务失败'))
+        if (!handleTrialExpired(data)) setMessage(apiErrorMessage(data, '创建任务失败'))
       }
     } catch {
       setMessage('创建任务失败')
@@ -813,5 +846,14 @@ export default function ProspectingPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+// §9.61: useSearchParams 需在 Suspense 内消费，避免静态预渲染报错
+export default function ProspectingPage() {
+  return (
+    <Suspense fallback={<div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+      <ProspectingContent />
+    </Suspense>
   )
 }

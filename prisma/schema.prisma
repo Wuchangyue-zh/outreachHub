@@ -281,6 +281,8 @@ model ContactEmail {
   address     String
   type        EmailType @default(PROFESSIONAL)  // professional, personal
   isVerified  Boolean  @default(false)
+  // M3d: 验证流水线状态 (valid/invalid/catch-all/unknown/disposable/format-error/no-mx)
+  verifyStatus String?
   verifiedAt  DateTime?
   isPrimary   Boolean  @default(false)
   bounceCount Int      @default(0)

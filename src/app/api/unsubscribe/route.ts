@@ -137,79 +137,79 @@ const i18n: Record<Lang, Record<string, string>> = {
     pageTitle: '구독 취소',
   },
   pt: {
-    successTitle: 'Unsubscribed',
-    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
-    errorTitle: 'Unsubscribe Failed',
-    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
-    infoTitle: 'Already Unsubscribed',
-    infoDesc: 'Your unsubscribe status has already been recorded.',
-    invalidLink: 'Invalid unsubscribe link',
-    notFound: 'Contact not found',
-    alreadyUnsub: 'You have already unsubscribed',
-    processError: 'An error occurred while processing your request',
-    footer: 'Processed by email marketing system',
-    footerContact: 'If you have questions, please contact the sender',
-    pageTitle: 'Unsubscribe',
+    successTitle: 'Cancelado com sucesso',
+    successDesc: 'A sua subscrição foi cancelada com sucesso. Deixaremos de lhe enviar e-mails de marketing. Se mudar de ideia, por favor contacte o remetente para voltar a subscrever.',
+    errorTitle: 'Falha ao cancelar',
+    errorDesc: 'Ocorreu um problema ao processar o seu pedido de cancelamento. Por favor contacte diretamente o remetente.',
+    infoTitle: 'Já cancelado',
+    infoDesc: 'O seu estado de cancelamento já foi registado.',
+    invalidLink: 'Ligação de cancelamento inválida',
+    notFound: 'Contacto não encontrado',
+    alreadyUnsub: 'Já cancelou a sua subscrição',
+    processError: 'Ocorreu um erro ao processar o seu pedido',
+    footer: 'Processado pelo sistema de marketing por e-mail',
+    footerContact: 'Se tiver questões, por favor contacte o remetente',
+    pageTitle: 'Cancelar subscrição',
   },
   ru: {
-    successTitle: 'Unsubscribed',
-    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
-    errorTitle: 'Unsubscribe Failed',
-    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
-    infoTitle: 'Already Unsubscribed',
-    infoDesc: 'Your unsubscribe status has already been recorded.',
-    invalidLink: 'Invalid unsubscribe link',
-    notFound: 'Contact not found',
-    alreadyUnsub: 'You have already unsubscribed',
-    processError: 'An error occurred while processing your request',
-    footer: 'Processed by email marketing system',
-    footerContact: 'If you have questions, please contact the sender',
-    pageTitle: 'Unsubscribe',
+    successTitle: 'Отмена подписки выполнена',
+    successDesc: 'Вы успешно отписались от рассылки. Мы больше не будем отправлять вам маркетинговые письма. Если вы передумаете, пожалуйста, свяжитесь с отправителем, чтобы подписаться снова.',
+    errorTitle: 'Не удалось отписаться',
+    errorDesc: 'При обработке вашего запроса на отмену подписки возникла проблема. Пожалуйста, свяжитесь с отправителем напрямую.',
+    infoTitle: 'Уже отписаны',
+    infoDesc: 'Ваш статус отмены подписки уже зарегистрирован.',
+    invalidLink: 'Недействительная ссылка для отмены подписки',
+    notFound: 'Контакт не найден',
+    alreadyUnsub: 'Вы уже отписались от рассылки',
+    processError: 'При обработке вашего запроса произошла ошибка',
+    footer: 'Обработано системой email-маркетинга',
+    footerContact: 'Если у вас есть вопросы, пожалуйста, свяжитесь с отправителем',
+    pageTitle: 'Отмена подписки',
   },
   ar: {
-    successTitle: 'Unsubscribed',
-    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
-    errorTitle: 'Unsubscribe Failed',
-    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
-    infoTitle: 'Already Unsubscribed',
-    infoDesc: 'Your unsubscribe status has already been recorded.',
-    invalidLink: 'Invalid unsubscribe link',
-    notFound: 'Contact not found',
-    alreadyUnsub: 'You have already unsubscribed',
-    processError: 'An error occurred while processing your request',
-    footer: 'Processed by email marketing system',
-    footerContact: 'If you have questions, please contact the sender',
-    pageTitle: 'Unsubscribe',
+    successTitle: 'تم إلغاء الاشتراك بنجاح',
+    successDesc: 'تم إلغاء اشتراكك بنجاح. لن نرسل لك رسائل البريد الإلكتروني التسويقية بعد الآن. إذا غيّرت رأيك، يرجى الاتصال بالمرسل لإعادة الاشتراك.',
+    errorTitle: 'فشل إلغاء الاشتراك',
+    errorDesc: 'حدثت مشكلة أثناء معالجة طلب إلغاء الاشتراك. يرجى الاتصال بالمرسل مباشرةً.',
+    infoTitle: 'تم إلغاء الاشتراك مسبقاً',
+    infoDesc: 'تم تسجيل حالة إلغاء الاشتراك الخاصة بك بالفعل.',
+    invalidLink: 'رابط إلغاء اشتراك غير صالح',
+    notFound: 'لم يتم العثور على جهة الاتصال',
+    alreadyUnsub: 'لقد ألغيت اشتراكك بالفعل',
+    processError: 'حدث خطأ أثناء معالجة طلبك',
+    footer: 'تتم المعالجة بواسطة نظام التسويق عبر البريد الإلكتروني',
+    footerContact: 'إذا كانت لديك أسئلة، يرجى الاتصال بالمرسل',
+    pageTitle: 'إلغاء الاشتراك',
   },
   it: {
-    successTitle: 'Unsubscribed',
-    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
-    errorTitle: 'Unsubscribe Failed',
-    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
-    infoTitle: 'Already Unsubscribed',
-    infoDesc: 'Your unsubscribe status has already been recorded.',
-    invalidLink: 'Invalid unsubscribe link',
-    notFound: 'Contact not found',
-    alreadyUnsub: 'You have already unsubscribed',
-    processError: 'An error occurred while processing your request',
-    footer: 'Processed by email marketing system',
-    footerContact: 'If you have questions, please contact the sender',
-    pageTitle: 'Unsubscribe',
+    successTitle: 'Disiscrizione riuscita',
+    successDesc: 'La tua disiscrizione è stata completata con successo. Non ti invieremo più email di marketing. Se cambi idea, contatta il mittente per iscriverti di nuovo.',
+    errorTitle: 'Disiscrizione non riuscita',
+    errorDesc: 'Si è verificato un problema durante l\'elaborazione della tua richiesta di disiscrizione. Contatta direttamente il mittente.',
+    infoTitle: 'Già disiscritto',
+    infoDesc: 'Il tuo stato di disiscrizione è già stato registrato.',
+    invalidLink: 'Link di disiscrizione non valido',
+    notFound: 'Contatto non trovato',
+    alreadyUnsub: 'Ti sei già disiscritto',
+    processError: 'Si è verificato un errore durante l\'elaborazione della richiesta',
+    footer: 'Elaborato dal sistema di email marketing',
+    footerContact: 'In caso di domande, contatta il mittente',
+    pageTitle: 'Disiscriviti',
   },
   nl: {
-    successTitle: 'Unsubscribed',
-    successDesc: 'You have been successfully unsubscribed. We will no longer send you marketing emails. If you change your mind, please contact the sender to resubscribe.',
-    errorTitle: 'Unsubscribe Failed',
-    errorDesc: 'There was a problem processing your unsubscribe request. Please contact the sender directly.',
-    infoTitle: 'Already Unsubscribed',
-    infoDesc: 'Your unsubscribe status has already been recorded.',
-    invalidLink: 'Invalid unsubscribe link',
-    notFound: 'Contact not found',
-    alreadyUnsub: 'You have already unsubscribed',
-    processError: 'An error occurred while processing your request',
-    footer: 'Processed by email marketing system',
-    footerContact: 'If you have questions, please contact the sender',
-    pageTitle: 'Unsubscribe',
+    successTitle: 'Uitschrijving geslaagd',
+    successDesc: 'U bent succesvol uitgeschreven. We zullen u geen marketing-e-mails meer sturen. Als u van gedachten verneemt, neem dan contact op met de afzender om u opnieuw in te schrijven.',
+    errorTitle: 'Uitschrijving mislukt',
+    errorDesc: 'Er is een probleem opgetreden bij het verwerken van uw uitschrijvingsverzoek. Neem direct contact op met de afzender.',
+    infoTitle: 'Al uitgeschreven',
+    infoDesc: 'Uw uitschrijvingsstatus is al geregistreerd.',
+    invalidLink: 'Ongeldige uitschrijvingslink',
+    notFound: 'Contact niet gevonden',
+    alreadyUnsub: 'U bent al uitgeschreven',
+    processError: 'Er is een fout opgetreden bij het verwerken van uw verzoek',
+    footer: 'Verwerkt door e-mailmarketingsysteem',
+    footerContact: 'Als u vragen heeft, neem dan contact op met de afzender',
+    pageTitle: 'Uitschrijven',
   },
 }
 
@@ -395,14 +395,17 @@ function generateUnsubscribePage(
     error: { bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', icon: '✕' },
     info: { bg: '#eff6ff', border: '#93c5fd', text: '#1e40af', icon: 'ℹ' },
   }
-
   const color = colors[type]
   const brandName = tenant?.name || 'OutreachHub'
   const descKey = type === 'success' ? 'successDesc' : type === 'error' ? 'errorDesc' : 'infoDesc'
   const description = t[descKey] || ''
 
+  // Q1d: 阿拉伯语 RTL 布局，并追加对应字体回退
+  const dir = lang === 'ar' ? 'rtl' : 'ltr'
+  const arFont = lang === 'ar' ? "'Segoe UI', 'Tahoma', " : ''
+
   return `<!DOCTYPE html>
-<html lang="${lang}">
+<html lang="${lang}" dir="${dir}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -410,7 +413,7 @@ function generateUnsubscribePage(
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: ${arFont}-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: #f9fafb;
       min-height: 100vh;
       display: flex;

@@ -157,7 +157,8 @@ export function StepAiWriter() {
 
       const sendingWindows = { start: windowStart, end: windowEnd }
 
-      const createPayload: Record<string, unknown> = {
+      // 新建 与 编辑 共用同一 payload 结构；编辑模式走 PATCH（经 campaign-contacts.ts 写联系人）
+      const campaignPayload: Record<string, unknown> = {
         name: campaignName,
         subject: subjectLine,
         content: emailContent,
@@ -171,41 +172,59 @@ export function StepAiWriter() {
         sendingWindows,
       }
       // #52: 传递产品关联
-      if (productId) createPayload.productId = productId
+      if (productId) campaignPayload.productId = productId
       if (attachments.length > 0) {
-        createPayload.attachmentIds = attachments.map((a) => a.id)
+        campaignPayload.attachmentIds = attachments.map((a) => a.id)
       }
 
       // #7: SEQUENCE 类型传递完整步骤配置（含 wait/condition）
       if (campaignType === 'SEQUENCE' && sequence.length > 0) {
-        createPayload.sequence = serializeSequenceForApi(sequence)
+        campaignPayload.sequence = serializeSequenceForApi(sequence)
       }
 
       // #8: A/B 测试变体 B 配置
       if (campaignType === 'AB_TEST' && variantBSubject && variantBContent) {
-        createPayload.abTestEnabled = true
-        createPayload.sequence = [
+        campaignPayload.abTestEnabled = true
+        campaignPayload.sequence = [
           { subject: subjectLine, content: emailContent, htmlContent, variant: 'A' },
           { subject: variantBSubject, content: variantBContent, htmlContent: variantBContent.replace(/\n/g, '<br/>'), variant: 'B' },
         ]
       }
 
       if (scheduleType === 'RECURRING') {
-        createPayload.recurrenceRule = recurrenceRule
+        campaignPayload.recurrenceRule = recurrenceRule
       }
       if (scheduleType === 'SCHEDULED' && scheduledAt) {
-        createPayload.scheduledAt = new Date(scheduledAt).toISOString()
+        campaignPayload.scheduledAt = new Date(scheduledAt).toISOString()
       }
 
-      const createRes = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createPayload),
-      })
-      const createJson = await createRes.json()
-      if (!createRes.ok || !createJson.success) {
-        setLaunchError(createJson.error?.message || createJson.message || t('campaignWizard.error.createFailed'))
-        return
+      let campaignId: string
+
+      if (isEditMode) {
+        // §9.60: 编辑模式 — PATCH 保存到既有活动（不新建），再启动同一活动
+        const patchRes = await fetch(`/api/campaigns/${editingCampaignId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(campaignPayload),
+        })
+        const patchJson = await patchRes.json()
+        if (!patchRes.ok || !patchJson.success) {
+          setLaunchError(patchJson.error?.message || patchJson.message || '保存失败，请重试')
+          return
+        }
+        campaignId = editingCampaignId!
+      } else {
+        const createRes = await fetch('/api/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(campaignPayload),
+        })
+        const createJson = await createRes.json()
+        if (!createRes.ok || !createJson.success) {
+          setLaunchError(createJson.error?.message || createJson.message || t('campaignWizard.error.createFailed'))
+          return
+        }
+        campaignId = createJson.data.id
       }
 
       const launchBody: Record<string, unknown> = {}
@@ -213,7 +232,7 @@ export function StepAiWriter() {
         launchBody.scheduledAt = new Date(scheduledAt).toISOString()
       }
 
-      const launchRes = await fetch(`/api/campaigns/${createJson.data.id}/launch`, {
+      const launchRes = await fetch(`/api/campaigns/${campaignId}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(launchBody),
@@ -467,12 +486,12 @@ export function StepAiWriter() {
             {launching ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {isEditMode ? '保存中...' : t('campaignWizard.launching')}
+                {isEditMode ? t('campaignWizard.saveAndLaunching') : t('campaignWizard.launching')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {isEditMode ? '保存修改' : (isSequence ? t('campaignWizard.launchSequence') : t('campaignWizard.launchCampaign'))}
+                {isEditMode ? t('campaignWizard.saveAndLaunch') : (isSequence ? t('campaignWizard.launchSequence') : t('campaignWizard.launchCampaign'))}
               </>
             )}
           </Button>

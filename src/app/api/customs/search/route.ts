@@ -9,6 +9,7 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { rateLimit } from '@/lib/rate-limit'
 import { getCustomsProvider } from '@/lib/data-providers/customs'
 import { calculatePurchaseIntentScore, generateBuyerAiSummary } from '@/lib/customs-scoring'
+import { checkTrialStatus, trialExpiredResponse } from '@/lib/trial-guard'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
 
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || 'Unauthorized', 401)
     if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
+
+    // R2b: 试用期过期限制海关数据能力
+    const trial = await checkTrialStatus(auth.tenantId)
+    if (!trial.allowed) return trialExpiredResponse()
 
     // N2b: 限流（20 req/min — 海关 API 查询成本高）
     const rateLimitResult = await limiter.check(req, 20)

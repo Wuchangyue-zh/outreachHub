@@ -29,6 +29,7 @@ import {
   Clock,
   AlertTriangle,
   ArrowUpRight,
+  Rocket,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -119,6 +120,7 @@ function TrialBanner() {
 
 const navigation: { name: string; href: string; icon: any; platformAdminOnly?: boolean }[] = [
   { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
+  { name: '快速开始', href: '/dashboard/getting-started', icon: Rocket },
   { name: '智能拓客', href: '/prospecting', icon: Search },
   { name: '海关数据', href: '/customs', icon: Container },
   { name: '客户管理', href: '/contacts', icon: Users },

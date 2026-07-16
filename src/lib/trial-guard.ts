@@ -1,4 +1,6 @@
+import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
+import { errorResponse, ErrorCodes } from './api-errors'
 
 export interface TrialCheckResult {
   allowed: boolean
@@ -6,6 +8,15 @@ export interface TrialCheckResult {
   trialEndsAt: Date | null
   daysRemaining: number | null
   plan: string
+}
+
+// 与 launch 一致的试用期过期响应结构（HTTP 403 + 升级引导提示）
+export function trialExpiredResponse(): NextResponse {
+  return errorResponse(
+    ErrorCodes.TRIAL_EXPIRED,
+    '试用期已结束，请升级套餐以继续使用。访问 /pricing 查看套餐方案。',
+    403
+  )
 }
 
 /**

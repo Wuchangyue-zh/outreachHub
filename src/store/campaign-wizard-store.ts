@@ -168,6 +168,8 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
       windowEnd: sendingWindows?.end || '17:00',
       recurrenceRule: (campaign.recurrenceRule as RecurrenceRule) || 'weekly',
       selectedContactIds: campaign.contactIds || [],
+      // §9.60: 编辑模式受众已从 campaignContacts 回填，直接使用联系人 tab
+      audienceTab: 'contacts',
       generatedEmail: campaign.content || '',
       variantBSubject,
       variantBContent,

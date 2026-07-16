@@ -46,6 +46,9 @@ export const ErrorCodes = {
   ALREADY_EXISTS: 'ALREADY_EXISTS',
   CONFLICT: 'CONFLICT',
 
+  // Plan / trial
+  TRIAL_EXPIRED: 'TRIAL_EXPIRED',
+
   // Rate limiting
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
 

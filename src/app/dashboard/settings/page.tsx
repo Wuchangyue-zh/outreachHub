@@ -159,7 +159,7 @@ interface EmailAccount {
 }
 
 interface TenantUsage {
-  tenant: { id: string; name: string; plan: string; expiresAt: string | null; createdAt: string; language?: string }
+  tenant: { id: string; name: string; plan: string; expiresAt: string | null; createdAt: string; language?: string; autoVerifyOnImport?: boolean }
   limits: { maxContacts: number; maxUsers: number; maxEmailsPerDay: number }
   usage: {
     contactCount: number; userCount: number; emailsSentToday: number; campaignCount: number
@@ -235,6 +235,10 @@ export default function SettingsPage() {
   // K6: 租户语言
   const [tenantLanguage, setTenantLanguage] = useState('zh')
   const [savingLanguage, setSavingLanguage] = useState(false)
+  // M3d: CSV 导入后自动验证邮箱
+  const [autoVerifyOnImport, setAutoVerifyOnImport] = useState(false)
+  const [savingAutoVerify, setSavingAutoVerify] = useState(false)
+  const [autoVerifyLoaded, setAutoVerifyLoaded] = useState(false)
 
   // J1: DNS 记录
   const [dnsAccountId, setDnsAccountId] = useState<string | null>(null)
@@ -314,6 +318,10 @@ export default function SettingsPage() {
       if (data.success) {
         setTenantData(data.data)
         if (data.data.tenant.language) setTenantLanguage(data.data.tenant.language)
+        if (typeof data.data.tenant.autoVerifyOnImport === 'boolean') {
+          setAutoVerifyOnImport(data.data.tenant.autoVerifyOnImport)
+        }
+        setAutoVerifyLoaded(true)
       }
       // Plan data loaded successfully
     } catch { /* silent */ } finally {
@@ -378,6 +386,27 @@ export default function SettingsPage() {
         toast.error(data.error?.message || t('dashboardSettings.saveFailed'))
       }
     } catch { toast.error(t('dashboardSettings.saveFailed')) } finally { setSavingLanguage(false) }
+  }
+
+  // M3d: 保存「导入后自动验证邮箱」开关
+  const handleToggleAutoVerify = async () => {
+    setSavingAutoVerify(true)
+    try {
+      const next = !autoVerifyOnImport
+      const res = await fetch('/api/tenant/usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoVerifyOnImport: next }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAutoVerifyOnImport(next)
+        toast.success(t('dashboardSettings.autoVerifyUpdated'))
+        await loadTenantUsage()
+      } else {
+        toast.error(data.error?.message || t('dashboardSettings.saveFailed'))
+      }
+    } catch { toast.error(t('dashboardSettings.saveFailed')) } finally { setSavingAutoVerify(false) }
   }
 
   // H3d: 撤销邀请
@@ -1416,6 +1445,24 @@ export default function SettingsPage() {
                       </select>
                       <Button size="sm" onClick={handleSaveLanguage} disabled={savingLanguage}>
                         {savingLanguage ? '保存中...' : '保存'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* M3d: CSV 导入后自动验证邮箱 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      🛡️ {t('dashboardSettings.autoVerifyOnImport')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-gray-500 mb-3">{t('dashboardSettings.autoVerifyDesc')}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">{autoVerifyOnImport ? t('common.enabled') : t('common.disabled')}</span>
+                      <Button size="sm" variant={autoVerifyOnImport ? 'destructive' : 'default'} onClick={handleToggleAutoVerify} disabled={savingAutoVerify || !autoVerifyLoaded}>
+                        {savingAutoVerify ? t('common.loading') : autoVerifyOnImport ? t('common.disabled') : t('common.enabled')}
                       </Button>
                     </div>
                   </CardContent>

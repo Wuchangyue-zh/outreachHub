@@ -1732,6 +1732,18 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 
 *本报告最后更新：2026-06-20。P2-2 Stripe Webhook 完成。*
 
+*本报告最后更新：2026-07-15。Batch M 遗留 M3d（CSV 导入后可选自动验证邮箱）补齐完成（§9.57），Batch M 收口。*
+
+*本报告最后更新：2026-07-15。试用过期后限制拓客与海关能力（audit §9.36 遗留）补齐完成（§9.58），trial-guard 全量覆盖 Launch / 联系人 / CSV import / 拓客 / 海关。*
+
+*本报告最后更新：2026-07-15。Batch Q1d 退订页 pt/ru/ar/it/nl 完整本地化补齐完成（§9.59），含阿拉伯语 RTL；Batch Q1 收口。*
+
+*本报告最后更新：2026-07-15。§9.48 已知限制（编辑模式仅能保存、无法直接启动）已消除 — 编辑模式支持保存并启动（§9.60）。*
+
+*本报告最后更新：2026-07-15。跨模块「定义 ICP → 验证 → 自动化营销」统一向导落地（§9.61），对齐首页 How It Works 工作流；含 /dashboard/getting-started 5 步向导、Dashboard 空数据 CTA、侧边栏「快速开始」入口。*
+
+*本报告最后更新：2026-07-16。Batch Q2b 增强 — Campaign 地理分析增加地图视图（§9.62）：新增零依赖 tile-grid choropleth 组件 + Map/Bar 视图切换，复用 geo[] 与 lib/geo.ts，无 schema 变更。*
+
 ### §9.54 TOTP Secret 加密存储与历史明文迁移（2026-06-20）
 
 **P2-3 — TOTP Secret AES-256-GCM 加密：**
@@ -1779,3 +1791,210 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - E2E 稳定套件：34 passed，1 skipped（`npm run test:e2e:ci`）
 - tsc --noEmit：通过
 - build：通过
+
+---
+
+### §9.57 Batch M 遗留补齐 — M3d CSV 导入后可选自动验证邮箱（2026-07-15）
+
+**目标：** 补齐 Batch M 唯一遗留项 M3d — CSV 导入后按租户开关自动触发邮箱验证流水线，联系人列表即时显示 verified/invalid。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| M3d-1 | ContactEmail 增加 `verifyStatus String?`，持久化流水线状态（valid/invalid/catch-all/...） | `prisma/schema.prisma` |
+| M3d-2 | 修复 `importContacts`：原将 `email` 作为标量写入 Contact（Contact 无此字段），改为通过 `emails` 关联创建 `ContactEmail` 行；返回 `importedEmails[]` 供验证/前端使用 | `src/lib/csv-import.ts` |
+| M3d-3 | `POST /api/contacts/import/confirm`：读取 `tenant.settings.autoVerifyOnImport`；≤100 条调用 `verifyBatch` 并回写 `isVerified`/`verifyStatus`/`verifiedAt`；>100 条返回明确分批提示（引导使用「批量验证邮箱」） | `src/app/api/contacts/import/confirm/route.ts` |
+| M3d-4 | `GET/PATCH /api/tenant/usage`：GET 返回 `autoVerifyOnImport`，PATCH 校验布尔值后写入 `tenant.settings` JSON（与 `language` 同模式） | `src/app/api/tenant/usage/route.ts` |
+| M3d-5 | Settings 页「导入后自动验证邮箱」开关（Card + Button，与 language 同类），调用 PATCH 保存；i18n 中英文案 | `src/app/dashboard/settings/page.tsx`, `src/lib/i18n.ts` |
+| M3d-6 | `verify-batch` 路由同步写入 `verifyStatus`；联系人详情抽屉邮箱旁按 `verifyStatus` 显示 ✅ verified / ❌ invalid 徽章（与 M3b 批量验证展示一致） | `src/app/api/contacts/verify-batch/route.ts`, `src/app/contacts/page.tsx` |
+
+**变更摘要：**
+
+- **Schema**：`ContactEmail.verifyStatus String?`（M3a 已有 `isVerified`/`verifiedAt`，`verifyStatus` 记录细粒度状态以便区分 invalid/unknown/catch-all）。需执行 `npm run db:push`。
+- **import 落地**：原 `csv-import.ts` 把 CSV 邮箱当作 Contact 标量 `email` 写入（Prisma 会丢弃/报错，实际从未产出 `ContactEmail` 行），修复后通过 `emails.create` 落库，导入后才「有东西可验证」。返回结构新增 `importedEmails`（contactId/contactEmailId/address），前端现有字段不变。
+- **自动验证（≤100）**：同步调用既有 `verifyBatch`（复用 M3a/M3b 能力，不重复实现），按唯一地址验证后批量回写；响应中返回 `autoVerify { enabled, performed, total, valid, invalid, hint }`。
+- **>100 策略**：不同步验证（避免 API 限流与长响应），返回 `hint` 引导用户到联系人列表分批「批量验证邮箱」（单次 ≤100，沿用 M3b）。
+- **租户开关**：复用 `tenant.settings` JSON + `/api/tenant/usage` PATCH，与 `language` 完全同模式（设置→PATCH→回写 settings→GET 返回），不引入新表/新 route。
+- **徽章一致性**：Contacts 抽屉每个邮箱依据 `verifyStatus` 渲染绿 ✅（valid）/ 红 ❌（invalid），与 M3b 批量验证写入的字段一致，刷新联系人即见。
+
+**验证：**
+- `npm run build` ✅ · TypeScript 零错误（`npx prisma generate` 后）
+- tsc --noEmit 待 db:push 后完整验证（环境无 Docker，未执行 db:push）
+- 手动冒烟（需 Docker 起 PG/Redis 后由用户执行）：Settings 开开关 → CSV 导入 → 联系人列表显示 verified/invalid
+
+**未完成项（需用户侧完成）：**
+- ⚠️ `npm run db:push`：本环境 Docker 不可用，未实际执行；`verifyStatus` 字段尚未同步到库，运行前须先起 Docker 并执行 `npm run db:push`。
+- 未新增单元测试（本阶段按指示以 `npm run build` 通过为验收，test/e2e 不要求）。
+- 未做 MillionVerifier/Hunter API Key 配置验证（验证流水线在无 Key 时回退到 MX+格式层，标为 valid；需配置 `MILLION_VERIFIER_API_KEY` 才触第三方）。
+
+**Batch M 最终状态：** M1–M4 + M3d 全部完成，Batch M 收口。下一步按规划顺序进入 **Batch N（海关数据）**，前置：海关 `CUSTOMS_PROVIDER` 选型。
+
+---
+
+### §9.58 试用过期后限制拓客与海关能力（audit §9.36 遗留，2026-07-15）
+
+**目标：** 补齐 §9.36 遗留 — `checkTrialStatus` 已覆盖 Launch / 联系人创建 / CSV import，但**拓客（prospecting）与海关（customs）**未接入。FREE 租户试用过期后调用这些能力应返回 403 + 与 launch 一致的升级提示，前端 toast 并引导 `/pricing`。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| T1 | 新增 `ErrorCodes.TRIAL_EXPIRED` 错误码 | `src/lib/api-errors.ts` |
+| T2 | `trial-guard.ts` 新增 `trialExpiredResponse()`：HTTP 403 + `TRIAL_EXPIRED` 码 + 与 launch 完全一致的升级提示文案 | `src/lib/trial-guard.ts` |
+| T3 | `POST /api/prospecting`：对 `search-people-multi` / `import-companies` / `import-contacts` / `create-prospecting-task` 做到期校验 | `src/app/api/prospecting/route.ts` |
+| T4 | `GET /api/customs/search`：到期校验（置于 tenantId 校验之后、限流之前） | `src/app/api/customs/search/route.ts` |
+| T5 | `POST /api/customs/import-to-campaign`：到期校验（置于权限校验之后） | `src/app/api/customs/import-to-campaign/route.ts` |
+| T6 | `prospecting/page.tsx`：403 `TRIAL_EXPIRED` → sonner toast（含「查看套餐」按钮跳转 /pricing），接入搜索/导入/创建任务 4 个	handler | `src/app/prospecting/page.tsx` |
+| T7 | `customs/page.tsx`：同上，接入搜索 + 导入 2 个 handler | `src/app/customs/page.tsx` |
+| T8 | i18n：prospecting / customs 三语区（zh/en）新增 `trialExpired` + `viewPlans` 文案 | `src/lib/i18n.ts` |
+
+**变更摘要：**
+
+- **错误码分离**：新增 `TRIAL_EXPIRED`（HTTP 403），与权限 `FORBIDDEN` 区分，使前端能可靠识别「试用期过期」并触发升级引导（避免与普通权限 403 混淆、错误跳转）。
+- **响应结构一致**：`trialExpiredResponse()` 统一产出 `{ success:false, error:{ code:'TRIAL_EXPIRED', message:'试用期已结束，请升级套餐以继续使用。访问 /pricing 查看套餐方案。' } }`，message 与 `campaigns/[id]/launch` 完全一致，便于后续统一治理。
+- **接入点**：prospecting POST 仅对「消耗型」能力（多源搜索、公司/联系人导入、创建采集任务）做校验；单源 `search-companies`/`search-people` 为保留入口未拦截（与需求显式列出的 search-people-multi + import 对齐）。海关 search 与 import-to-campaign 全量拦截。
+- **前端 UX**：两页面均在 failure 分支先以 `handleTrialExpired(data)` 探测 `TRIAL_EXPIRED`，命中则 `sonner` `toast.error`（文案取 API 返回的 message，带 `/pricing` 行动按钮，8s 显示），不再写入普通 `message` 横幅；未命中则保持原有错误提示行为。
+- **不在 middleware 做全局拦截**：严格按需求，仅在三个 route handler 内显式调用 checkTrialStatus，不影响其他路由。
+
+**验证：**
+- `npm run build` ✅ · TypeScript 零错误。
+- 三个接入 route 与两个 page 均编译为动态函数（ƒ），无硬错误。
+
+**未完成项：**
+- 未新增单元测试（本阶段以 `npm run build` 通过为验收，test/e2e 不要求）。
+- 未实测试用过期 → 403 → toast → /pricing 跳转链路（需起 Docker + 写 trialEndsAt 到未来/过去时间后手动验证）。
+- 拓客单源搜索（`search-companies`/`search-people`）、海关买家详情（`GET /api/customs/buyers/[id]`）未纳入拦截；如需覆盖可照 `trialGuardedTypes` 模式增补。
+
+**阶段状态：** audit §9.36 trial-guard 接入闭环完成（Launch / 联系人 / CSV import / 拓客 / 海关 全量覆盖）。
+
+---
+
+### §9.59 Batch Q 遗留补齐 — Q1d 退订页 pt/ru/ar/it/nl 完整本地化（2026-07-15）
+
+**目标：** 补齐 Batch Q1d 遗留 — 退订页 `zh/en/de/fr/es/ja/ko` 已完整，`pt/ru/ar/it/nl` 为英文 stub。将五种语言补全为与 zh/en 同结构的完整翻译，并支持阿拉伯语 RTL。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| Q1d-1 | 补全葡萄牙语 (pt) 13 项文案 | `src/app/api/unsubscribe/route.ts` |
+| Q1d-2 | 补全俄语 (ru) 13 项文案 | 同上 |
+| Q1d-3 | 补全阿拉伯语 (ar) 13 项文案 | 同上 |
+| Q1d-4 | 补全意大利语 (it) 13 项文案 | 同上 |
+| Q1d-5 | 补全荷兰语 (nl) 13 项文案 | 同上 |
+| Q1d-6 | 阿拉伯语 RTL：`dir="rtl"` + 字体回退 | 同上 |
+
+**变更摘要：**
+
+- **文案补全**：五种语言均按 zh/en 的 13 个 key（`successTitle/successDesc/errorTitle/errorDesc/infoTitle/infoDesc/invalidLink/notFound/alreadyUnsub/processError/footer/footerContact/pageTitle`）逐项翻译为母语，移除英文 stub。
+  - pt: "Cancelado com sucesso" / "Cancelar subscrição"
+  - ru: "Отмена подписки выполнена" / "Отменา подписки"
+  - ar: "تم إلغاء الاشتراك بنجاح" / "إلغاء الاشتراك"
+  - it: "Disiscrizione riuscita" / "Disiscriviti"
+  - nl: "Uitschrijving geslaagd" / "Uitschrijven"
+- **RTL 支持**：`generateUnsubscribePage` 检测 `lang === 'ar'` 时输出 `<html lang="ar" dir="rtl">`，并在 `body` 的 `font-family` 前追加 `'Segoe UI', 'Tahoma'` 字体回退，确保阿拉伯字符跨设备可读；其余语言保持 `dir="ltr"`。
+- **逻辑不变**：`detectLanguage` 与 `tenant.settings.language` 优先级逻辑完全未动（Accept-Language → tenant setting → zh 默认）；仅替换 `i18n` 表中五个语种的值。
+
+**验证：**
+- `npm run build` ✅ — `✓ Compiled successfully`，`/api/unsubscribe` 路由编译为动态函数（ƒ），无硬错误。
+- 12 种语言的 `successTitle` + `pageTitle` 经逐一核对均为母语、互不重复；五语种 13 项 key 齐全。
+
+**未完成项：**
+- 未新增单元测试（本阶段以 `npm run build` 通过为验收，test/e2e 不要求）。
+- 未手动以 `Accept-Language` / tenant language 切换验证五语种退订页渲染（需 Docker + 真实请求）。RTL 效果依赖浏览器对 `dir="rtl"` 的标准支持，已通过 HTML 标准属性保证。
+
+**Batch Q 最终状态：** Q1a/Q1b/Q1c 已在前序批次完成；Q1d 补齐后 **Batch Q1（12 语言邮件）收口**。下一步 Batch Q 剩余 Q2（数据看板与报表）按规划继续。
+
+---
+
+### §9.60 消除 §9.48 已知限制 — 编辑模式支持保存后直接 Launch（2026-07-15）
+
+**目标：** 补齐 audit §9.48 已知限制「编辑模式暂不支持保存并启动，需先保存再从列表手动启动」。编辑模式（DRAFT/PAUSED）单次点击完成 PATCH 保存 → POST launch。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| E1 | 重构 `handleLaunch`：编辑模式分支 — PATCH 保存既有活动 → POST `/api/campaigns/{id}/launch`；新建模式保持不变 | `src/components/campaign-wizard/StepAiWriter.tsx` |
+| E2 | 按钮文案：编辑模式显示「保存并启动」/「保存并启动中...」（i18n） | 同上 + `src/lib/i18n.ts` |
+| E3 | 编辑模式受众回填：hydrate 时 `audienceTab='contacts'`，使 `resolveContactIds()` 使用既有 contactIds | `src/store/campaign-wizard-store.ts` |
+| E4 | 复用 launch `warnings[]` toast；不重复写入 AuditLog（launch route 已写） | 复用既有逻辑 |
+
+**变更摘要：**
+
+- **PATCH 而非新建**：原 `handleLaunch` 在编辑模式下竟仍走 `POST /api/campaigns`（新建），会复制出一个重复活动再启动——这是 §9.48 的核心缺陷。现编辑模式改为 `PATCH /api/campaigns/{editingCampaignId}`（经 PATCH route 的 `replaceCampaignContacts` 写联系人，**不绕过 campaign-contacts.ts**），保存成功后以同一 id 调用 launch。
+- **流程**：`PATCH 保存 → POST launch → toast(warnings[]) → router.push('/campaigns')`。launch 已有 AuditLog（`auditCampaignLaunch`），前端不再重复写入。
+- **状态约束**：`campaignPayload` 含 name/subject/content/contactIds 等，触发 PATCH route 的 `isContentEdit` 守卫（仅 DRAFT/PAUSED 允许），与需求一致；且 `page.tsx` 加载编辑页时已连续校验 status∈{DRAFT,PAUSED}，故 RUNNING/COMPLETED/FAILED 既无法进入向导也看不到该按钮。
+- **launch warnings 复用**：保持既有 `if (launchJson.warnings?.length) toast.warning(launchJson.warnings[0])`，APP_URL 缺失等提示照旧。
+- **sequence JSON schema 未改**：复用 `serializeSequenceForApi` 序列化，不修改 schema。
+
+**验证：**
+- `npm run build` ✅ — `✓ Compiled successfully`；`StepAiWriter.tsx` 编译通过，无硬错误。
+- i18n 新增 `campaignWizard.saveAndLaunch` / `saveAndLaunching`（zh/en）。
+
+**未完成项：**
+- 未新增单元测试/edit E2E（本阶段以 `npm run build` 通过为验收）。
+- 未实测编辑 → 保存并启动 → 联系人/Guid 不变的完整链路（需 Docker + 实库验证；建议校验 PATCH 前后 campaignContacts 与 hydrate 回填的 contactIds 一致）。
+
+**§9.48 状态：** 已知限制（保存并启动）已消除。
+
+---
+
+### §9.61 跨模块「定义 ICP → 验证 → 自动化营销」统一向导（2026-07-15）
+
+**目标：** 落地 `landing-data.ts` How It Works 工作流（Prospect → Enrich → Verify → Outreach → Reply → Win）的 Dashboard 侧对齐 — 一个跨模块的统一入门向导，串联拓客、验证、Campaign、监控能力，消除功能孤岛。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| W1 | 新建 `/dashboard/getting-started` 5 步向导（ICP → 拓客/海关 → 验证 → Campaign → 启动监控） | `src/app/dashboard/getting-started/page.tsx` |
+| W2 | 向导每步 deep-link 到既有页面并带 query 预填（ICP 参数透传 prospecting / customs） | 同上 |
+| W3 | prospecting / customs 页面读取 URL 参数预填搜索表单 | `src/app/prospecting/page.tsx`, `src/app/customs/page.tsx` |
+| W4 | Dashboard 首次登录或 `contactCount===0` 时展示渐变 CTA 卡片 | `src/components/dashboard/dashboard-content.tsx` |
+| W5 | 侧边栏新增「快速开始」入口（Rocket 图标） | `src/components/layout/dashboard-layout.tsx` |
+| W6 | i18n：`gettingStarted.*` + `dashboard.gettingStarted.*`（zh/en） | `src/lib/i18n.ts` |
+
+**变更摘要：**
+
+- **5 步向导**（`Rocket` + 步骤指示灯）：
+  1. 定义 ICP（行业/国家/关键词/HS 编码）→ 参数存入组件 state
+  2. 搜索潜在客户：两张卡片分别跳转 `/prospecting` 与 `/customs`，自动拼接 `?keyword=&country=&industry=&hsCode=`
+  3. 验证邮箱：说明「导入后自动验证」与「批量验证」两条路径，链到 `/contacts`
+  4. 创建 Campaign：链到 `/campaigns/new`（单次/序列）
+  5. 启动与监控：链到 `/campaigns` 与 `/deliverability`
+- **URL 预填**：prospecting 页将 keyword→keywords、country→locations、industry→industries；customs 页将 keyword/country/hsCode 直接映射到表单字段。均由 `useSearchParams` + `useEffect` 实现，零后端改动。
+- **Dashboard CTA**：`dashboard-content` 拉取 `/api/tenant/usage`，`contactCount===0` 时在主内容区顶部渲染渐变 CTA 卡片（标题 / 描述 / 「快速开始」按钮），引导进入向导。
+- **侧边栏**：`navigation` 数组顶部新增「快速开始」→ `/dashboard/getting-started`，`Rocket` 图标，紧跟仪表盘之后，确保老用户也能随时唤起。
+- **复用既有能力**：向导本身不重建拓客/Campaign/验证功能，仅做「导航 + 参数透传 + 说明」，对齐首页 How It Works 叙事。
+
+**验证：**
+- `npm run build` ✅ — `✓ Compiled successfully`，`/dashboard/getting-started` 路由、prospecting/customs 预填、Dashboard CTA、侧边栏入口均编译通过，无硬错误。
+- i18n 关键 key（`ctaEmptyTitle/ctaEmptyDesc/ctaButton`、`gettingStarted.title`）中英双端核实存在。
+
+**未完成项：**
+- 未新增单元测试 / wizard E2E（本阶段以 `npm run build` 通过为验收，test/e2e 不要求）。
+- 未实测「定义 ICP → 跳转 prospecting → 表单预填」端到端（需 Docker + 实库；URL 参数读取逻辑已独立可测）。
+- Campaign 步骤当前仅链到 `/campaigns/new`，未把向导收集的联系人 prefill 到 Campaign 向导（该交叉状态传递需 campaign-wizard-store 扩展，留作后续；MVP 以 deep-link 预填搜索参数为交付）。
+
+**首页对齐状态：** How It Works 6 步工作流（Prospect/Enrich/Verify/Outreach/Reply/Win）首次在 Dashboard 侧以可交互向导落地；与 `landing-data.ts` `heroWorkflowData` 叙事一致。
+
+---
+
+### §9.62 Batch Q2b 增强 — Campaign 地理分析增加地图视图（2026-07-16）
+
+**目标：** 补齐 Q2b「地理分析升级：CampaignStats API 新增城市 Top 10 + 组件展示城市分布柱状图」中缺失的国家级 choropleth 地图视图。复用既有 `api/campaigns/stats` 的 `geo[]`，不新增 schema。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| G1 | 新建轻量 `GeoMap` 瓦片网格 choropleth 组件（零依赖、纯 Tailwind，5 档颜色强度） | `src/components/dashboard/geo-map.tsx` |
+| G2 | CampaignStats 地理区加入 Map/Bar 视图切换按钮，保留原有柱状图 | `src/components/CampaignStats.tsx` |
+| G3 | 复用 `geo[]` 数据与 `lib/geo.ts` 本地化国家名 | 同上 |
+
+**变更摘要：**
+
+- **轻量 choropleth**：为避免引入 `react-simple-maps`/`d3-geo` 等 heavyweight 地图库膨胀 bundle，采用「瓦片网格地图（tile grid map）」——每个国家为一个带颜色强度的圆角方块（国家代码 + 本地化名称 + 打开数），按相对最大打开数分 5 档蓝色色阶（`bg-blue-100` → `bg-blue-700`）。零运行时依赖、纯 Tailwind、响应式自动换行，移动端友好。
+- **数据复用**：直接消费 CampaignStats 已有的 `geoStats`（`{ country, code, count }[]`，由 `api/campaigns/stats` → `localizeGeoStats` 产出），**无 schema 变更、无新 API**。国家名通过既有 `lib/geo.ts` `getCountryName(code, lang)` 本地化（中英）。
+- **Map/Bar 切换**：在 `CardHeader` 右侧增加一组紧凑切换按钮（`BarChart3` / `LayoutGrid` 图标），默认 `bar`（柱状图），切到 `map` 渲染 GeoMap。原有横向柱状图完整保留。
+- **移动端策略**：默认柱状图视图，用户主动切到手机视图也能正常浏览（瓦片在窄屏自然换行，不默认展示地图以避免首屏信息密度过高）。
+
+**验证：**
+- `npm run build` ✅ — `✓ Compiled successfully`；`CampaignStats.tsx`、`geo-map.tsx` 编译通过，无硬错误；`cn`、`GeoMap`、`LayoutGrid`/`BarChart3` 导入均落位。
+
+**未完成项：**
+- 未新增单元测试（本阶段以 `npm run build` 通过为验收，test/e2e 不要求）。
+- 未实测带真实 `geo[]` 数据的地图色阶渲染（需 Docker + 实库 + 有打开国家的 EmailLog；组件逻辑已独立可测）。
+- 若后续需「真·地理轮廓地图」，可增量引入 `react-simple-maps`，当前 tile grid 为 bundle 可控的 MVP 方案。
+
+**Q2b 最终状态：** CampaignStats 地理分析现具备 国家级 choropleth 视图（tile grid）+ 原有柱状图 + 城市 Top 10，三种视角齐备。

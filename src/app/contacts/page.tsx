@@ -1007,14 +1007,18 @@ export default function ContactsPage() {
               {/* Contact Info */}
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-900">{t('contacts.contactInfo')}</h4>
-                {currentContact.emails.map((email, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-gray-400" />
-                    <span>{email.address}</span>
-                    {email.isVerified && <Check className="h-3 w-3 text-green-500" />}
-                    {email.isPrimary && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{t('contacts.primary')}</span>}
-                  </div>
-                ))}
+                {currentContact.emails.map((email, i) => {
+                  const status = (email as { verifyStatus?: string }).verifyStatus
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <span>{email.address}</span>
+                      {email.isVerified && <Check className="h-3 w-3 text-green-500" />}
+                      {status === 'invalid' && <X className="h-3 w-3 text-red-500" />}
+                      {email.isPrimary && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{t('contacts.primary')}</span>}
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Company */}
