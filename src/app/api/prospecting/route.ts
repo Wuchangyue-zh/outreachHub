@@ -230,10 +230,13 @@ export async function POST(req: NextRequest) {
             })
 
             if (existingContact) {
+              // Idempotent: already in tenant DB counts as success for wizard/import UX
               results.push({
-                success: false,
+                success: true,
+                id: existingContact.id,
+                name: existingContact.fullName,
                 email: contactData.email,
-                error: '联系人已存在',
+                alreadyExists: true,
               })
               continue
             }

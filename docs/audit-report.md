@@ -2019,3 +2019,24 @@ H3aï¼ˆCSV tenantId ä¿®å¤ï¼ŒP0 bugï¼‰â†’ H1 â†’ H2 â†’ H3bâ€“e â†’ H4 â†’ npm ru
 - ç«™å†…æé†’å¤ç”¨ Redis Pub/Sub `emailEvents` + SSEï¼›æœ¬æ‰¹ä¸å‘å¹³å°é‚®ä»¶ / æµè§ˆå™¨ Pushã€‚
 
 **éªŒè¯ï¼š** `npx tsc --noEmit` é€šè¿‡ Â· `npm run db:push` é€šè¿‡ Â· `npm test` 201 passedã€‚
+
+### ¡ì9.64 ¿ìËÙ¿ªÊ¼Ò³ÄÚ±Õ»·£¨2026-07-26£©
+
+**Ä¿±ê£º** ½« `/dashboard/getting-started` ´Ó deep-link ¿ÇÉı¼¶ÎªÒ³ÄÚ±Õ»·£ºÅäÖÃÓÊÏä ¡ú ICP ¡ú ËÑË÷/CSV Èë¿â ¡ú ÅúÁ¿ÑéÖ¤ ¡ú ¾«¼ò½¨»î¶¯ ¡ú Æô¶¯¡£
+
+| ±àºÅ | ÈÎÎñ | ¹Ø¼üÎÄ¼ş |
+|------|------|----------|
+| GS1 | Ïòµ¼×´Ì¬»ú + localStorage ³Ö¾Ã»¯ + ÕæÊµÍê³É¶È checklist | `src/components/getting-started/*` |
+| GS2 | Ç°ÖÃ SMTP ÕË»§¼ì²é/ÃÔÄã´´½¨ | `StepPrereq.tsx` |
+| GS3 | ICP + ¿ÉÑ¡ AI ÍØ´Ê | `StepIcp.tsx` |
+| GS4 | search-people-multi ¹´Ñ¡Èë¿â£»ÎŞ Key Ê± CSV ±£µ× | `StepProspect.tsx` |
+| GS5 | verify-batch + ¿É·¢ËÍÊÜÖÚÉ¸Ñ¡ | `StepVerify.tsx` |
+| GS6 | POST+PATCH Campaign + launch | `StepCampaign.tsx`, `StepLaunch.tsx`, `api.ts` |
+| GS7 | Ò³Ãæ¸ÄÎª¹ÒÔØ `GettingStartedWizard` | `src/app/dashboard/getting-started/page.tsx` |
+
+**¼Ü¹¹¾ö²ß£º**
+- ²»Ç¶ÈëÍêÕû `campaign-wizard`£¨±ÜÃâÓë `/campaigns/new` È«¾Ö store ³åÍ»£©¡£
+- º£¹Ø²»×÷±Õ»·Ö÷Â·¾¶£¨ÎŞÓÊÏä£©£»ÎŞÍØ¿Í Key Ê±Ç¿ÖÆ CSV ±£µ×¡£
+- Campaign ´´½¨ºóÁ¢¿Ì PATCH `contactIds`£¬×ß `replaceCampaignContacts`¡£
+
+**ÑéÖ¤£º** `npm run build`£¨±¾Åú½áÊøÊ±Ö´ĞĞ£©¡£
