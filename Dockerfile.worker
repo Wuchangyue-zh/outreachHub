@@ -4,7 +4,8 @@ WORKDIR /app
 
 # 安装依赖
 COPY package*.json ./
-RUN npm ci
+# alpine/npm 小版本差异时 ci 可能因 optional 依赖不同步；回退 install
+RUN npm ci || npm install
 
 # 复制源代码
 COPY . .

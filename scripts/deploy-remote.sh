@@ -25,15 +25,13 @@ fi
 if command -v docker >/dev/null 2>&1; then
   echo "==> Ensure postgres + redis"
   docker compose up -d postgres redis
-
-  echo "==> Ensure email worker"
-  docker compose --profile full up -d --build worker || {
-    echo "WARN: worker 启动失败，请检查 Dockerfile.worker / 内存"
-  }
 fi
 
 echo "==> npm ci"
-npm ci
+if ! npm ci; then
+  echo "WARN: npm ci 失败（lock 不同步），回退 npm install"
+  npm install
+fi
 
 echo "==> db:push"
 npm run db:push
@@ -49,6 +47,24 @@ if systemctl list-unit-files | grep -q '^outreachhub.service'; then
 else
   echo "WARN: 未找到 outreachhub.service"
   echo "请在服务器执行一次手动安装 systemd（见 docs/deploy-aliyun-ecs.md）"
+fi
+
+# Email Worker：4G 机器用宿主机 systemd，避免每次 docker build 拉 node 镜像卡死
+# 设 DEPLOY_DOCKER_WORKER=1 才走 docker compose --build worker
+if [[ "${DEPLOY_DOCKER_WORKER:-0}" == "1" ]] && command -v docker >/dev/null 2>&1; then
+  echo "==> Ensure email worker (docker)"
+  docker compose --profile full up -d --build worker || {
+    echo "WARN: docker worker 启动失败"
+  }
+else
+  echo "==> Ensure email worker (host systemd outreachhub-worker)"
+  if systemctl list-unit-files | grep -q '^outreachhub-worker.service'; then
+    systemctl restart outreachhub-worker || true
+    systemctl --no-pager -l status outreachhub-worker || true
+  else
+    echo "WARN: 未找到 outreachhub-worker.service，Campaign 发信需另开 worker"
+    echo "  一次性安装见 docs/deploy-aliyun-ecs.md"
+  fi
 fi
 
 echo "==> Done"

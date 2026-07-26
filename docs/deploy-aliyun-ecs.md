@@ -99,6 +99,28 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now outreachhub
+
+# Email Worker（宿主机，避免每次 docker build 拉 node 镜像）
+cat >/etc/systemd/system/outreachhub-worker.service <<'EOF'
+[Unit]
+Description=OutreachHub Email Worker
+After=network.target docker.service outreachhub.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/outreachhub
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/outreachhub/.env
+ExecStart=/usr/bin/npm run worker:email
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now outreachhub-worker
 ```
 
 ## GitHub Secrets
