@@ -19,9 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install rsync
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq rsync openssh-client
-
       - name: Setup SSH
         env:
           SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
@@ -29,36 +26,45 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          # 去掉可能粘贴进来的 Windows \r，避免私钥损坏
           printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Rsync code to ECS
+      - name: Probe SSH
         env:
           HOST: ${{ secrets.ECS_HOST }}
           USER: ${{ secrets.ECS_USER }}
         run: |
-          rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30" \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude '.next' \
-            --exclude '.env' \
-            --exclude 'public/uploads' \
-            --exclude '.claude' \
-            --exclude 'coverage' \
-            --exclude 'deploy_ecs' \
-            --exclude 'deploy_ecs.pub' \
-            ./ "${USER}@${HOST}:/opt/outreachhub/"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            "${USER}@${HOST}" 'echo SSH_OK && uname -a && mkdir -p /opt/outreachhub'
+
+      - name: Sync code to ECS (tar over SSH)
+        env:
+          HOST: ${{ secrets.ECS_HOST }}
+          USER: ${{ secrets.ECS_USER }}
+        run: |
+          # 不依赖远端 rsync：本地打包 → SSH → 远端解压（保留服务器上的 .env）
+          tar -czf - \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.env' \
+            --exclude='public/uploads' \
+            --exclude='.claude' \
+            --exclude='coverage' \
+            --exclude='deploy_ecs' \
+            --exclude='deploy_ecs.pub' \
+            . \
+          | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+              "${USER}@${HOST}" \
+              'mkdir -p /opt/outreachhub && tar -xzf - -C /opt/outreachhub'
 
       - name: Remote build and restart
         env:
           HOST: ${{ secrets.ECS_HOST }}
           USER: ${{ secrets.ECS_USER }}
         run: |
-          # 先保证远端脚本为 LF，再执行
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
             "${USER}@${HOST}" \
             "sed -i 's/\r$//' /opt/outreachhub/scripts/deploy-remote.sh && bash /opt/outreachhub/scripts/deploy-remote.sh"
