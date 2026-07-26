@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    setAuthCookie(response, jwtToken)
+    setAuthCookie(response, jwtToken, req)
 
     return response
   } catch (error) {

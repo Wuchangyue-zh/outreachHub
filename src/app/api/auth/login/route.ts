@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       user: { id: user.id, email: user.email, name: user.name },
     })
 
-    setAuthCookie(response, token)
+    setAuthCookie(response, token, req)
 
     return response
   } catch (error) {

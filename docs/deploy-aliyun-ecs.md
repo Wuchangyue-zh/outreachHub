@@ -62,8 +62,11 @@ REDIS_URL="redis://localhost:6379"
 NEXTAUTH_SECRET="..."
 NEXTAUTH_URL="http://121.199.31.190:3030"
 APP_URL="http://121.199.31.190:3030"
+APP_NAME="OutreachHub"
 CRON_SECRET="..."
 ENCRYPTION_KEY="64位hex"
+# HTTP 部署必须关掉 Secure cookie，否则浏览器会丢弃登录态
+COOKIE_SECURE=false
 SMTP_HOST=...
 SMTP_USER=...
 SMTP_PASSWORD=...

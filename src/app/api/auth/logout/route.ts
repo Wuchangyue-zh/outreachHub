@@ -3,6 +3,6 @@ import { clearAuthCookie } from '@/lib/auth-cookies'
 
 export async function POST(req: NextRequest) {
   const response = NextResponse.json({ success: true })
-  clearAuthCookie(response)
+  clearAuthCookie(response, req)
   return response
 }

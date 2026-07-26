@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(req: NextRequest) {
+  // Auth routes set cookies — do not interfere with Set-Cookie passthrough
+  if (req.nextUrl.pathname.startsWith('/api/auth/')) {
+    return NextResponse.next()
+  }
+
   const token = req.cookies.get('auth-token')?.value
 
   const protectedPaths = [
@@ -35,7 +40,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Add token to request headers for API routes to use
-  if (token) {
+  if (token && req.nextUrl.pathname.startsWith('/api/')) {
     const requestHeaders = new Headers(req.headers)
     requestHeaders.set('x-auth-token', token)
     return NextResponse.next({
