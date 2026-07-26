@@ -31,6 +31,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import { useI18n } from '@/hooks/use-i18n'
+import { SSE_REPLY_EVENT } from '@/components/RealtimeStatus'
 
 interface InboxThread {
   id: string
@@ -126,6 +127,18 @@ export default function InboxPage() {
   useEffect(() => {
     syncAndLoadThreads()
     loadAccounts()
+    // Mark inbox as seen so sidebar unread badge clears
+    fetch('/api/inbox/mark-seen', { method: 'POST' }).catch(() => {})
+  }, [])
+
+  // 停留收件箱时收到新回复：推进已读水位并刷新列表
+  useEffect(() => {
+    const onReply = () => {
+      fetch('/api/inbox/mark-seen', { method: 'POST' }).catch(() => {})
+      loadThreads()
+    }
+    window.addEventListener(SSE_REPLY_EVENT, onReply)
+    return () => window.removeEventListener(SSE_REPLY_EVENT, onReply)
   }, [])
 
   useEffect(() => {

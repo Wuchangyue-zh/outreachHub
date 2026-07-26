@@ -15,6 +15,7 @@ import { addEmailTracking } from './email-tracking'
 import { maybeMarkCampaignCompleted } from './campaign-completion'
 import { fetchFileBuffer } from './storage'
 import { resolvePublicUrls } from './email-html'
+import { resolvePersonalizedContent } from './email-personalize'
 
 export interface EmailJobData {
   to: string
@@ -29,6 +30,14 @@ export interface EmailJobData {
   trackingPixel?: string | boolean
   trackingLinks?: boolean
   attachmentIds?: string[] // H1: 附件 ID 列表
+  /** 千邮千面：Worker 发送前按联系人 AI 生成 */
+  personalizePerContact?: boolean
+  baseSubject?: string
+  baseHtml?: string
+  baseText?: string
+  productDescription?: string
+  tone?: string
+  language?: string
 }
 
 let _emailQueue: Queue<EmailJobData> | null = null
@@ -145,17 +154,14 @@ export async function addBulkEmailJobs(emails: EmailJobData[], options?: { delay
  */
 async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined> {
   try {
-    // 确定发件人邮箱
+    // 日限额先于 AI，避免白烧 Token
     let fromEmail = data.fromEmail || process.env.SMTP_USER || ''
-
-    // 如果指定了 EmailAccount，检查发送限额
     if (data.emailAccountId) {
       const canSend = await checkDailyLimit(data.emailAccountId)
       if (!canSend) {
         console.warn(`[EmailQueue] EmailAccount ${data.emailAccountId} reached daily limit, skipping`)
         return undefined
       }
-      // 从 EmailAccount 获取发件人邮箱
       const account = await prisma.emailAccount.findUnique({
         where: { id: data.emailAccountId },
         select: { email: true },
@@ -165,16 +171,37 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       }
     }
 
+    const resolved = await resolvePersonalizedContent({
+      to: data.to,
+      subject: data.subject,
+      html: data.html,
+      text: data.text,
+      contactId: data.contactId,
+      personalizePerContact: data.personalizePerContact,
+      baseSubject: data.baseSubject,
+      baseHtml: data.baseHtml,
+      baseText: data.baseText,
+      productDescription: data.productDescription,
+      tone: data.tone,
+      language: data.language,
+    })
+
+    if (resolved.fallbackReason) {
+      console.warn(
+        `[EmailQueue] Personalize fallback for ${data.to}: ${resolved.fallbackReason}`
+      )
+    }
+
     const logData: any = {
       contactId: data.contactId || '',
       messageId: '',
       toEmail: data.to,
       fromEmail,
-      subject: data.subject,
+      subject: resolved.subject,
       status: 'PENDING',
       sentAt: new Date(),
-      htmlContent: data.html,
-      content: data.text || data.html || '',
+      htmlContent: resolved.html,
+      content: resolved.text || resolved.html || '',
       tracked: false,
     }
 
@@ -184,7 +211,7 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
 
     const emailLog = await prisma.emailLog.create({ data: logData })
 
-    let emailHtml = data.html || ''
+    let emailHtml = resolved.html || ''
     if (data.contactId) {
       emailHtml = addEmailTracking(emailHtml, emailLog.id, data.contactId, data.campaignId)
     }
@@ -222,9 +249,9 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       result = await sendAccountMail({
         emailAccountId: data.emailAccountId,
         to: data.to,
-        subject: data.subject,
+        subject: resolved.subject,
         html: emailHtml,
-        text: data.text,
+        text: resolved.text,
         from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
         attachments: emailAttachments,
       })
@@ -235,9 +262,9 @@ async function sendEmailDirectly(data: EmailJobData): Promise<string | undefined
       }
       result = await sendPlatformMail({
         to: data.to,
-        subject: data.subject,
+        subject: resolved.subject,
         html: emailHtml,
-        text: data.text,
+        text: resolved.text,
         from: data.fromName ? `${data.fromName} <${fromEmail}>` : fromEmail,
         attachments: emailAttachments,
       })

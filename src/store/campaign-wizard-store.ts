@@ -46,6 +46,9 @@ export interface HydratePayload {
   contactIds?: string[]
   sequence?: any[] | null
   abTestEnabled?: boolean
+  personalizePerContact?: boolean
+  contentLanguage?: string | null
+  contentTone?: string | null
 }
 
 export interface WizardState {
@@ -124,6 +127,8 @@ export interface WizardState {
   setGeneratedEmail: (v: string) => void
   isGenerating: boolean
   setIsGenerating: (v: boolean) => void
+  personalizePerContact: boolean
+  setPersonalizePerContact: (v: boolean) => void
 
   // Reset
   resetWizard: () => void
@@ -171,6 +176,9 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
       // §9.60: 编辑模式受众已从 campaignContacts 回填，直接使用联系人 tab
       audienceTab: 'contacts',
       generatedEmail: campaign.content || '',
+      personalizePerContact: campaign.personalizePerContact === true,
+      language: campaign.contentLanguage || 'en',
+      tone: (campaign.contentTone as ToneType) || 'professional',
       variantBSubject,
       variantBContent,
       sequence: campaign.type === 'SEQUENCE'
@@ -277,6 +285,8 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
   setGeneratedEmail: (v) => set({ generatedEmail: v }),
   isGenerating: false,
   setIsGenerating: (v) => set({ isGenerating: v }),
+  personalizePerContact: false,
+  setPersonalizePerContact: (v) => set({ personalizePerContact: v }),
 
   // Reset
   resetWizard: () =>
@@ -307,5 +317,6 @@ export const useCampaignWizardStore = create<WizardState>((set) => ({
       tone: 'professional',
       generatedEmail: '',
       isGenerating: false,
+      personalizePerContact: false,
     }),
 }))

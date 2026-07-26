@@ -6,6 +6,7 @@
 import { prisma } from '@/lib/prisma'
 import { addBulkEmailJobs } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
+import { buildProductDescription } from '@/lib/email-personalize'
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
 import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
@@ -123,6 +124,7 @@ function getLinearEmailSteps(steps: SequenceStepNode[]): SequenceStepNode[] {
 export async function executeAdvanceSequences() {
   const campaigns = await prisma.campaign.findMany({
     where: { type: 'SEQUENCE', status: 'RUNNING' },
+    include: { product: { select: { name: true, description: true } } },
   })
 
   if (campaigns.length === 0) {
@@ -301,23 +303,50 @@ export async function executeAdvanceSequences() {
       }
 
       const primaryEmail = contact.emails[0]
-      const vars = buildContactVariables(contact, primaryEmail.address)
       const rawHtml = targetStep.htmlContent || targetStep.content || ''
+      const baseSubject = targetStep.subject || campaign.subject
+      const baseText = targetStep.content || ''
+      const personalize = (campaign as any).personalizePerContact === true
 
-      await addBulkEmailJobs([{
-        to: primaryEmail.address,
-        subject: applyEmailVariables(targetStep.subject || campaign.subject, vars),
-        html: applyEmailVariables(rawHtml, vars),
-        text: applyEmailVariables(targetStep.content || '', vars),
-        contactId: contact.id,
-        campaignId: campaign.id,
-        emailAccountId: availableAccountId,
-        fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-        fromName: campaign.fromName || '',
-        trackingPixel: true,
-        trackingLinks: true,
-        attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-      }])
+      if (personalize) {
+        await addBulkEmailJobs([{
+          to: primaryEmail.address,
+          subject: baseSubject,
+          html: rawHtml,
+          text: baseText,
+          contactId: contact.id,
+          campaignId: campaign.id,
+          emailAccountId: availableAccountId,
+          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
+          fromName: campaign.fromName || '',
+          trackingPixel: true,
+          trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+          personalizePerContact: true,
+          baseSubject,
+          baseHtml: rawHtml,
+          baseText,
+          productDescription: buildProductDescription(campaign as any),
+          tone: (campaign as any).contentTone || 'professional',
+          language: (campaign as any).contentLanguage || 'en',
+        }])
+      } else {
+        const vars = buildContactVariables(contact, primaryEmail.address)
+        await addBulkEmailJobs([{
+          to: primaryEmail.address,
+          subject: applyEmailVariables(baseSubject, vars),
+          html: applyEmailVariables(rawHtml, vars),
+          text: applyEmailVariables(baseText, vars),
+          contactId: contact.id,
+          campaignId: campaign.id,
+          emailAccountId: availableAccountId,
+          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
+          fromName: campaign.fromName || '',
+          trackingPixel: true,
+          trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+        }])
+      }
 
       advanced++
     }

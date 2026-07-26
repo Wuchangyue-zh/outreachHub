@@ -63,6 +63,9 @@ function CampaignWizardContent() {
         contactIds,
         sequence: c.sequence,
         abTestEnabled: c.abTestEnabled,
+        personalizePerContact: c.personalizePerContact,
+        contentLanguage: c.contentLanguage,
+        contentTone: c.contentTone,
       })
     } catch {
       setFetchError('网络错误，请稍后重试')

@@ -4,6 +4,7 @@ import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { addBulkEmailJobs, addEmailJob } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
+import { buildProductDescription } from '@/lib/email-personalize'
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { checkDailyEmailLimit } from '@/lib/plan-limits'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
@@ -45,6 +46,75 @@ function getLaunchWarnings(): string[] {
   return []
 }
 
+/** Build email job payload — personalize flag defers AI to Worker */
+function buildContactEmailJob(opts: {
+  contact: { id: string; emails: { address: string }[] }
+  subject: string
+  html: string
+  text: string
+  campaign: {
+    id: string
+    fromEmail: string | null
+    fromName: string | null
+    personalizePerContact: boolean
+    contentLanguage?: string | null
+    contentTone?: string | null
+    content?: string | null
+    subject?: string
+    product?: { name?: string | null; description?: string | null } | null
+  }
+  emailAccountId: string | undefined
+  attachmentIds: string[]
+}) {
+  const primaryEmail = opts.contact.emails[0]
+  if (!primaryEmail) return null
+
+  const personalize = opts.campaign.personalizePerContact === true
+  const productDescription = buildProductDescription(opts.campaign)
+  const language = opts.campaign.contentLanguage || 'en'
+  const tone = opts.campaign.contentTone || 'professional'
+
+  if (personalize) {
+    return {
+      to: primaryEmail.address,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      contactId: opts.contact.id,
+      campaignId: opts.campaign.id,
+      emailAccountId: opts.emailAccountId,
+      fromEmail: opts.campaign.fromEmail || process.env.SMTP_USER || '',
+      fromName: opts.campaign.fromName || '',
+      trackingPixel: true,
+      trackingLinks: true,
+      attachmentIds: opts.attachmentIds.length > 0 ? opts.attachmentIds : undefined,
+      personalizePerContact: true,
+      baseSubject: opts.subject,
+      baseHtml: opts.html,
+      baseText: opts.text,
+      productDescription,
+      tone,
+      language,
+    }
+  }
+
+  const vars = buildContactVariables(opts.contact as any, primaryEmail.address)
+  return {
+    to: primaryEmail.address,
+    subject: applyEmailVariables(opts.subject, vars),
+    html: applyEmailVariables(opts.html, vars),
+    text: applyEmailVariables(opts.text, vars),
+    contactId: opts.contact.id,
+    campaignId: opts.campaign.id,
+    emailAccountId: opts.emailAccountId,
+    fromEmail: opts.campaign.fromEmail || process.env.SMTP_USER || '',
+    fromName: opts.campaign.fromName || '',
+    trackingPixel: true,
+    trackingLinks: true,
+    attachmentIds: opts.attachmentIds.length > 0 ? opts.attachmentIds : undefined,
+  }
+}
+
 /**
  * POST /api/campaigns/[id]/launch
  *
@@ -78,6 +148,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     const campaign = await prisma.campaign.findUnique({
       where: { id, tenantId: auth.tenantId },
+      include: { product: { select: { name: true, description: true } } },
     })
     if (!campaign) return errorResponse(ErrorCodes.NOT_FOUND, '活动不存在或无权操作', 404)
 
@@ -227,27 +298,19 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       const variantA = variants[0]
       const variantB = variants[1]
 
-      const buildJobs = (group: typeof contacts, variant: any, variantLabel: string) =>
+      const buildJobs = (group: typeof contacts, variant: any, _variantLabel: string) =>
         group
-          .map((contact) => {
-            const primaryEmail = contact.emails[0]
-            if (!primaryEmail) return null
-            const vars = buildContactVariables(contact, primaryEmail.address)
-            return {
-              to: primaryEmail.address,
-              subject: applyEmailVariables(variant.subject, vars),
-              html: applyEmailVariables(variant.htmlContent || variant.content || '', vars),
-              text: applyEmailVariables(variant.content || '', vars),
-              contactId: contact.id,
-              campaignId: campaign.id,
+          .map((contact) =>
+            buildContactEmailJob({
+              contact,
+              subject: variant.subject,
+              html: variant.htmlContent || variant.content || '',
+              text: variant.content || '',
+              campaign,
               emailAccountId: availableAccountId,
-              fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-              fromName: campaign.fromName || '',
-              trackingPixel: true,
-              trackingLinks: true,
-              attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-            }
-          })
+              attachmentIds,
+            })
+          )
           .filter(Boolean)
 
       const jobsA = buildJobs(groupA, variantA, 'A')
@@ -330,31 +393,17 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       const contactSlice = pendingContacts.slice(0, maxQueue)
 
       const emailJobs = contactSlice
-        .map((contact) => {
-          const primaryEmail = contact.emails[0]
-          if (!primaryEmail) return null
-
-          const vars = buildContactVariables(contact, primaryEmail.address)
-          const rawHtml = firstStep.htmlContent || firstStep.content || campaign.htmlContent || campaign.content || ''
-          const subject = applyEmailVariables(firstStep.subject || campaign.subject, vars)
-          const html = applyEmailVariables(rawHtml, vars)
-          const text = applyEmailVariables(firstStep.content || campaign.content || '', vars)
-
-          return {
-            to: primaryEmail.address,
-            subject,
-            html,
-            text,
-            contactId: contact.id,
-            campaignId: campaign.id,
+        .map((contact) =>
+          buildContactEmailJob({
+            contact,
+            subject: firstStep.subject || campaign.subject,
+            html: firstStep.htmlContent || firstStep.content || campaign.htmlContent || campaign.content || '',
+            text: firstStep.content || campaign.content || '',
+            campaign,
             emailAccountId: availableAccountId,
-            fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-            fromName: campaign.fromName || '',
-            trackingPixel: true,
-            trackingLinks: true,
-            attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-          }
-        })
+            attachmentIds,
+          })
+        )
         .filter(Boolean)
 
       if (emailJobs.length === 0) {
@@ -426,31 +475,17 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     const contactSlice = pendingContacts.slice(0, maxQueue)
 
     const emailJobs = contactSlice
-      .map((contact) => {
-        const primaryEmail = contact.emails[0]
-        if (!primaryEmail) return null
-
-        const vars = buildContactVariables(contact, primaryEmail.address)
-        const rawHtml = campaign.htmlContent || campaign.content || ''
-        const subject = applyEmailVariables(campaign.subject, vars)
-        const html = applyEmailVariables(rawHtml, vars)
-        const text = applyEmailVariables(campaign.content || '', vars)
-
-        return {
-          to: primaryEmail.address,
-          subject,
-          html,
-          text,
-          contactId: contact.id,
-          campaignId: campaign.id,
-          emailAccountId: availableAccountId,  // 使用自动选择的发件账户
-          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-          fromName: campaign.fromName || '',
-          trackingPixel: true,
-          trackingLinks: true,
-          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-        }
-      })
+      .map((contact) =>
+        buildContactEmailJob({
+          contact,
+          subject: campaign.subject,
+          html: campaign.htmlContent || campaign.content || '',
+          text: campaign.content || '',
+          campaign,
+          emailAccountId: availableAccountId,
+          attachmentIds,
+        })
+      )
       .filter(Boolean)
 
     if (emailJobs.length === 0) {

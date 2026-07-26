@@ -51,6 +51,7 @@ export function StepAiWriter() {
     scheduleType, scheduledAt, recurrenceRule, timezone,
     windowStart, windowEnd,
     editingCampaignId,
+    personalizePerContact, setPersonalizePerContact,
   } = useCampaignWizardStore()
 
   const isEditMode = !!editingCampaignId
@@ -173,6 +174,9 @@ export function StepAiWriter() {
       }
       // #52: 传递产品关联
       if (productId) campaignPayload.productId = productId
+      campaignPayload.personalizePerContact = personalizePerContact
+      campaignPayload.contentLanguage = language
+      campaignPayload.contentTone = tone
       if (attachments.length > 0) {
         campaignPayload.attachmentIds = attachments.map((a) => a.id)
       }
@@ -323,6 +327,26 @@ export function StepAiWriter() {
         </p>
       </div>
 
+      {/* 千邮千面开关 */}
+      <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 space-y-2">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            checked={personalizePerContact}
+            onChange={(e) => setPersonalizePerContact(e.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-medium text-gray-900">
+              {t('campaignWizard.personalizePerContact.label')}
+            </span>
+            <span className="mt-0.5 block text-xs text-gray-600">
+              {t('campaignWizard.personalizePerContact.hint')}
+            </span>
+          </span>
+        </label>
+      </div>
+
       {isSequence && sequenceReady && (
         <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2">
           <p className="text-sm font-medium text-gray-800">{t('campaignWizard.aiWriter.sequencePreview')}</p>
@@ -354,7 +378,7 @@ export function StepAiWriter() {
 
       {/* Tone selector */}
       <div className="space-y-2">
-        <Label>{t('campaignWizard.aiWriter.toneLabel')}</Label>
+        <Label>{t('campaignWizard.aiWriter.tone')}</Label>
         <div className="flex flex-wrap gap-2">
           {TONE_IDS.map((toneItem) => (
             <button

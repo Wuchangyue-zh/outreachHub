@@ -13,6 +13,10 @@ import { fetchFileBuffer } from './storage'
 import { resolvePublicUrls } from './email-html'
 import { incrementTenantStat } from './stats-aggregate'
 import { updateCampaignContactStatus } from './campaign-contacts'
+import { resolvePersonalizedContent } from './email-personalize'
+
+/** AI personalization + SMTP can exceed default 30s BullMQ lock */
+const WORKER_LOCK_DURATION_MS = 5 * 60 * 1000
 
 async function processEmailJob(job: Job<EmailJobData>) {
   const {
@@ -28,40 +32,83 @@ async function processEmailJob(job: Job<EmailJobData>) {
     trackingPixel,
     trackingLinks,
     attachmentIds,
+    personalizePerContact,
+    baseSubject,
+    baseHtml,
+    baseText,
+    productDescription,
+    tone,
+    language,
   } = job.data
 
   console.log(`[Email Worker] Processing job ${job.id}: Sending to ${to}`)
 
-  // Update job progress
+  await job.updateProgress(5)
+
+  // 确定发件人 + 日限额（必须在 AI 之前，避免白烧 Token）
+  let senderEmail = fromEmail || process.env.SMTP_USER || ''
+  if (emailAccountId) {
+    const canSend = await checkDailyLimit(emailAccountId)
+    if (!canSend) {
+      console.warn(`[Email Worker] EmailAccount ${emailAccountId} reached daily limit, skipping job ${job.id}`)
+      throw new Error(`EmailAccount ${emailAccountId} reached daily limit`)
+    }
+    const account = await prisma.emailAccount.findUnique({
+      where: { id: emailAccountId },
+      select: { email: true },
+    })
+    if (account) {
+      senderEmail = account.email
+    }
+  }
+
   await job.updateProgress(10)
 
-  // P1-10: 模板变量替换
-  let finalSubject = subject
-  let finalHtml = html || ''
-  let finalText = text || ''
+  // 千邮千面 / 变量替换
+  const resolved = await resolvePersonalizedContent({
+    to,
+    subject,
+    html,
+    text,
+    contactId,
+    personalizePerContact,
+    baseSubject,
+    baseHtml,
+    baseText,
+    productDescription,
+    tone,
+    language,
+  })
 
-  if (contactId) {
-    // 获取联系人信息用于变量替换
+  if (resolved.fallbackReason) {
+    console.warn(
+      `[Email Worker] Personalize fallback for ${to}: ${resolved.fallbackReason}`
+    )
+  }
+
+  let finalSubject = resolved.subject
+  let finalHtml = resolved.html || ''
+  let finalText = resolved.text || ''
+
+  // 非个性化路径仍可能需要变量替换（兼容旧 job 只传未替换模板）
+  if (!personalizePerContact && contactId && (subject.includes('{{') || (html || '').includes('{{') || (text || '').includes('{{'))) {
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
       include: {
         company: true,
-        emails: {
-          where: { isPrimary: true },
-          take: 1,
-        },
+        emails: { where: { isPrimary: true }, take: 1 },
       },
     })
-
     if (contact) {
       const primaryEmail = contact.emails[0]?.address || to
       const variables = buildContactVariables(contact, primaryEmail)
-
       finalSubject = applyEmailVariables(subject, variables)
       finalHtml = applyEmailVariables(html || '', variables)
       finalText = applyEmailVariables(text || '', variables)
     }
   }
+
+  await job.updateProgress(25)
 
   // H1: 加载附件 Buffer
   let emailAttachments: Array<{ filename: string; content: Buffer }> | undefined
@@ -85,26 +132,7 @@ async function processEmailJob(job: Job<EmailJobData>) {
     }
   }
 
-  // 确定发件人邮箱
-  let senderEmail = fromEmail || process.env.SMTP_USER || ''
-
-  // 如果指定了 EmailAccount，检查发送限额并获取发件人邮箱
-  if (emailAccountId) {
-    const canSend = await checkDailyLimit(emailAccountId)
-    if (!canSend) {
-      console.warn(`[Email Worker] EmailAccount ${emailAccountId} reached daily limit, skipping job ${job.id}`)
-      throw new Error(`EmailAccount ${emailAccountId} reached daily limit`)
-    }
-    const account = await prisma.emailAccount.findUnique({
-      where: { id: emailAccountId },
-      select: { email: true },
-    })
-    if (account) {
-      senderEmail = account.email
-    }
-  }
-
-  // Create email log entry
+  // Create email log entry（不把 personalize_fallback 写入 error 字段）
   const emailLogData: any = {
     contactId: contactId || '',
     messageId: '',
@@ -132,22 +160,18 @@ async function processEmailJob(job: Job<EmailJobData>) {
   if (emailLog.id && contactId) {
     emailHtml = addEmailTracking(emailHtml, emailLog.id, contactId, campaignId)
   } else if (trackingPixel && emailLog.id) {
-    // Fallback: just add tracking pixel if no contactId
     const pixelUrl = `${process.env.APP_URL}/api/email/track/open?e=${emailLog.id}&c=${contactId || ''}&t=${Date.now()}`
     emailHtml += `<img src="${pixelUrl}" width="1" height="1" style="display:none" />`
   }
 
-  // H2: 将本地路径图片 URL 转为公网可访问 URL
   emailHtml = resolvePublicUrls(emailHtml)
 
   await job.updateProgress(50)
 
   try {
-    // Send email - 根据是否有 EmailAccount 选择发送方式
     let result: { success: boolean; messageId?: string }
 
     if (emailAccountId) {
-      // 使用用户 EmailAccount 发送
       result = await sendAccountMail({
         emailAccountId,
         to,
@@ -158,7 +182,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
         attachments: emailAttachments,
       })
     } else {
-      // 使用平台 SMTP 发送（降级）
       result = await sendPlatformMail({
         to,
         subject: finalSubject,
@@ -171,7 +194,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
 
     await job.updateProgress(90)
 
-    // Update email log with success
     await prisma.emailLog.update({
       where: { id: emailLog.id },
       data: {
@@ -180,7 +202,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
       },
     })
 
-    // Update contact email statistics if contactId exists
     if (contactId) {
       await prisma.contact.update({
         where: { id: contactId },
@@ -191,7 +212,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
       })
     }
 
-    // #9: 不再直接 totalSent++，由 stats API 从 EmailLog 聚合后同步
     if (campaignId) {
       await maybeMarkCampaignCompleted(campaignId)
       if (contactId) {
@@ -206,7 +226,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
       }
     }
 
-    // #14: 发送成功时小幅恢复账户健康度（上限由 select-email-account 控制）
     if (emailAccountId) {
       await prisma.emailAccount.update({
         where: { id: emailAccountId },
@@ -215,25 +234,15 @@ async function processEmailJob(job: Job<EmailJobData>) {
     }
 
     await job.updateProgress(100)
-
-    console.log(`[Email Worker] Job ${job.id} completed: ${result.messageId}`)
-
-    return {
-      success: true,
-      messageId: result.messageId,
-      emailLogId: emailLog.id,
-    }
+    return { success: true, emailLogId: emailLog.id, messageId: result.messageId }
   } catch (error: any) {
     console.error(`[Email Worker] Job ${job.id} failed:`, error)
 
-    // #14: 检测是否为永久性退信（5xx SMTP 错误）
     const isBounce = isPermanentBounce(error.message || '')
 
     if (isBounce) {
-      // 退信：标记 BOUNCED + 降级健康度 + 更新统计
       await markAsBounced(emailLog.id, error.message, emailAccountId)
     } else {
-      // 普通发送失败
       await prisma.emailLog.update({
         where: { id: emailLog.id },
         data: {
@@ -242,7 +251,6 @@ async function processEmailJob(job: Job<EmailJobData>) {
         },
       })
 
-      // #14: 发送失败时降低账户健康度
       if (emailAccountId) {
         await prisma.emailAccount.update({
           where: { id: emailAccountId },
@@ -270,6 +278,7 @@ export function createEmailWorker() {
   const worker = new Worker<EmailJobData>('email-queue', processEmailJob, {
     connection,
     concurrency: getWorkerConcurrency(5),
+    lockDuration: WORKER_LOCK_DURATION_MS,
     limiter: {
       max: rateLimit.max,
       duration: rateLimit.duration,

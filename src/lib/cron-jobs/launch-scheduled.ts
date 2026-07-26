@@ -1,9 +1,78 @@
 import { prisma } from '@/lib/prisma'
 import { addBulkEmailJobs } from '@/lib/email-queue'
 import { applyEmailVariables, buildContactVariables } from '@/lib/email-variables'
+import { buildProductDescription } from '@/lib/email-personalize'
 import { getAvailableAccount } from '@/lib/select-email-account'
 import { getCampaignContactIds } from '@/lib/campaign-contacts'
 import { getCampaignAttachmentIds } from '@/lib/campaign-attachments'
+
+function buildJobsForContacts(
+  contacts: Array<{
+    id: string
+    emails: { address: string }[]
+    firstName?: string | null
+    lastName?: string | null
+    fullName?: string | null
+    title?: string | null
+    country?: string | null
+    company?: { name?: string | null; industry?: string | null } | null
+  }>,
+  campaign: any,
+  availableAccountId: string,
+  attachmentIds: string[]
+) {
+  const personalize = campaign.personalizePerContact === true
+  const productDescription = buildProductDescription(campaign)
+  const rawHtml = campaign.htmlContent || campaign.content || ''
+  const baseText = campaign.content || ''
+
+  return contacts
+    .map((contact) => {
+      const primaryEmail = contact.emails[0]
+      if (!primaryEmail) return null
+
+      if (personalize) {
+        return {
+          to: primaryEmail.address,
+          subject: campaign.subject,
+          html: rawHtml,
+          text: baseText,
+          contactId: contact.id,
+          campaignId: campaign.id,
+          emailAccountId: availableAccountId,
+          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
+          fromName: campaign.fromName || '',
+          trackingPixel: true,
+          trackingLinks: true,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+          personalizePerContact: true,
+          baseSubject: campaign.subject,
+          baseHtml: rawHtml,
+          baseText,
+          productDescription,
+          tone: campaign.contentTone || 'professional',
+          language: campaign.contentLanguage || 'en',
+        }
+      }
+
+      const vars = buildContactVariables(contact, primaryEmail.address)
+      return {
+        to: primaryEmail.address,
+        subject: applyEmailVariables(campaign.subject, vars),
+        html: applyEmailVariables(rawHtml, vars),
+        text: applyEmailVariables(baseText, vars),
+        contactId: contact.id,
+        campaignId: campaign.id,
+        emailAccountId: availableAccountId,
+        fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
+        fromName: campaign.fromName || '',
+        trackingPixel: true,
+        trackingLinks: true,
+        attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+      }
+    })
+    .filter(Boolean)
+}
 
 function calculateNextRecurrence(recurrenceRule: string, lastRun: Date): Date | null {
   switch (recurrenceRule.toLowerCase()) {
@@ -93,28 +162,12 @@ async function processScheduledCampaign(campaign: any) {
       .filter((c) => !sentContactIds.has(c.id))
       .slice(0, campaign.throttlePerDay || 200)
 
-    const emailJobs = contactSlice
-      .map((contact) => {
-        const primaryEmail = contact.emails[0]
-        if (!primaryEmail) return null
-        const vars = buildContactVariables(contact, primaryEmail.address)
-        const rawHtml = campaign.htmlContent || campaign.content || ''
-        return {
-          to: primaryEmail.address,
-          subject: applyEmailVariables(campaign.subject, vars),
-          html: applyEmailVariables(rawHtml, vars),
-          text: applyEmailVariables(campaign.content || '', vars),
-          contactId: contact.id,
-          campaignId: campaign.id,
-          emailAccountId: availableAccountId,
-          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-          fromName: campaign.fromName || '',
-          trackingPixel: true,
-          trackingLinks: true,
-          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-        }
-      })
-      .filter(Boolean)
+    const emailJobs = buildJobsForContacts(
+      contactSlice,
+      campaign,
+      availableAccountId,
+      attachmentIds
+    )
 
     if (emailJobs.length === 0) {
       return { campaignId: campaign.id, success: false, error: 'No emails to send' }
@@ -180,28 +233,12 @@ async function processRecurringCampaign(campaign: any) {
       .filter((c) => !recentlySentIds.has(c.id))
       .slice(0, campaign.throttlePerDay || 200)
 
-    const emailJobs = contactSlice
-      .map((contact) => {
-        const primaryEmail = contact.emails[0]
-        if (!primaryEmail) return null
-        const vars = buildContactVariables(contact, primaryEmail.address)
-        const rawHtml = campaign.htmlContent || campaign.content || ''
-        return {
-          to: primaryEmail.address,
-          subject: applyEmailVariables(campaign.subject, vars),
-          html: applyEmailVariables(rawHtml, vars),
-          text: applyEmailVariables(campaign.content || '', vars),
-          contactId: contact.id,
-          campaignId: campaign.id,
-          emailAccountId: availableAccountId,
-          fromEmail: campaign.fromEmail || process.env.SMTP_USER || '',
-          fromName: campaign.fromName || '',
-          trackingPixel: true,
-          trackingLinks: true,
-          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-        }
-      })
-      .filter(Boolean)
+    const emailJobs = buildJobsForContacts(
+      contactSlice,
+      campaign,
+      availableAccountId,
+      attachmentIds
+    )
 
     const nextRecurrence = calculateNextRecurrence(campaign.recurrenceRule, now)
 
@@ -236,6 +273,7 @@ export async function executeLaunchScheduled() {
   const [scheduledCampaigns, recurringCampaigns] = await Promise.all([
     prisma.campaign.findMany({
       where: { status: 'SCHEDULED', scheduledAt: { lte: now } },
+      include: { product: { select: { name: true, description: true } } },
     }),
     prisma.campaign.findMany({
       where: {
@@ -247,6 +285,7 @@ export async function executeLaunchScheduled() {
           { nextRecurrenceAt: null, lastRecurrenceAt: null },
         ],
       },
+      include: { product: { select: { name: true, description: true } } },
     }),
   ])
 

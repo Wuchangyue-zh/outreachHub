@@ -81,7 +81,7 @@ export async function generateEmail(input: EmailGenerationInput) {
       {
         role: 'system',
         content:
-          'You are a professional B2B email copywriter specializing in cold outreach for Chinese exporters selling to overseas markets. Write compelling, personalized emails that get responses. Always write in the specified language.',
+          'You are a professional B2B email copywriter specializing in cold outreach for Chinese exporters selling to overseas markets. Write a complete, ready-to-send personalized email (not a template with placeholders). Use ONLY the real contact/company facts provided — never invent purchase history, awards, or other unverifiable claims. Always write in the specified language.',
       },
       { role: 'user', content: prompt },
     ],
@@ -484,9 +484,23 @@ function buildEmailPrompt(input: EmailGenerationInput): string {
     pt: 'Portuguese',
     ru: 'Russian',
     ar: 'Arabic',
+    it: 'Italian',
+    nl: 'Dutch',
+    English: 'English',
+    Chinese: 'Chinese',
+    German: 'German',
+    French: 'French',
+    Spanish: 'Spanish',
+    Japanese: 'Japanese',
+    Korean: 'Korean',
+    Portuguese: 'Portuguese',
+    Russian: 'Russian',
+    Arabic: 'Arabic',
+    Italian: 'Italian',
+    Dutch: 'Dutch',
   }
 
-  const lang = languageMap[input.language || 'en'] || 'English'
+  const lang = languageMap[input.language || 'en'] || input.language || 'English'
   const tone = input.tone || 'professional'
   const purpose = input.purpose || 'cold-outreach'
 
@@ -500,12 +514,13 @@ Industry: ${input.companyIndustry || 'Not specified'}
 Our Product/Service: ${input.productDescription}
 
 Requirements:
-1. Personalize the opening with the contact's name and company
+1. Personalize the opening with the contact's real name and company (use the values above, not placeholders like {{FirstName}})
 2. Keep it under 150 words
 3. Include a clear call-to-action
 4. Be concise and value-focused
 5. Avoid overly salesy language
-6. Reference industry-specific pain points if possible
+6. You may reference the industry only if provided — do NOT invent procurement history, news, or awards
+7. Output a complete sendable email body with no {{variable}} placeholders
 
 Return the email with a compelling subject line at the top, formatted as:
 Subject: [subject line]

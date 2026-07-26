@@ -4,6 +4,7 @@ import { useSSE } from '@/hooks/use-sse'
 import { useI18n } from '@/hooks/use-i18n'
 import { Bell, Wifi, WifiOff, Loader2, Mail, Eye, MousePointer, Reply, AlertTriangle, X } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/toast'
 
 interface EmailEvent {
@@ -12,6 +13,7 @@ interface EmailEvent {
   toEmail: string
   subject: string
   timestamp: number
+  replyCategory?: string
 }
 
 interface RealtimeData {
@@ -33,7 +35,14 @@ interface RealtimeData {
 
 interface RealtimeStatusProps {
   onNewData?: (data: RealtimeData) => void
+  /** Called when a new email:replied event arrives (for unread badge) */
+  onReplyEvent?: () => void
+  /** Hide connection label — compact header mode */
+  compact?: boolean
 }
+
+export const SSE_STATS_EVENT = 'oh:sse-stats'
+export const SSE_REPLY_EVENT = 'oh:sse-reply'
 
 const eventIcons: Record<string, typeof Mail> = {
   'email:sent': Mail,
@@ -53,9 +62,10 @@ const eventColors: Record<string, string> = {
   'email:failed': 'text-red-600 bg-red-50',
 }
 
-export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
+export function RealtimeStatus({ onNewData, onReplyEvent, compact }: RealtimeStatusProps) {
   const { addToast } = useToast()
   const { t } = useI18n()
+  const router = useRouter()
   const { data, connected, error } = useSSE('/api/sse/stats', {
     enabled: true,
     reconnectInterval: 10000,
@@ -83,16 +93,22 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
 
     if (data.type === 'stats' && data.data) {
       onNewData?.(data.data)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(SSE_STATS_EVENT, { detail: data.data }))
+      }
     }
 
     // Process real-time email events
     if (data.type === 'email_event') {
+      const replyCategory =
+        (data as any).metadata?.replyCategory || (data as any).replyCategory
       const event = {
         type: (data as any).eventType || data.type,
         emailLogId: (data as any).emailLogId,
         toEmail: (data as any).toEmail,
         subject: (data as any).subject,
         timestamp: (data as any).timestamp,
+        replyCategory,
       } as EmailEvent
       if (event.timestamp > lastEventTimestamp) {
         setLastEventTimestamp(event.timestamp)
@@ -100,11 +116,17 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
 
         // Show toast for important events
         if (event.type === 'email:replied') {
+          const categorySuffix = replyCategory ? ` [${replyCategory}]` : ''
           addToast({
             type: 'success',
             title: t('realtime.receivedReply'),
-            description: `${event.toEmail}: "${event.subject}"`,
+            description: `${event.toEmail}: "${event.subject}"${categorySuffix}`,
+            href: '/dashboard/inbox',
           })
+          onReplyEvent?.()
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(SSE_REPLY_EVENT, { detail: event }))
+          }
         } else if (event.type === 'email:bounced' || event.type === 'email:failed') {
           addToast({
             type: 'error',
@@ -114,7 +136,7 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
         }
       }
     }
-  }, [data, lastEventTimestamp, onNewData, addToast, t])
+  }, [data, lastEventTimestamp, onNewData, onReplyEvent, addToast, t])
 
   const clearNotifications = useCallback(() => {
     setNotifications([])
@@ -123,30 +145,33 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
   return (
     <div className="flex items-center gap-3">
       {/* Connection status */}
-      <div className="flex items-center gap-1.5 text-xs">
-        {connected ? (
-          <>
-            <Wifi className="h-3.5 w-3.5 text-green-500" />
-            <span className="text-green-600">{t('realtime.connected')}</span>
-          </>
-        ) : error ? (
-          <>
-            <WifiOff className="h-3.5 w-3.5 text-red-500" />
-            <span className="text-red-500">{t('realtime.disconnected')}</span>
-          </>
-        ) : (
-          <>
-            <Loader2 className="h-3.5 w-3.5 text-gray-400 animate-spin" />
-            <span className="text-gray-400">{t('realtime.connecting')}</span>
-          </>
-        )}
-      </div>
+      {!compact && (
+        <div className="flex items-center gap-1.5 text-xs">
+          {connected ? (
+            <>
+              <Wifi className="h-3.5 w-3.5 text-green-500" />
+              <span className="text-green-600">{t('realtime.connected')}</span>
+            </>
+          ) : error ? (
+            <>
+              <WifiOff className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-red-500">{t('realtime.disconnected')}</span>
+            </>
+          ) : (
+            <>
+              <Loader2 className="h-3.5 w-3.5 text-gray-400 animate-spin" />
+              <span className="text-gray-400">{t('realtime.connecting')}</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Notifications bell */}
       <div className="relative">
         <button
           onClick={() => setShowPanel(!showPanel)}
           className="relative p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          title={connected ? t('realtime.connected') : t('realtime.connecting')}
         >
           <Bell className="h-4 w-4 text-gray-600 dark:text-gray-400" />
           {notifications.length > 0 && (
@@ -189,9 +214,16 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
                   const Icon = eventIcons[event.type] || Mail
                   const colorClass = eventColors[event.type] || 'text-gray-600 bg-gray-50'
                   return (
-                    <div
+                    <button
                       key={`${event.emailLogId}-${event.timestamp}-${index}`}
-                      className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-b border-gray-50 dark:border-gray-700/50 last:border-0"
+                      type="button"
+                      onClick={() => {
+                        if (event.type === 'email:replied') {
+                          router.push('/dashboard/inbox')
+                          setShowPanel(false)
+                        }
+                      }}
+                      className="flex w-full items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 border-b border-gray-50 dark:border-gray-700/50 last:border-0 text-left"
                     >
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${colorClass}`}>
                         <Icon className="h-4 w-4" />
@@ -199,6 +231,11 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                           {getEventLabel(event.type)}
+                          {event.replyCategory ? (
+                            <span className="ml-1 text-xs font-normal text-gray-400">
+                              ({event.replyCategory})
+                            </span>
+                          ) : null}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {event.toEmail}
@@ -210,7 +247,7 @@ export function RealtimeStatus({ onNewData }: RealtimeStatusProps) {
                       <span className="text-[10px] text-gray-400 flex-shrink-0">
                         {new Date(event.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                    </div>
+                    </button>
                   )
                 })
               )}

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import StatsOverview from '@/components/dashboard/stats-overview'
 import RecentCampaigns from '@/components/dashboard/recent-campaigns'
 import ActivityChart from '@/components/dashboard/activity-chart'
 import QuickActions from '@/components/dashboard/quick-actions'
 import TodayTasks from '@/components/dashboard/today-tasks'
-import { RealtimeStatus } from '@/components/RealtimeStatus'
+import { SSE_STATS_EVENT } from '@/components/RealtimeStatus'
 import { useI18n } from '@/hooks/use-i18n'
 import { Rocket, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,11 +29,16 @@ export default function DashboardContent() {
       .catch(() => {})
   }, [])
 
-  const handleSseRefresh = useCallback(() => {
-    const now = Date.now()
-    if (now - lastSseRefresh.current < 60_000) return
-    lastSseRefresh.current = now
-    setRefreshToken((t) => t + 1)
+  // Listen for SSE stats from layout RealtimeStatus (avoid double SSE connection)
+  useEffect(() => {
+    const handler = () => {
+      const now = Date.now()
+      if (now - lastSseRefresh.current < 60_000) return
+      lastSseRefresh.current = now
+      setRefreshToken((t) => t + 1)
+    }
+    window.addEventListener(SSE_STATS_EVENT, handler)
+    return () => window.removeEventListener(SSE_STATS_EVENT, handler)
   }, [])
 
   return (
@@ -45,7 +50,6 @@ export default function DashboardContent() {
             {t('dashboard.welcome')}
           </p>
         </div>
-        <RealtimeStatus onNewData={handleSseRefresh} />
       </div>
 
       {/* §9.61: 无客户数据时展示入门向导 CTA */}

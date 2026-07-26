@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -9,6 +10,7 @@ interface Toast {
   type: 'success' | 'error' | 'info' | 'warning'
   title: string
   description?: string
+  href?: string
 }
 
 interface ToastContextType {
@@ -69,6 +71,8 @@ function ToastContainer({
 }
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+  const router = useRouter()
+
   const icons = {
     success: <CheckCircle className="h-5 w-5 text-green-500" />,
     error: <AlertCircle className="h-5 w-5 text-red-500" />,
@@ -83,11 +87,21 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     warning: 'bg-yellow-50 border-yellow-200',
   }
 
+  const handleClick = () => {
+    if (toast.href) {
+      router.push(toast.href)
+      onClose()
+    }
+  }
+
   return (
     <div
+      role={toast.href ? 'link' : undefined}
+      onClick={handleClick}
       className={cn(
         'flex w-80 items-start gap-3 rounded-lg border p-4 shadow-lg transition-all animate-in slide-in-from-right-full',
-        bgColors[toast.type]
+        bgColors[toast.type],
+        toast.href && 'cursor-pointer hover:opacity-90'
       )}
     >
       {icons[toast.type]}
@@ -95,7 +109,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         <p className="text-sm font-medium">{toast.title}</p>
         {toast.description && <p className="mt-1 text-xs text-gray-500">{toast.description}</p>}
       </div>
-      <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onClose()
+        }}
+        className="text-gray-400 hover:text-gray-600"
+      >
         <X className="h-4 w-4" />
       </button>
     </div>

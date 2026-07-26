@@ -34,6 +34,7 @@ model User {
   twoFactorSecret      String?   // TOTP secret (encrypted)
   twoFactorBackupCodes String?   // JSON array of hashed backup codes
   isPlatformAdmin      Boolean   @default(false)
+  inboxLastSeenAt      DateTime? // 站内收件箱上次已读时间
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -360,6 +361,12 @@ model Campaign {
   // 发件账户关联
   emailAccountId  String?
   emailAccount    EmailAccount?   @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+
+  // 千邮千面：每人独立 AI 生成（默认关闭，走变量替换）
+  personalizePerContact Boolean @default(false)
+  // 千邮千面 / AI 写信用语种与语调（向导选择）
+  contentLanguage String @default("en")
+  contentTone     String @default("professional")
 
   // #52: 产品关联
   productId       String?

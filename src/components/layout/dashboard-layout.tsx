@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useI18n } from '@/hooks/use-i18n'
+import { RealtimeStatus, SSE_REPLY_EVENT } from '@/components/RealtimeStatus'
 
 interface TenantUsageData {
   tenant: {
@@ -143,10 +144,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
+  const [inboxUnread, setInboxUnread] = useState(0)
   const pathname = usePathname()
   useEffect(() => { fetch('/api/users/me').then(r=>r.json()).then(d=>{ if(d.success) setIsPlatformAdmin(d.user?.isPlatformAdmin===true) }).catch(()=>{}) }, [])
   const router = useRouter()
   const { t } = useI18n()
+
+  const fetchUnread = useCallback(async () => {
+    // 已在收件箱：角标保持 0，避免轮询把水位未更新的未读又刷回来
+    if (pathname.startsWith('/dashboard/inbox')) {
+      setInboxUnread(0)
+      return
+    }
+    try {
+      const res = await fetch('/api/inbox/unread-count')
+      const data = await res.json()
+      if (data.success) setInboxUnread(data.data?.count || 0)
+    } catch {
+      // non-critical
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 45000)
+    const onReply = () => {
+      if (pathname.startsWith('/dashboard/inbox')) {
+        setInboxUnread(0)
+        // 推进已读水位，离开收件箱后轮询不会误亮角标
+        fetch('/api/inbox/mark-seen', { method: 'POST' }).catch(() => {})
+        return
+      }
+      setInboxUnread((c) => c + 1)
+    }
+    window.addEventListener(SSE_REPLY_EVENT, onReply)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener(SSE_REPLY_EVENT, onReply)
+    }
+  }, [fetchUnread, pathname])
+
+  // Clear badge when navigating to inbox (mark-seen runs on inbox page)
+  useEffect(() => {
+    if (pathname.startsWith('/dashboard/inbox')) {
+      setInboxUnread(0)
+    }
+  }, [pathname])
 
   const handleLogout = async () => {
     try {
@@ -199,6 +242,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <ul className="space-y-1">
             {navigation.filter(item => !item.platformAdminOnly || isPlatformAdmin).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const showBadge = item.href === '/dashboard/inbox' && inboxUnread > 0
               return (
                 <li key={item.href}>
                   <Link
@@ -213,8 +257,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     )}
                     title={collapsed ? item.name : undefined}
                   >
-                    <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
-                    {!collapsed && <span>{item.name}</span>}
+                    <span className="relative flex-shrink-0">
+                      <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                      {collapsed && showBadge && (
+                        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="flex-1">{item.name}</span>
+                        {showBadge && (
+                          <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
+                            {inboxUnread > 99 ? '99+' : inboxUnread}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </Link>
                 </li>
               )
@@ -245,6 +303,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-4 ml-auto">
+            <RealtimeStatus compact />
             <LanguageSwitcher />
             <ThemeToggle />
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">

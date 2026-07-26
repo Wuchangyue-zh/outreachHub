@@ -111,7 +111,8 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     // Status guard: editing content fields requires DRAFT or PAUSED
     const isContentEdit = ['name', 'subject', 'content', 'htmlContent', 'type', 'sequence',
       'emailAccountId', 'productId', 'scheduleType', 'scheduledAt', 'timezone',
-      'sendingWindows', 'recurrenceRule', 'abTestEnabled', 'contactIds'].some(
+      'sendingWindows', 'recurrenceRule', 'abTestEnabled', 'personalizePerContact',
+      'contentLanguage', 'contentTone', 'contactIds'].some(
       (k) => body[k] !== undefined
     )
     if (isContentEdit && !EDITABLE_STATUSES.includes(existing.status)) {
@@ -140,6 +141,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.throttlePerHour !== undefined) updateData.throttlePerHour = body.throttlePerHour
     if (body.throttlePerDay !== undefined) updateData.throttlePerDay = body.throttlePerDay
     if (body.abTestEnabled !== undefined) updateData.abTestEnabled = body.abTestEnabled
+    if (body.personalizePerContact !== undefined) updateData.personalizePerContact = !!body.personalizePerContact
+    if (body.contentLanguage !== undefined) updateData.contentLanguage = body.contentLanguage || 'en'
+    if (body.contentTone !== undefined) updateData.contentTone = body.contentTone || 'professional'
     if (body.type !== undefined) updateData.type = body.type
     if (body.productId !== undefined) updateData.productId = body.productId || null
     if (body.recurrenceRule !== undefined) updateData.recurrenceRule = body.recurrenceRule || null

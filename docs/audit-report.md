@@ -1998,3 +1998,24 @@ H3a（CSV tenantId 修复，P0 bug）→ H1 → H2 → H3b–e → H4 → npm ru
 - 若后续需「真·地理轮廓地图」，可增量引入 `react-simple-maps`，当前 tile grid 为 bundle 可控的 MVP 方案。
 
 **Q2b 最终状态：** CampaignStats 地理分析现具备 国家级 choropleth 视图（tile grid）+ 原有柱状图 + 城市 Top 10，三种视角齐备。
+---
+
+### §9.63 千邮千面 + 站内收件提醒（2026-07-26）
+
+**目标：** 补齐首页承诺的「千人千面」可开关能力；打通 IMAP 回复 → 站内 Toast/铃铛/侧边栏未读角标。
+
+| 编号 | 任务 | 关键文件 |
+|------|------|----------|
+| B1 | IMAP `processReply` 发射 `email:replied`（含 tenantId + replyCategory） | `lib/imap-multi.ts` |
+| B2 | `RealtimeStatus` 挂到 `dashboard-layout` 顶栏；Dashboard 去重 SSE；Toast 可点进 Inbox | `RealtimeStatus.tsx`, `dashboard-layout.tsx`, `dashboard-content.tsx`, `ui/toast.tsx` |
+| B3 | `User.inboxLastSeenAt` + unread-count / mark-seen API + 侧边栏角标 | `schema.prisma`, `api/inbox/*`, layout, inbox page |
+| A1 | `Campaign.personalizePerContact` 字段 + PATCH/创建读写 | `schema.prisma`, `api/campaigns/[id]` |
+| A2 | 向导开关 + hydrate + i18n | `campaign-wizard-store.ts`, `StepAiWriter.tsx`, `i18n.ts` |
+| A3 | Worker/直发 AI 生成 + 失败降级；Launch/SEQUENCE/AB 入队 flag | `email-personalize.ts`, `email-queue.ts`, `email-worker.ts`, `launch/route.ts`, `advance-sequences.ts` |
+| A4 | `generateEmail` prompt：可发送正文、禁止编造虚假采购数据 | `openai.ts` |
+
+**架构决策：**
+- 千邮千面默认关闭；开启时 Launch 不同步调 AI，由 Email Worker 发送前 `generateEmail`，失败降级变量替换。
+- 站内提醒复用 Redis Pub/Sub `emailEvents` + SSE；本批不发平台邮件 / 浏览器 Push。
+
+**验证：** `npx tsc --noEmit` 通过 · `npm run db:push` 通过 · `npm test` 201 passed。

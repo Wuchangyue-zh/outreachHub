@@ -1309,6 +1309,10 @@ const translations: Record<Locale, Translations> = {
         uploadFailed: '上传失败', label: '邮件附件（可选）', add: '添加附件',
         remove: '移除附件', hint: '支持 PDF、Office、图片等，单文件最大 10MB',
       },
+      personalizePerContact: {
+        label: '千邮千面（每人独立 AI 生成）',
+        hint: '开启后，发送时为每位联系人单独调用 AI 生成正文（耗时更长、费用更高）；关闭则使用上方模板 + 变量替换。大名单建议关闭。',
+      },
       error: {
         noRecipients: '没有有效的收件人，请返回上一步添加联系人',
         sequenceNeedsEmail: '序列中至少需要一个邮件步骤',
@@ -2706,6 +2710,10 @@ const translations: Record<Locale, Translations> = {
       attachment: {
         uploadFailed: 'Upload failed', label: 'Email Attachments (optional)', add: 'Add Attachment',
         remove: 'Remove Attachment', hint: 'Supports PDF, Office, images, etc. Max 10MB per file',
+      },
+      personalizePerContact: {
+        label: 'Per-contact AI personalization',
+        hint: 'When on, each recipient gets a unique AI-written email at send time (slower, higher cost). When off, the template above is sent with variable substitution. Keep off for large lists.',
       },
       error: {
         noRecipients: 'No valid recipients, please go back and add contacts',

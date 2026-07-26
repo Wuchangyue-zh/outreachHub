@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { classifyReply, type ClassificationResult } from './reply-classifier'
 import { safeDecrypt } from './encryption'
 import { dispatchWebhook } from './webhook-dispatch'
+import { emailEvents } from './events'
 
 export interface IMAPAccountConfig {
   id: string
@@ -291,21 +292,42 @@ async function processReply(email: FetchedEmail): Promise<boolean> {
 
   // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 
-  // Fire-and-forget webhook dispatch for reply received
+  // Resolve tenant for webhook + real-time SSE (prefer campaign, fallback contact)
+  let replyTenantId: string | null | undefined
   if (originalLog.campaignId) {
     const campaignForWebhook = await prisma.campaign.findUnique({
       where: { id: originalLog.campaignId },
       select: { tenantId: true },
     }).catch(() => null)
-
-    if (campaignForWebhook?.tenantId) {
-      dispatchWebhook(campaignForWebhook.tenantId, 'reply.received', {
-        contactId: originalLog.contactId,
-        emailLogId: originalLog.id,
-        category: classification.category,
-      }).catch(() => {})
-    }
+    replyTenantId = campaignForWebhook?.tenantId
   }
+  if (!replyTenantId) {
+    const contact = await prisma.contact.findUnique({
+      where: { id: originalLog.contactId },
+      select: { tenantId: true },
+    }).catch(() => null)
+    replyTenantId = contact?.tenantId
+  }
+
+  if (replyTenantId) {
+    dispatchWebhook(replyTenantId, 'reply.received', {
+      contactId: originalLog.contactId,
+      emailLogId: originalLog.id,
+      category: classification.category,
+    }).catch(() => {})
+  }
+
+  emailEvents.emit({
+    type: 'email:replied',
+    emailLogId: originalLog.id,
+    toEmail: originalLog.toEmail,
+    subject: originalLog.subject,
+    campaignId: originalLog.campaignId || undefined,
+    contactId: originalLog.contactId,
+    tenantId: replyTenantId || undefined,
+    timestamp: Date.now(),
+    metadata: { replyCategory: classification.category },
+  })
 
   return true
 }
