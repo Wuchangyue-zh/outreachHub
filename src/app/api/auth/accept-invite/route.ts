@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import { generateToken } from '@/lib/jwt'
+import { setAuthCookie } from '@/lib/auth-cookies'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { getTenantLimits } from '@/lib/plan-limits'
 
@@ -97,13 +98,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    response.cookies.set('auth-token', jwtToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    })
+    setAuthCookie(response, jwtToken)
 
     return response
   } catch (error) {

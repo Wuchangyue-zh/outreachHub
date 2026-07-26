@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Mail, Loader2, AlertCircle, Shield } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import { useI18n } from '@/hooks/use-i18n'
 
 export default function LoginForm() {
   const { t } = useI18n()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/dashboard'
   const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/dashboard'
@@ -47,7 +46,7 @@ export default function LoginForm() {
 
       if (data.success) {
         addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: t('loginForm.welcomeBackName', { name: data.user.name }) })
-        router.push(redirectTo)
+        window.location.assign(redirectTo)
       } else if (data.requires2FA) {
         // Switch to 2FA verification step
         setRequires2FA(true)
@@ -87,7 +86,7 @@ export default function LoginForm() {
 
       if (data.success) {
         addToast({ type: 'success', title: t('loginForm.loginSuccess'), description: t('loginForm.welcomeBackName', { name: data.user.name }) })
-        router.push(redirectTo)
+        window.location.assign(redirectTo)
       } else {
         const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('loginForm.verificationFailed')
         setError(errorMsg)

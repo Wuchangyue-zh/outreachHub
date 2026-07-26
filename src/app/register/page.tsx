@@ -2,13 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Mail, Loader2, AlertCircle } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import { useI18n } from '@/hooks/use-i18n'
 
 export default function RegisterPage() {
-  const router = useRouter()
   const { addToast } = useToast()
   const { t } = useI18n()
   const [form, setForm] = useState({ email: '', password: '', name: '', company: '' })
@@ -47,7 +45,8 @@ export default function RegisterPage() {
 
       if (data.success) {
         addToast({ type: 'success', title: t('auth.registerSuccess'), description: t('auth.welcomeJoin') })
-        router.push('/dashboard')
+        // Hard navigation so middleware sees the newly set auth cookie
+        window.location.assign('/dashboard')
       } else {
         const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || t('auth.registerFailed')
         setError(errorMsg)

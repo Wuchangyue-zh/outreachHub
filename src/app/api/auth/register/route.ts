@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import { generateToken } from '@/lib/jwt'
+import { setAuthCookie } from '@/lib/auth-cookies'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { sendPlatformMail } from '@/lib/email'
@@ -142,13 +143,7 @@ export async function POST(req: NextRequest) {
       user: { id: user.id, email: user.email, name: user.name },
     })
 
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    })
+    setAuthCookie(response, token)
 
     return response
   } catch (error) {
