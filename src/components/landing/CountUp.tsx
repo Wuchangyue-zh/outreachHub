@@ -24,26 +24,24 @@ export function CountUp({ end, duration = 2000, prefix = '', suffix = '', decima
     const el = ref.current
     if (!el) return
 
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+    // If IO never fires (opacity:0 parents, odd layouts), still show the final value
+    const fallbackTimer = setTimeout(() => setInView(true), 1200)
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setInView(true)
           observer.unobserve(el)
-          if (fallbackTimer) clearTimeout(fallbackTimer)
+          clearTimeout(fallbackTimer)
         }
       },
       { threshold: 0.05, rootMargin: '80px' }
     )
     observer.observe(el)
 
-    // If IO never fires (opacity:0 parents, odd layouts), still show the final value
-    fallbackTimer = setTimeout(() => setInView(true), 1200)
-
     return () => {
       observer.disconnect()
-      if (fallbackTimer) clearTimeout(fallbackTimer)
+      clearTimeout(fallbackTimer)
     }
   }, [])
 

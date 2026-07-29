@@ -111,3 +111,17 @@ export async function replaceCampaignContacts(
     await replaceCampaignContactsWithClient(inner, campaignId, contactIds)
   })
 }
+
+/**
+ * 更新单个 CampaignContact 状态。
+ */
+export async function updateCampaignContactStatus(
+  campaignId: string,
+  contactId: string,
+  status: 'PENDING' | 'SENT' | 'OPENED' | 'REPLIED' | 'BOUNCED' | 'FAILED' | 'SKIPPED'
+): Promise<void> {
+  await prisma.campaignContact.updateMany({
+    where: { campaignId, contactId },
+    data: { status },
+  })
+}
