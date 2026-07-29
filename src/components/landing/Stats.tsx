@@ -7,14 +7,15 @@ import { ScrollReveal } from '@/components/landing/ScrollReveal'
 
 const statIcons = [Users, Globe, ShieldCheck, Building2]
 
-/** Parse a value string like "9亿+" into a numeric end value for CountUp. */
+/** Parse a value string like "9亿+" or "2,800+" into a numeric end value for CountUp. */
 function parseValue(value: string): { num: number; suffix: string; decimals: number } {
-  const match = value.match(/^([\d.]+)(.*)$/)
+  const match = value.match(/^([\d,.]+)(.*)$/)
   if (!match) return { num: 0, suffix: value, decimals: 0 }
-  const num = parseFloat(match[1])
+  const raw = match[1].replace(/,/g, '')
+  const num = parseFloat(raw)
   const suffix = match[2]
-  const decimals = match[1].includes('.') ? match[1].split('.')[1].length : 0
-  return { num, suffix, decimals }
+  const decimals = raw.includes('.') ? raw.split('.')[1].length : 0
+  return { num: Number.isFinite(num) ? num : 0, suffix, decimals }
 }
 
 export function Stats() {

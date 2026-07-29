@@ -10,29 +10,31 @@ interface User {
 
 interface AuthState {
   user: User | null
-  token: string | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (user: User, token: string) => void
+  login: (user: User) => void
   logout: () => void
   setLoading: (loading: boolean) => void
+  /** Cookie is httpOnly — client cannot read it. Session is validated via /api/users/me. */
   initFromCookie: () => void
 }
 
+/**
+ * Client auth UI state only.
+ * JWT lives in httpOnly `auth-token` cookie (set by /api/auth/*).
+ * Do not write auth-token via document.cookie — browsers cannot read httpOnly cookies.
+ */
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: null,
   isLoading: true,
   isAuthenticated: false,
 
-  login: (user, token) => {
-    set({ user, token, isAuthenticated: true, isLoading: false })
-    document.cookie = `auth-token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; sameSite=lax`
+  login: (user) => {
+    set({ user, isAuthenticated: true, isLoading: false })
   },
 
   logout: () => {
-    set({ user: null, token: null, isAuthenticated: false, isLoading: false })
-    document.cookie = 'auth-token=; path=/; max-age=0'
+    set({ user: null, isAuthenticated: false, isLoading: false })
   },
 
   setLoading: (loading) => {
@@ -40,18 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initFromCookie: () => {
-    const cookies = document.cookie.split(';')
-    const authCookie = cookies.find((c) => c.trim().startsWith('auth-token='))
-
-    if (authCookie) {
-      const token = authCookie.trim().split('=')[1]
-      if (token) {
-        // We'll validate the token via API on the server side
-        set({ token, isAuthenticated: true, isLoading: false })
-        return
-      }
-    }
-
+    // httpOnly cookie is invisible to JS; mark loading done and let middleware /api decide.
     set({ isLoading: false })
   },
 }))

@@ -5,6 +5,7 @@ import { classifyReply, type ClassificationResult } from './reply-classifier'
 import { safeDecrypt } from './encryption'
 import { dispatchWebhook } from './webhook-dispatch'
 import { emailEvents } from './events'
+import { updateCampaignContactStatus } from './campaign-contacts'
 
 export interface IMAPAccountConfig {
   id: string
@@ -289,6 +290,15 @@ async function processReply(email: FetchedEmail): Promise<boolean> {
     where: { id: originalLog.contactId },
     data: updateData,
   })
+
+  // Sync CampaignContact association status when reply maps to a campaign
+  if (originalLog.campaignId && originalLog.contactId) {
+    await updateCampaignContactStatus(
+      originalLog.campaignId,
+      originalLog.contactId,
+      'REPLIED'
+    ).catch((err) => console.error('[IMAP] Failed to update CampaignContact status:', err))
+  }
 
   // #9: Campaign 统计由 EmailLog 聚合同步，不在此处 increment
 

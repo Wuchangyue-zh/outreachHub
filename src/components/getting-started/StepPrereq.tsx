@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, CheckCircle2, Loader2, Mail, Settings } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle2, Loader2, Mail, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiErrorMessage, fetchJson } from './api'
 import { EmailAccountOption } from './types'
+import { useI18n } from '@/hooks/use-i18n'
 
 type Props = {
   accounts: EmailAccountOption[]
@@ -24,9 +25,12 @@ export function StepPrereq({
   onAccountsChange,
   onContinue,
 }: Props) {
+  const { t } = useI18n()
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [warning, setWarning] = useState('')
   const [form, setForm] = useState({
     email: '',
     displayName: '',
@@ -42,6 +46,8 @@ export function StepPrereq({
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
+    setWarning('')
     setLoading(true)
     try {
       const { ok, data } = await fetchJson<{ success: boolean; data?: EmailAccountOption }>(
@@ -56,10 +62,35 @@ export function StepPrereq({
         setError(apiErrorMessage(data, '创建邮箱账户失败'))
         return
       }
-      const next = [data.data, ...accounts]
-      onAccountsChange(next)
-      onSelectAccount(data.data.id)
+
+      const created = data.data
+      onAccountsChange([created, ...accounts])
+      onSelectAccount(created.id)
       setShowForm(false)
+      setSuccess(t('gettingStarted.accountSaved'))
+
+      // SMTP 测试与账户创建解耦：测试失败/网络异常不得掩盖「账户已保存」
+      try {
+        const test = await fetchJson<{ success?: boolean }>('/api/email/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: created.email || form.email,
+            subject: 'OutreachHub SMTP 连通性测试',
+            content: '您的发件账户已配置成功。这是一封自动发送的连通性测试邮件。',
+            emailAccountId: created.id,
+            plain: true,
+          }),
+        })
+        if (test.ok && test.data.success !== false) {
+          setSuccess(`${t('gettingStarted.accountSaved')} · ${t('gettingStarted.smtpTestOk')}`)
+          setWarning('')
+        } else {
+          setWarning(t('gettingStarted.smtpTestFail'))
+        }
+      } catch {
+        setWarning(t('gettingStarted.smtpTestFail'))
+      }
     } catch {
       setError('网络错误，请重试')
     } finally {
@@ -111,6 +142,22 @@ export function StepPrereq({
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
           尚未配置邮箱账户。请在下方快速添加，或前往完整设置页。
         </div>
+      )}
+
+      {success && (
+        <p className="flex items-center gap-1.5 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4 shrink-0" /> {success}
+        </p>
+      )}
+      {warning && (
+        <p className="flex items-center gap-1.5 text-sm text-amber-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {warning}
+        </p>
+      )}
+      {error && !showForm && (
+        <p className="flex items-center gap-1.5 text-sm text-red-600">
+          <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+        </p>
       )}
 
       {!showForm ? (

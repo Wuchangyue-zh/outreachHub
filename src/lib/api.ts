@@ -6,22 +6,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-// Request interceptor - add auth token
-api.interceptors.request.use((config) => {
-  // For client-side requests, get token from cookie
-  if (typeof document !== 'undefined') {
-    const cookies = document.cookie.split(';')
-    const authCookie = cookies.find((c) => c.trim().startsWith('auth-token='))
-    if (authCookie) {
-      const token = authCookie.trim().split('=')[1]
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
-    }
-  }
-  return config
+  // Auth uses httpOnly `auth-token` cookie set by the server — browser sends it automatically.
+  withCredentials: true,
 })
 
 // Response interceptor - handle errors

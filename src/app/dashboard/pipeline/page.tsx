@@ -288,6 +288,7 @@ function KanbanColumn({
   onEdit,
   onDragStart,
 }: KanbanColumnProps) {
+  const { t } = useI18n()
   return (
     <div
       className={`flex min-w-[260px] sm:min-w-[280px] flex-shrink-0 flex-col rounded-lg border-2 scroll-snap-align-start transition-colors ${
@@ -306,7 +307,7 @@ function KanbanColumn({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={`text-sm font-semibold ${stage.color} dark:text-gray-100`}>
-              {stage.label}
+              {t(stage.label)}
             </span>
             <Badge className="bg-white/80 text-gray-700 text-xs px-1.5 py-0 dark:bg-gray-600 dark:text-gray-200">
               {deals.length}
@@ -349,6 +350,7 @@ interface ConversionRateProps {
 }
 
 function ConversionRateDisplay({ stats }: ConversionRateProps) {
+  const { t } = useI18n()
   const stages: StageKey[] = ['LEAD', 'OPPORTUNITY', 'QUOTE', 'WON']
   const pairs: Array<{ from: StageKey; to: StageKey; label: string }> = []
 
@@ -361,7 +363,7 @@ function ConversionRateDisplay({ stats }: ConversionRateProps) {
     pairs.push({
       from,
       to,
-      label: `${STAGE_MAP[from].label} -> ${STAGE_MAP[to].label}: ${rate}%`,
+      label: `${t(STAGE_MAP[from].label)} → ${t(STAGE_MAP[to].label)}: ${rate}%`,
     })
   }
 

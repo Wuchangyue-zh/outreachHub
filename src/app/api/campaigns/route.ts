@@ -5,6 +5,7 @@ import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
 import { refreshRunningCampaignStatuses } from '@/lib/campaign-completion'
 import { syncCampaignStatsByIds } from '@/lib/campaign-stats-sync'
 import { linkAttachmentsToCampaign } from '@/lib/campaign-attachments'
+import { replaceCampaignContacts, assertContactsBelongToTenant } from '@/lib/campaign-contacts'
 import { rateLimit } from '@/lib/rate-limit'
 
 const limiter = rateLimit({ interval: 60000, uniqueTokenPerInterval: 100 })
@@ -96,10 +97,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { attachmentIds, ...campaignData } = body
+    const { attachmentIds, contactIds, ...campaignData } = body
 
-    const campaign = await prisma.campaign.create({
-      data: { ...campaignData, tenantId: auth.tenantId },
+    const safeContactIds = Array.isArray(contactIds)
+      ? await assertContactsBelongToTenant(auth.tenantId, contactIds)
+      : []
+
+    // 活动创建与联系人关联同一事务，避免关联失败留下无受众孤儿活动
+    const campaign = await prisma.$transaction(async (tx) => {
+      const created = await tx.campaign.create({
+        data: { ...campaignData, tenantId: auth.tenantId },
+      })
+      if (safeContactIds.length > 0) {
+        await replaceCampaignContacts(created.id, safeContactIds, tx)
+      }
+      return created
     })
 
     if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {

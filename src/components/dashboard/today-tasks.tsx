@@ -128,8 +128,8 @@ export default function TodayTasks() {
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <ListTodo className="h-10 w-10 text-gray-300 mb-3" />
-            <p className="text-sm text-gray-500 font-medium">{t('dashboardTasks.noTasks')}</p>
-            <p className="text-xs text-gray-400 mt-1">{t('dashboardTasks.allDone')}</p>
+            <p className="text-sm text-gray-500 font-medium">{t('dashboardTasks.empty')}</p>
+            <p className="text-xs text-gray-400 mt-1">{t('dashboardTasks.emptyHint')}</p>
           </div>
         ) : (
           <div className="space-y-2">

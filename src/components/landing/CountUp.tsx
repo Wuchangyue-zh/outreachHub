@@ -12,6 +12,7 @@ interface CountUpProps {
 
 /**
  * Animated counter that scrolls from 0 to `end` when the element enters the viewport.
+ * Falls back to the final value if IntersectionObserver never fires.
  */
 export function CountUp({ end, duration = 2000, prefix = '', suffix = '', decimals = 0 }: CountUpProps) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -23,17 +24,27 @@ export function CountUp({ end, duration = 2000, prefix = '', suffix = '', decima
     const el = ref.current
     if (!el) return
 
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setInView(true)
           observer.unobserve(el)
+          if (fallbackTimer) clearTimeout(fallbackTimer)
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.05, rootMargin: '80px' }
     )
     observer.observe(el)
-    return () => observer.disconnect()
+
+    // If IO never fires (opacity:0 parents, odd layouts), still show the final value
+    fallbackTimer = setTimeout(() => setInView(true), 1200)
+
+    return () => {
+      observer.disconnect()
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+    }
   }, [])
 
   useEffect(() => {

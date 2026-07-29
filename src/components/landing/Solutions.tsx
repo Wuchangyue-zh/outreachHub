@@ -139,7 +139,7 @@ export function Solutions() {
 
                 {/* Bottom metric bar */}
                 <div className="mt-6 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
-                  <span className="text-xs font-medium text-blue-700">{t('landingComponents.solutions.improvement')}</span>
+                  <span className="text-xs font-medium text-blue-700">{t('landingComponents.solutions.effectBoost')}</span>
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <div

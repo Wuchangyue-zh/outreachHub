@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuthToken, hasPermission } from '@/lib/auth-middleware'
 import { errorResponse, ErrorCodes, handleApiError } from '@/lib/api-errors'
-import { replaceCampaignContacts } from '@/lib/campaign-contacts'
+import { replaceCampaignContacts, assertContactsBelongToTenant } from '@/lib/campaign-contacts'
 import { writeAuditLog, getAuditRequestMeta } from '@/lib/audit'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -93,6 +93,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const auth = await verifyAuthToken(req)
     if (!auth.success) return errorResponse(ErrorCodes.UNAUTHORIZED, auth.error || "Unauthorized", 401)
+    if (!auth.tenantId) return errorResponse(ErrorCodes.FORBIDDEN, '用户未关联租户', 403)
     if (!hasPermission(auth.role, 'campaigns:manage')) {
       return errorResponse(ErrorCodes.FORBIDDEN, '权限不足：需要营销管理权限', 403)
     }
@@ -150,14 +151,22 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     // Sequence/A-B test config
     if (body.sequence !== undefined) updateData.sequence = body.sequence
 
-    const campaign = await prisma.campaign.update({
-      where: { id, tenantId: auth.tenantId },
-      data: updateData,
-    })
+    const hasContactIds = body.contactIds !== undefined && Array.isArray(body.contactIds)
+    const safeContactIds = hasContactIds
+      ? await assertContactsBelongToTenant(auth.tenantId, body.contactIds)
+      : null
 
-    if (body.contactIds !== undefined && Array.isArray(body.contactIds)) {
-      await replaceCampaignContacts(campaign.id, body.contactIds)
-    }
+    // 字段更新与联系人替换同一事务，避免联系人写入失败后字段已改、关联半残
+    const campaign = await prisma.$transaction(async (tx) => {
+      const updated = await tx.campaign.update({
+        where: { id, tenantId: auth.tenantId },
+        data: updateData,
+      })
+      if (safeContactIds !== null) {
+        await replaceCampaignContacts(updated.id, safeContactIds, tx)
+      }
+      return updated
+    })
 
     return NextResponse.json({ success: true, data: campaign })
   } catch (error) {

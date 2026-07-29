@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CampaignStats } from '@/components/CampaignStats'
+import { useI18n } from '@/hooks/use-i18n'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -52,14 +53,14 @@ interface CampaignsStats {
   comparison: Array<{ name: string; openRate: number; clickRate: number; replyRate: number }>
 }
 
-// Map DB status to display config
-const STATUS_DISPLAY: Record<CampaignStatus, { label: string; dot: string; bg: string; text: string }> = {
-  RUNNING:   { label: 'Running',   dot: 'bg-green-500 animate-pulse', bg: 'bg-green-50',   text: 'text-green-700' },
-  PAUSED:    { label: 'Paused',    dot: 'bg-amber-500',              bg: 'bg-amber-50',    text: 'text-amber-700' },
-  DRAFT:     { label: 'Draft',     dot: 'bg-blue-500',               bg: 'bg-blue-50',     text: 'text-blue-700' },
-  COMPLETED: { label: 'Completed', dot: 'bg-gray-400',               bg: 'bg-gray-100',    text: 'text-gray-600' },
-  SCHEDULED: { label: 'Scheduled', dot: 'bg-purple-500',             bg: 'bg-purple-50',   text: 'text-purple-700' },
-  FAILED:    { label: 'Failed',    dot: 'bg-red-500',                bg: 'bg-red-50',      text: 'text-red-700' },
+// Map DB status to display config (labels resolved via i18n at render time)
+const STATUS_DISPLAY: Record<CampaignStatus, { labelKey: string; dot: string; bg: string; text: string }> = {
+  RUNNING:   { labelKey: 'campaigns.status.running',   dot: 'bg-green-500 animate-pulse', bg: 'bg-green-50',   text: 'text-green-700' },
+  PAUSED:    { labelKey: 'campaigns.status.paused',    dot: 'bg-amber-500',              bg: 'bg-amber-50',    text: 'text-amber-700' },
+  DRAFT:     { labelKey: 'campaigns.status.draft',     dot: 'bg-blue-500',               bg: 'bg-blue-50',     text: 'text-blue-700' },
+  COMPLETED: { labelKey: 'campaigns.status.completed', dot: 'bg-gray-400',               bg: 'bg-gray-100',    text: 'text-gray-600' },
+  SCHEDULED: { labelKey: 'campaigns.status.scheduled', dot: 'bg-purple-500',             bg: 'bg-purple-50',   text: 'text-purple-700' },
+  FAILED:    { labelKey: 'campaigns.status.failed',    dot: 'bg-red-500',                bg: 'bg-red-50',      text: 'text-red-700' },
 }
 
 function rateDenominator(c: Campaign): number {
@@ -127,6 +128,7 @@ function RateBar({ value, color }: { value: number; color: string }) {
 // ─── Page ───────────────────────────────────────────────────
 
 export default function CampaignsPage() {
+  const { t } = useI18n()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [stats, setStats] = useState<CampaignsStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -256,25 +258,25 @@ export default function CampaignsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={Send}
-            label="Total Sent"
+            label={t('campaigns.totalSent')}
             value={statsValue.totalSent.toLocaleString()}
             iconBg="bg-blue-50 text-blue-600"
           />
           <StatCard
             icon={Eye}
-            label="Avg Open Rate"
+            label={t('campaigns.avgOpenRate')}
             value={`${statsValue.avgOpenRate.toFixed(1)}%`}
             iconBg="bg-emerald-50 text-emerald-600"
           />
           <StatCard
             icon={Reply}
-            label="Avg Reply Rate"
+            label={t('campaigns.avgReplyRate')}
             value={`${statsValue.avgReplyRate.toFixed(1)}%`}
             iconBg="bg-violet-50 text-violet-600"
           />
           <StatCard
             icon={Rocket}
-            label="Active Campaigns"
+            label={t('campaigns.activeCampaigns')}
             value={String(statsValue.activeCampaigns)}
             iconBg="bg-amber-50 text-amber-600"
           />
@@ -289,7 +291,7 @@ export default function CampaignsPage() {
             <div className="relative max-w-xs flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="搜索任务名称..."
+                placeholder={t('campaigns.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -302,13 +304,13 @@ export default function CampaignsPage() {
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="all">All Status</option>
-              <option value="RUNNING">Running</option>
-              <option value="PAUSED">Paused</option>
-              <option value="DRAFT">Draft</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="SCHEDULED">Scheduled</option>
-              <option value="FAILED">Failed</option>
+              <option value="all">{t('campaigns.allStatus')}</option>
+              <option value="RUNNING">{t('campaigns.status.running')}</option>
+              <option value="PAUSED">{t('campaigns.status.paused')}</option>
+              <option value="DRAFT">{t('campaigns.status.draft')}</option>
+              <option value="COMPLETED">{t('campaigns.status.completed')}</option>
+              <option value="SCHEDULED">{t('campaigns.status.scheduled')}</option>
+              <option value="FAILED">{t('campaigns.status.failed')}</option>
             </select>
           </div>
 
@@ -316,7 +318,7 @@ export default function CampaignsPage() {
           <Link href="/campaigns/new">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              New Campaign
+              {t('campaigns.createCampaign')}
             </Button>
           </Link>
         </div>
@@ -327,28 +329,28 @@ export default function CampaignsPage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80">
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Campaign Name
+                  {t('campaigns.tableHeaders.name')}
                 </th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Status
+                  {t('campaigns.tableHeaders.status')}
                 </th>
                 <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Audience
+                  {t('campaigns.tableHeaders.audience')}
                 </th>
                 <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Sent
+                  {t('campaigns.tableHeaders.sent')}
                 </th>
                 <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Open Rate
+                  {t('campaigns.tableHeaders.openRate')}
                 </th>
                 <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Reply Rate
+                  {t('campaigns.tableHeaders.replyRate')}
                 </th>
                 <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Created
+                  {t('campaigns.tableHeaders.createdAt')}
                 </th>
                 <th className="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Actions
+                  {t('campaigns.tableHeaders.actions')}
                 </th>
               </tr>
             </thead>
@@ -389,7 +391,7 @@ export default function CampaignsPage() {
                         )}
                       >
                         <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-                        {cfg.label}
+                        {t(cfg.labelKey)}
                       </span>
                     </td>
 
@@ -489,7 +491,7 @@ export default function CampaignsPage() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-16 text-center">
-                    <p className="text-gray-500">没有匹配的营销任务</p>
+                    <p className="text-gray-500">{t('campaigns.noMatch')}</p>
                   </td>
                 </tr>
               )}

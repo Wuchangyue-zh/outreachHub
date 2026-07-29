@@ -6,10 +6,10 @@ test.describe('Campaigns Page', () => {
   })
 
   test('should show stat cards', async ({ page }) => {
-    await expect(page.getByText('Total Sent')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('Avg Open Rate')).toBeVisible()
-    await expect(page.getByText('Avg Reply Rate')).toBeVisible()
-    await expect(page.getByText('Active Campaigns')).toBeVisible()
+    await expect(page.getByText('总发送邮件')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('平均打开率')).toBeVisible()
+    await expect(page.getByText('平均回复率')).toBeVisible()
+    await expect(page.getByText('进行中活动')).toBeVisible()
   })
 
   test('should show search input', async ({ page }) => {
@@ -19,11 +19,11 @@ test.describe('Campaigns Page', () => {
   test('should show status filter', async ({ page }) => {
     const select = page.locator('select')
     await expect(select).toBeVisible({ timeout: 10000 })
-    await expect(select).toContainText('All Status')
+    await expect(select).toContainText('全部状态')
   })
 
   test('should show New Campaign button', async ({ page }) => {
-    await expect(page.getByRole('link', { name: /New Campaign/ })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('link', { name: /创建活动/ })).toBeVisible({ timeout: 10000 })
   })
 
   test('should display campaigns table', async ({ page }) => {
@@ -32,16 +32,16 @@ test.describe('Campaigns Page', () => {
 
   test('should display table column headers', async ({ page }) => {
     const headerRow = page.getByRole('table').locator('thead tr')
-    await expect(headerRow.getByText('Campaign Name')).toBeVisible({ timeout: 10000 })
-    await expect(headerRow.getByText('Audience')).toBeVisible()
-    await expect(headerRow.getByText('Sent')).toBeVisible()
-    await expect(headerRow.getByText('Open Rate')).toBeVisible()
-    await expect(headerRow.getByText('Reply Rate')).toBeVisible()
+    await expect(headerRow.getByText('活动名称')).toBeVisible({ timeout: 10000 })
+    await expect(headerRow.getByText('受众')).toBeVisible()
+    await expect(headerRow.getByText('已发送')).toBeVisible()
+    await expect(headerRow.getByText('打开率')).toBeVisible()
+    await expect(headerRow.getByText('回复率')).toBeVisible()
   })
 
   test('should filter by status', async ({ page }) => {
     const select = page.locator('select')
-    await select.selectOption('Draft')
+    await select.selectOption('DRAFT')
     await expect(select).toHaveValue('DRAFT')
   })
 

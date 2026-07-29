@@ -283,9 +283,11 @@ export default function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm">
-            <p className="text-gray-500">{t('loginForm.demoAccount')} admin@outreachhub.com / admin123</p>
-          </div>
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-6 text-center text-sm">
+              <p className="text-gray-500">{t('loginForm.demoAccount')}</p>
+            </div>
+          )}
 
           <p className="mt-6 text-center text-sm text-gray-500">
             {t('loginForm.noAccount')}{' '}

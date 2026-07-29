@@ -55,7 +55,7 @@ export function FAQ() {
               </h2>
               <p className="mt-4 text-base text-gray-500">{faqData.subtitle}</p>
               <div className="mt-8 rounded-xl bg-blue-50 p-5">
-                <p className="text-sm font-medium text-blue-900">{t('landingComponents.faq.otherQuestions')}</p>
+                <p className="text-sm font-medium text-blue-900">{t('landingComponents.faq.contactTitle')}</p>
                 <p className="mt-1 text-sm text-blue-700">{t('landingComponents.faq.contactDesc')}</p>
                 <a
                   href="mailto:support@outreachhub.com"

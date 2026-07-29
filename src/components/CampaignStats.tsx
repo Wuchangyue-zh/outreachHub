@@ -143,7 +143,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
               <div>
                 <p className="text-sm text-gray-600 mb-1">{t('campaignStats.openRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.openRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalOpened.toLocaleString()} {t('campaignStats.opened')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('campaignStats.opened').replace('{n}', stats.totalOpened.toLocaleString())}</p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <Eye className="h-6 w-6 text-green-600" />
@@ -158,7 +158,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
               <div>
                 <p className="text-sm text-gray-600 mb-1">{t('campaignStats.clickRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.clickRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalClicked.toLocaleString()} {t('campaignStats.clicked')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('campaignStats.clicked').replace('{n}', stats.totalClicked.toLocaleString())}</p>
               </div>
               <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <MousePointer className="h-6 w-6 text-yellow-600" />
@@ -173,7 +173,7 @@ export function CampaignStats({ campaignId }: CampaignStatsProps) {
               <div>
                 <p className="text-sm text-gray-600 mb-1">{t('campaignStats.replyRate')}</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.replyRate.toFixed(1)}%</p>
-                <p className="text-xs text-gray-500 mt-1">{stats.totalReplied.toLocaleString()} {t('campaignStats.replied')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('campaignStats.replied').replace('{n}', stats.totalReplied.toLocaleString())}</p>
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Reply className="h-6 w-6 text-purple-600" />

@@ -140,8 +140,8 @@ export function Hero() {
                   <Users className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-900">+1 {t('landingComponents.hero.newLead')}</p>
-                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.leadDetail')}</p>
+                  <p className="text-xs font-semibold text-gray-900">{t('landingComponents.hero.floatingLead')}</p>
+                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.floatingLeadDesc')}</p>
                 </div>
               </div>
             </div>
@@ -154,7 +154,7 @@ export function Hero() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-900">{t('landingComponents.hero.emailOpened')}</p>
-                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.emailDetail')}</p>
+                  <p className="text-[10px] text-gray-400">{t('landingComponents.hero.emailOpenedDesc')}</p>
                 </div>
               </div>
             </div>
